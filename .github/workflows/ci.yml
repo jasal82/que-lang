@@ -37,10 +37,16 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-musl
+            rust_targets: x86_64-unknown-linux-musl
             archive: que-x86_64-unknown-linux-musl.tar.gz
           - os: windows-2022
             target: x86_64-pc-windows-msvc
+            rust_targets: x86_64-pc-windows-msvc
             archive: que-x86_64-pc-windows-msvc.zip
+          - os: macos-15-intel
+            target: universal-apple-darwin
+            rust_targets: x86_64-apple-darwin,aarch64-apple-darwin
+            archive: que-universal-apple-darwin.tar.gz
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
@@ -52,13 +58,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes musl-tools
 
-      - name: Install Rust target
+      - name: Install Rust targets
         shell: bash
-        run: rustup toolchain install stable --profile minimal --no-self-update --target "${{ matrix.target }}"
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          IFS=',' read -ra targets <<< "${{ matrix.rust_targets }}"
+          for target in "${targets[@]}"; do
+            rustup target add --toolchain stable "$target"
+          done
 
       - name: Build release binaries
+        if: matrix.target != 'universal-apple-darwin'
         shell: bash
         run: cargo +stable build --workspace --release --locked --target "${{ matrix.target }}"
+
+      - name: Build universal macOS release binaries
+        if: matrix.target == 'universal-apple-darwin'
+        shell: bash
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          IFS=',' read -ra targets <<< "${{ matrix.rust_targets }}"
+          for target in "${targets[@]}"; do
+            cargo +stable build --workspace --release --locked --target "$target"
+          done
 
       - name: Package Linux release
         if: startsWith(github.ref, 'refs/tags/') && matrix.target == 'x86_64-unknown-linux-musl'
@@ -81,6 +104,27 @@ jobs:
           Copy-Item "target/${{ matrix.target }}/release/que-lsp.exe" "dist/$package/"
           Copy-Item README.md, LICENSE "dist/$package/"
           Compress-Archive -Path "dist/$package" -DestinationPath "dist/${{ matrix.archive }}"
+
+      - name: Package universal macOS release
+        if: startsWith(github.ref, 'refs/tags/') && matrix.target == 'universal-apple-darwin'
+        shell: bash
+        run: |
+          package="que-${{ matrix.target }}"
+          mkdir -p "dist/$package"
+          lipo -create \
+            target/x86_64-apple-darwin/release/que \
+            target/aarch64-apple-darwin/release/que \
+            -output "dist/$package/que"
+          lipo -create \
+            target/x86_64-apple-darwin/release/que-lsp \
+            target/aarch64-apple-darwin/release/que-lsp \
+            -output "dist/$package/que-lsp"
+          codesign --force --sign - "dist/$package/que"
+          codesign --force --sign - "dist/$package/que-lsp"
+          lipo -archs "dist/$package/que"
+          lipo -archs "dist/$package/que-lsp"
+          cp README.md LICENSE "dist/$package/"
+          tar -C dist -czf "dist/${{ matrix.archive }}" "$package"
 
       - name: Upload release archive
         if: startsWith(github.ref, 'refs/tags/')
