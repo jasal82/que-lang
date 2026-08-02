@@ -17,6 +17,8 @@ use rustyline::history::DefaultHistory;
 use rustyline::{Editor, CompletionType, Config};
 use que_lang::completion::QueHelper;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -38,6 +40,7 @@ fn main() {
         "fmt" => cmd_fmt(&args[2..]),
         "lint" => cmd_lint(&args[2..]),
         "help" | "--help" | "-h" => print_usage(),
+        "version" | "--version" | "-V" => print_version(),
         _ => {
             // Treat the argument as a script file (backward compatible).
             // Recognized flags: --strict.
@@ -140,7 +143,13 @@ fn exit_interrupted(sig: i32) -> ! {
     process::exit(que_lang::interrupt::exit_code_for(sig));
 }
 
+fn print_version() {
+    println!("Que v{}", VERSION);
+}
+
 fn print_usage() {
+    eprintln!("Que v{}", VERSION);
+    eprintln!();
     eprintln!("Usage: que [command] [options]");
     eprintln!();
     eprintln!("Commands:");
@@ -153,6 +162,11 @@ fn print_usage() {
     eprintln!("  fmt [options] [files...]    Format Que source files");
     eprintln!("  lint [files...]             Lint Que source files for issues");
     eprintln!("  help                        Show this help message");
+    eprintln!("  version                     Show version information");
+    eprintln!();
+    eprintln!("Global options:");
+    eprintln!("  --help, -h                  Show this help message");
+    eprintln!("  --version, -V               Show version information");
     eprintln!();
     eprintln!("Run options:");
     eprintln!("  -f <file>                   Use a specific Quefile (default: auto-detect)");
@@ -924,7 +938,7 @@ fn repl() {
 
     println!(
         "{}  —  type {} for an overview, {} to inspect a value,",
-        "Que v0.1.0".cyan().bold(),
+        format!("Que v{}", VERSION).cyan().bold(),
         "help()".green(),
         "?name".green()
     );
