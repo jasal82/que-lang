@@ -1,0 +1,7 @@
+- First-class task values
+- Dependency graph resolution
+- Diamond dependency deduplication
+- Input/output freshness checking
+- Parameterized tasks with defaults
+- Status tracking (pending, succeeded, failed, skipped)
+- CLI runner: wisp run / wisp tasks

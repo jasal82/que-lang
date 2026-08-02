@@ -1,0 +1,32 @@
+// ── lib/strings.que ────────────────────────────────────────────────────────
+//
+//  String utility module.
+
+println("  [loader] Loading strings module...")
+
+pub fn capitalize(s) {
+    if s.len() == 0 { "" }
+    else {
+        let first = s.chars()[0].to_upper()
+        let rest = s.substring(1)
+        first + rest
+    }
+}
+
+pub fn pad_left(s, width, ch) {
+    mut result = str(s)
+    while result.len() < width {
+        result = ch + result
+    }
+    result
+}
+
+pub fn pad_right(s, width, ch) {
+    mut result = str(s)
+    while result.len() < width {
+        result = result + ch
+    }
+    result
+}
+
+pub fn module_info() { "strings v1.0" }

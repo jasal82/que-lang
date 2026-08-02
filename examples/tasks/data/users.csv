@@ -1,0 +1,6 @@
+name,role,active
+Alice,engineer,true
+Bob,designer,true
+Charlie,manager,true
+Diana,engineer,false
+Eve,designer,true

@@ -1,0 +1,99 @@
+{
+  "name": "que-lang",
+  "displayName": "Que Language",
+  "description": "Syntax highlighting, snippets, LSP support, and language features for the Que build & DevOps scripting language (.que, Quefile)",
+  "version": "0.2.0",
+  "publisher": "que-lang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/que-lang/que"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "que",
+    "quelang",
+    "devops",
+    "build",
+    "scripting",
+    "lsp"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:que"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "que",
+        "aliases": [
+          "Que",
+          "que",
+          "quelang"
+        ],
+        "extensions": [
+          ".que"
+        ],
+        "filenames": [
+          "Quefile"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "que",
+        "scopeName": "source.que",
+        "path": "./syntaxes/que.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "que",
+        "path": "./snippets/que.json"
+      }
+    ],
+    "configuration": {
+      "title": "Que Language",
+      "properties": {
+        "que.lsp.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the que-lsp binary. If empty, searches PATH."
+        },
+        "que.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Que language server."
+        },
+        "que.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Trace communication between VS Code and the Que language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npm run compile && vsce package",
+    "publish": "npm run compile && vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

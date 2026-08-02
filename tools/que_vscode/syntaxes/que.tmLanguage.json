@@ -1,0 +1,626 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Que",
+  "scopeName": "source.que",
+  "fileTypes": ["que", "Quefile"],
+  "patterns": [
+    { "include": "#prologue" },
+    { "include": "#comments" },
+    { "include": "#task-declaration" },
+    { "include": "#function-declaration" },
+    { "include": "#type-declarations" },
+    { "include": "#import-statement" },
+    { "include": "#keywords" },
+    { "include": "#storage" },
+    { "include": "#constants" },
+    { "include": "#strings" },
+    { "include": "#string-backtick" },
+    { "include": "#prefixed-literals" },
+    { "include": "#duration-literal" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#punctuation" },
+    { "include": "#function-call" },
+    { "include": "#method-call" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "prologue": {
+      "patterns": [
+        {
+          "name": "keyword.control.pragma.que",
+          "match": "\\A#!strict\\s*$"
+        },
+        {
+          "name": "comment.line.shebang.que",
+          "match": "\\A#!/.*$"
+        }
+      ]
+    },
+
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.documentation.que",
+          "match": "///.*$"
+        },
+        {
+          "name": "comment.line.double-slash.que",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.que",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "captures": {
+            "0": { "name": "punctuation.definition.comment.que" }
+          }
+        }
+      ]
+    },
+
+    "task-declaration": {
+      "patterns": [
+        {
+          "comment": "Task declaration",
+          "match": "\\b(task)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "keyword.declaration.task.que" },
+            "2": { "name": "entity.name.function.task.que" }
+          }
+        },
+        {
+          "comment": "Task attributes written above the declaration",
+          "match": "^\\s*(@)(description|deps|inputs|outputs|aliases|env)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "punctuation.definition.annotation.que" },
+            "2": { "name": "keyword.other.task-attribute.que" }
+          }
+        }
+      ]
+    },
+
+    "function-declaration": {
+      "patterns": [
+        {
+          "comment": "Named function: fn name(...)",
+          "match": "\\b(fn)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\(|<)",
+          "captures": {
+            "1": { "name": "keyword.declaration.function.que" },
+            "2": { "name": "entity.name.function.que" }
+          }
+        },
+        {
+          "comment": "Pub modifier before fn",
+          "match": "\\b(pub)\\s+(?=fn\\b)",
+          "captures": {
+            "1": { "name": "keyword.modifier.pub.que" }
+          }
+        }
+      ]
+    },
+
+    "type-declarations": {
+      "patterns": [
+        {
+          "comment": "type alias: type Name = ...",
+          "match": "\\b(type)\\s+([A-Z][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "keyword.declaration.type.que" },
+            "2": { "name": "entity.name.type.que" }
+          }
+        },
+        {
+          "comment": "enum declaration",
+          "match": "\\b(enum)\\s+([A-Z][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "keyword.declaration.enum.que" },
+            "2": { "name": "entity.name.type.enum.que" }
+          }
+        },
+        {
+          "comment": "struct declaration",
+          "match": "\\b(struct)\\s+([A-Z][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "keyword.declaration.struct.que" },
+            "2": { "name": "entity.name.type.struct.que" }
+          }
+        },
+        {
+          "comment": "Built-in type names",
+          "match": "\\b(Int|Float|Bool|String|Bytes|Path|Glob|Cmd|Duration|Timestamp|Regex|Semver|Secret|List|Map|Set|Result|Ok|Err|ProcessHandle|ProcessResult|FileHandle|Stream|TempDir|TempFile|TypeInfo|VarInfo|OsInfo|Logger|DateTime|Any|Null)\\b",
+          "name": "entity.name.type.builtin.que"
+        }
+      ]
+    },
+
+    "import-statement": {
+      "patterns": [
+        {
+          "comment": "import statement: import .foo.bar, import std.fs, etc.",
+          "match": "\\b(pub\\s+)?(import)\\s+",
+          "captures": {
+            "1": { "name": "keyword.modifier.pub.que" },
+            "2": { "name": "keyword.control.import.que" }
+          }
+        },
+        {
+          "comment": "from keyword in imports",
+          "match": "\\b(from)\\s+",
+          "captures": {
+            "1": { "name": "keyword.control.import.que" }
+          }
+        },
+        {
+          "comment": "as keyword in imports",
+          "match": "\\b(as)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "keyword.control.as.que" },
+            "2": { "name": "entity.name.namespace.que" }
+          }
+        }
+      ]
+    },
+
+    "keywords": {
+      "patterns": [
+        {
+          "comment": "Control flow keywords",
+          "name": "keyword.control.que",
+          "match": "\\b(if|else|match|for|in|while|loop|return|break|continue|defer|try|catch|finally|with|where)\\b"
+        },
+        {
+          "comment": "Declaration keywords",
+          "name": "keyword.declaration.que",
+          "match": "\\b(fn|task|type|enum|struct|impl|trait)\\b"
+        },
+        {
+          "comment": "Variable binding keywords",
+          "name": "keyword.other.binding.que",
+          "match": "\\b(let|mut)\\b"
+        },
+        {
+          "comment": "Visibility and module keywords",
+          "name": "keyword.modifier.que",
+          "match": "\\b(pub|import|from|as)\\b"
+        },
+        {
+          "comment": "Concurrency and execution keywords",
+          "name": "keyword.control.concurrency.que",
+          "match": "\\b(spawn|parallel)\\b"
+        },
+        {
+          "comment": "Built-in namespace objects",
+          "name": "support.class.namespace.builtin.que",
+          "match": "\\b(env|os)\\s*(?=\\.)"
+        },
+        {
+          "comment": "Standard library modules",
+          "name": "support.class.module.std.que",
+          "match": "\\b(archive|config|container|csv|dotenv|fs|git|hash|http|json|log|net|prompt|reflect|ssh|stream|template|time|toml|tty|watch|yaml)\\s*(?=\\.)"
+        }
+      ]
+    },
+
+    "storage": {
+      "patterns": [
+        {
+          "name": "storage.type.que",
+          "match": "\\b(let|mut)\\b"
+        }
+      ]
+    },
+
+    "constants": {
+      "patterns": [
+        {
+          "comment": "Boolean literals",
+          "name": "constant.language.boolean.que",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "comment": "Null literal",
+          "name": "constant.language.null.que",
+          "match": "\\b(null)\\b"
+        }
+      ]
+    },
+
+    "strings": {
+      "patterns": [
+        {
+          "comment": "Triple-quoted heredoc string",
+          "name": "string.quoted.triple.que",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [
+            { "include": "#string-interpolation" },
+            { "include": "#string-escape" }
+          ]
+        },
+        {
+          "comment": "Raw string with # delimiters",
+          "name": "string.quoted.raw.hash.que",
+          "begin": "r#\"",
+          "end": "\"#"
+        },
+        {
+          "comment": "Raw string",
+          "name": "string.quoted.raw.que",
+          "begin": "r\"",
+          "end": "\""
+        },
+        {
+          "comment": "Double-quoted string with interpolation",
+          "name": "string.quoted.double.que",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "include": "#string-interpolation" },
+            { "include": "#string-escape" }
+          ]
+        }
+      ]
+    },
+
+    "string-interpolation": {
+      "patterns": [
+        {
+          "comment": "String interpolation ${...}",
+          "name": "meta.template.expression.que",
+          "contentName": "meta.embedded.line.que",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.template-expression.begin.que" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.template-expression.end.que" }
+          },
+          "patterns": [
+            { "include": "source.que" }
+          ]
+        },
+        {
+          "comment": "Raw interpolation !{...}",
+          "name": "meta.template.expression.raw.que",
+          "contentName": "meta.embedded.line.que",
+          "begin": "!\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.template-expression.begin.que" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.template-expression.end.que" }
+          },
+          "patterns": [
+            { "include": "source.que" }
+          ]
+        }
+      ]
+    },
+
+    "string-escape": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.que",
+          "match": "\\\\(?:[nrtv0'\"\\\\]|x[0-9a-fA-F]{2}|u\\{[0-9a-fA-F]{1,6}\\})"
+        }
+      ]
+    },
+
+    "string-backtick": {
+      "comment": "Command literal `...`",
+      "name": "string.interpolated.command.que",
+      "begin": "`",
+      "end": "`",
+      "patterns": [
+        { "include": "#string-interpolation" },
+        {
+          "comment": "Command name (first word)",
+          "match": "(?<=`)([a-zA-Z_][a-zA-Z0-9_\\-]*)",
+          "name": "support.function.command.que"
+        }
+      ]
+    },
+
+    "prefixed-literals": {
+      "patterns": [
+        {
+          "comment": "Path literal p\"...\" with interpolation",
+          "name": "string.quoted.path.que",
+          "begin": "p\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "meta.embedded.path.interpolation.que",
+              "begin": "\\$\\{",
+              "end": "\\}",
+              "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.que" } },
+              "endCaptures": { "0": { "name": "punctuation.section.embedded.end.que" } },
+              "patterns": [{ "include": "$self" }]
+            }
+          ]
+        },
+        {
+          "comment": "Glob literal g\"...\" with interpolation",
+          "name": "string.quoted.glob.que",
+          "begin": "g\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "meta.embedded.glob.interpolation.que",
+              "begin": "\\$\\{",
+              "end": "\\}",
+              "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.que" } },
+              "endCaptures": { "0": { "name": "punctuation.section.embedded.end.que" } },
+              "patterns": [{ "include": "$self" }]
+            },
+            {
+              "name": "keyword.operator.glob.wildcard.que",
+              "match": "\\*\\*|\\*|\\?"
+            },
+            {
+              "name": "constant.character.escape.glob.class.que",
+              "match": "\\[[^\\]]*\\]"
+            },
+            {
+              "name": "constant.character.escape.glob.alternation.que",
+              "match": "\\{[^}]*\\}"
+            }
+          ]
+        },
+        {
+          "comment": "Regex literal re\"...\"",
+          "name": "string.regexp.que",
+          "begin": "re\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.regexp.que",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "comment": "Semver literal v\"...\"",
+          "name": "string.quoted.semver.que",
+          "begin": "v\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.numeric.semver.que",
+              "match": "\\d+\\.\\d+\\.\\d+(?:-[a-zA-Z0-9.]+)?(?:\\+[a-zA-Z0-9.]+)?"
+            },
+            {
+              "name": "keyword.operator.semver.que",
+              "match": ">=|<=|>|<|=|\\^|~"
+            }
+          ]
+        },
+        {
+          "comment": "Path/Glob constructor functions",
+          "match": "\\b(path|glob)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "support.function.builtin.path.que" }
+          }
+        }
+      ]
+    },
+
+    "duration-literal": {
+      "patterns": [
+        {
+          "comment": "Duration literal: 5s, 500ms, 10m, 2h, 1d",
+          "name": "constant.numeric.duration.que",
+          "match": "\\b\\d[\\d_]*(ms|[smhd])\\b"
+        }
+      ]
+    },
+
+    "numbers": {
+      "patterns": [
+        {
+          "comment": "Hexadecimal integer",
+          "name": "constant.numeric.hex.que",
+          "match": "\\b0x[0-9a-fA-F][0-9a-fA-F_]*\\b"
+        },
+        {
+          "comment": "Binary integer",
+          "name": "constant.numeric.binary.que",
+          "match": "\\b0b[01][01_]*\\b"
+        },
+        {
+          "comment": "Octal integer",
+          "name": "constant.numeric.octal.que",
+          "match": "\\b0o[0-7][0-7_]*\\b"
+        },
+        {
+          "comment": "Float",
+          "name": "constant.numeric.float.que",
+          "match": "\\b\\d[\\d_]*\\.\\d[\\d_]*(?:[eE][+-]?\\d+)?\\b"
+        },
+        {
+          "comment": "Integer",
+          "name": "constant.numeric.integer.que",
+          "match": "\\b\\d[\\d_]*\\b"
+        }
+      ]
+    },
+
+    "operators": {
+      "patterns": [
+        {
+          "comment": "Pipe operator",
+          "name": "keyword.operator.pipe.que",
+          "match": "\\|>"
+        },
+        {
+          "comment": "Fat arrow",
+          "name": "keyword.operator.arrow.que",
+          "match": "=>"
+        },
+        {
+          "comment": "Thin arrow (return type)",
+          "name": "keyword.operator.arrow.return.que",
+          "match": "->"
+        },
+        {
+          "comment": "Null coalescing",
+          "name": "keyword.operator.null-coalesce.que",
+          "match": "\\?\\?"
+        },
+        {
+          "comment": "Error propagation",
+          "name": "keyword.operator.error-propagation.que",
+          "match": "\\?"
+        },
+        {
+          "comment": "Spread operator",
+          "name": "keyword.operator.spread.que",
+          "match": "\\.\\.\\."
+        },
+        {
+          "comment": "Inclusive range operator",
+          "name": "keyword.operator.range.inclusive.que",
+          "match": "\\.\\.="
+        },
+        {
+          "comment": "Exclusive range operator",
+          "name": "keyword.operator.range.que",
+          "match": "\\.\\."
+        },
+        {
+          "comment": "Comparison operators",
+          "name": "keyword.operator.comparison.que",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "comment": "Logical operators",
+          "name": "keyword.operator.logical.que",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "comment": "Assignment operators",
+          "name": "keyword.operator.assignment.que",
+          "match": "\\+=|-=|\\*=|/=|%=|="
+        },
+        {
+          "comment": "Arithmetic operators",
+          "name": "keyword.operator.arithmetic.que",
+          "match": "\\*\\*|[+\\-*/%]"
+        },
+        {
+          "comment": "Bitwise operators",
+          "name": "keyword.operator.bitwise.que",
+          "match": "<<|>>|[&|^~]"
+        }
+      ]
+    },
+
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.comma.que",
+          "match": ","
+        },
+        {
+          "name": "punctuation.terminator.semicolon.que",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.colon.que",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.section.braces.begin.que",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.braces.end.que",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.section.brackets.begin.que",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.section.brackets.end.que",
+          "match": "\\]"
+        },
+        {
+          "name": "punctuation.section.parens.begin.que",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.parens.end.que",
+          "match": "\\)"
+        }
+      ]
+    },
+
+    "function-call": {
+      "patterns": [
+        {
+          "comment": "Built-in function calls",
+          "match": "\\b(print|println|input|confirm|typeof|str|int|float|bool|abs|min|max|range|chr|ord|assert|compose|secret|fail|sleep|quefile_dir|script_dir|dry_run|path|glob|open|which|retry|timeout|semver_parse|regex|dbg|help|args|tasks|run_task|strict)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "support.function.builtin.que" }
+          }
+        },
+        {
+          "comment": "General function call",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.call.que" }
+          }
+        }
+      ]
+    },
+
+    "method-call": {
+      "patterns": [
+        {
+          "comment": "Method call on objects: .method(...)",
+          "match": "\\.\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.method.que" }
+          }
+        }
+      ]
+    },
+
+    "identifiers": {
+      "patterns": [
+        {
+          "comment": "Module / namespace access: foo.bar",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\.\\s*[a-zA-Z_])",
+          "captures": {
+            "1": { "name": "entity.name.namespace.que" }
+          }
+        },
+        {
+          "comment": "Closure parameter list |...|",
+          "begin": "(?<!\\|)\\|(?!\\||>)",
+          "end": "\\|",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.parameters.begin.que" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.parameters.end.que" }
+          },
+          "patterns": [
+            {
+              "name": "variable.parameter.que",
+              "match": "[a-zA-Z_][a-zA-Z0-9_]*"
+            },
+            {
+              "name": "punctuation.separator.comma.que",
+              "match": ","
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,28 @@
+// ── utils.que ──────────────────────────────────────────────────────────────
+//
+//  A utility module exporting helper functions.
+//  Only `pub` declarations are visible to importers.
+
+/// Greet someone by name.
+pub fn greet(name) {
+    "Hello, " + name + "!"
+}
+
+/// Convert a string to a URL-friendly slug.
+pub fn slug(s) {
+    s.to_lower().replace(" ", "-")
+}
+
+/// Repeat a string n times.
+pub fn repeat_str(s, n) {
+    mut result = ""
+    for _ in range(0, n) {
+        result = result + s
+    }
+    result
+}
+
+// This function is private — not visible outside this module.
+fn internal_helper() {
+    "you can't see me"
+}

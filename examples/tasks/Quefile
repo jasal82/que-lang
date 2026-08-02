@@ -1,0 +1,306 @@
+// ============================================================================
+//  Que Task System - Example Quefile
+// ============================================================================
+//
+//  This Quefile demonstrates Que's task system:
+//
+//    - Task declarations with descriptions
+//    - Dependency chains and diamond dedup
+//    - Input/output freshness tracking (automatic skip)
+//    - Parameterized tasks with defaults
+//    - Introspection and status tracking
+//    - The tasks() / run_task() builtins
+//
+//  Try these commands from this directory:
+//
+//    que tasks                    # list all tasks
+//    que run build                # run the full pipeline
+//    que run build                # run again — bundle is skipped (fresh)
+//    que run clean build          # clean first, then rebuild
+//    que run report               # generate a summary report
+//    que run stats                # show project statistics
+//    que run config_demo          # config parsing, path queries & conversion
+//
+// ============================================================================
+
+// -- Imports -----------------------------------------------------------------
+
+import std.fs { read, write, exists }
+import std.json { parse, stringify }
+import std.stream
+import std.config
+import std.time
+
+// -- Utility ----------------------------------------------------------------
+
+@description("Remove all build artifacts")
+task clean {
+    if exists(path("./build")) {
+        path("./build").delete()
+        println("  removed build/")
+    } else {
+        println("  nothing to clean")
+    }
+}
+
+@description("Create the build output directory")
+@outputs(["./build"])
+task prepare {
+    path("./build").mkdir()
+    println("  created build/")
+}
+
+// -- Core pipeline -----------------------------------------------------------
+
+@description("Concatenate source files into a single bundle")
+@deps([prepare])
+@inputs(["src/*.txt"])
+@outputs(["./build/bundle.txt"])
+task bundle {
+    mut content = ""
+    for file in glob("src/*.txt") {
+        let name = file.name()
+        let text = read(file).unwrap()
+        content = content + "=== " + name + " ===\n" + text + "\n"
+    }
+    write(path("./build/bundle.txt"), content)
+    println("  bundled " + str(glob("src/*.txt").expand().len()) + " files")
+}
+
+@description("Transform the bundle to uppercase using streams")
+@deps([bundle])
+@inputs(["./build/bundle.txt"])
+@outputs(["./build/bundle.upper.txt"])
+task transform {
+    // Stream pipeline: read, transform, write in one go
+    stream.file(path("./build/bundle.txt"))
+        .to_upper()
+        .write_to(path("./build/bundle.upper.txt"))
+    println("  transformed to uppercase (via stream)")
+}
+
+@description("Full build pipeline")
+@deps([transform])
+task build {
+    let size = path("./build/bundle.upper.txt").size()
+    println("  build complete - output is " + str(size) + " bytes")
+}
+
+// -- Data processing ---------------------------------------------------------
+
+@description("Parse CSV data into a summary")
+@deps([prepare])
+@inputs(["./data/users.csv"])
+@outputs(["./build/users.json"])
+task parse_csv {
+    let raw = read(path("./data/users.csv")).unwrap()
+    let lines = raw.trim().split("\n")
+    let header = lines.first().split(",")
+
+    // Skip header, process rows
+    let rows = lines.skip(1)
+    mut result = "[\n"
+    for row in rows {
+        let cols = row.split(",")
+        let name = cols[0]
+        let role = cols[1]
+        let active = cols[2]
+        result = result + "  {\"name\": \"" + name + "\", \"role\": \"" + role + "\", \"active\": " + active + "},\n"
+    }
+    result = result + "]\n"
+    write(path("./build/users.json"), result)
+    println("  parsed " + str(rows.len()) + " user records")
+}
+
+// -- Reporting ---------------------------------------------------------------
+
+@description("Show project statistics")
+task stats {
+    let src_files = glob("src/*.txt").expand()
+    mut total_lines = 0
+    mut total_bytes = 0
+
+    for f in src_files {
+        let content = read(f).unwrap()
+        let lines = content.trim().split("\n")
+        total_lines = total_lines + lines.len()
+        total_bytes = total_bytes + f.size()
+    }
+
+    println("  source files:  " + str(src_files.len()))
+    println("  total lines:   " + str(total_lines))
+    println("  total bytes:   " + str(total_bytes))
+
+    if exists(path("./data/users.csv")) {
+        let csv = read(path("./data/users.csv")).unwrap()
+        let records = csv.trim().split("\n").len() - 1
+        println("  CSV records:   " + str(records))
+    }
+}
+
+@description("Generate a full project report")
+@deps([build, parse_csv])
+@inputs(["./build/bundle.upper.txt", "./build/users.json"])
+@outputs(["./build/report.txt"])
+task report {
+    mut report = "=== Que Build Report ===\n\n"
+
+    report = report + "Generated: " + time.now().to_string() + "\n"
+    report = report + "Platform:  " + os.name + " (" + os.arch + ")\n\n"
+
+    // Summarize the bundle
+    let bundle = read(path("./build/bundle.upper.txt")).unwrap()
+    let bundle_lines = bundle.trim().split("\n")
+    report = report + "Bundle:    " + str(bundle_lines.len()) + " lines, " + str(path("./build/bundle.upper.txt").size()) + " bytes\n"
+
+    // Summarize users
+    let users = read(path("./build/users.json")).unwrap()
+    report = report + "Users:     " + str(path("./build/users.json").size()) + " bytes\n\n"
+
+    report = report + "--- Bundle preview ---\n"
+    let preview = bundle_lines.take(5)
+    for line in preview {
+        report = report + "  " + line + "\n"
+    }
+    report = report + "  ...\n"
+
+    write(path("./build/report.txt"), report)
+    println("  report written to build/report.txt")
+}
+
+// -- Parameterized tasks -----------------------------------------------------
+
+@description("A parameterized greeting task")
+task greet(name, greeting = "Hello") {
+    let msg = greeting + ", " + name + "! Welcome to Que."
+    println("  " + msg)
+}
+
+// -- Showcase: stream processing ──────────────────────────────────────
+
+@description("Demonstrate stream processing pipelines")
+@deps([bundle])
+task stream_demo {
+    println("  -- Stream pipeline demo --")
+
+    // 1. Read, filter, and count lines
+    let line_count = stream.file(path("./build/bundle.txt"))
+        .skip_empty()
+        .count_lines()
+    println("  non-empty lines: " + str(line_count))
+
+    // 2. Extract section headers and sort them
+    let headers = stream.file(path("./build/bundle.txt"))
+        .grep("^===")
+        .sort_lines()
+        .collect()
+    println("  sorted headers:\n" + headers)
+
+    // 3. Build a processed version: trim, uppercase, add line numbers
+    stream.file(path("./build/bundle.txt"))
+        .trim()
+        .to_upper()
+        .enumerate_lines()
+        .head(5)
+        .prepend("--- NUMBERED PREVIEW ---\n")
+        .append("\n--- END ---")
+        .write_to(path("./build/bundle.numbered.txt"))
+    println("  wrote build/bundle.numbered.txt")
+
+    // 4. Stream from a list
+    let fruits = stream.of(["apple", "banana", "cherry", "date"])
+        .map(|f| f.to_upper())
+        .filter(|f| f.len() > 5)
+        .collect()
+    println("  long fruits (uppercase): " + fruits)
+}
+
+// -- Showcase: config file parsing & manipulation ─────────────────────
+
+@description("Demonstrate config file parsing, path queries, and format conversion")
+@deps([prepare])
+@inputs(["./data/config.json"])
+@outputs(["./build/config.yaml", "./build/config.toml", "./build/config.modified.json"])
+task config_demo {
+    println("  -- Config parsing & manipulation demo --")
+
+    // 1. Read a JSON config (auto-detected from extension)
+    let cfg = config.read(path("./data/config.json")).unwrap()
+
+    // 2. Navigate with path syntax
+    let app_name = cfg.get_path("app.name")
+    let db_host  = cfg.get_path("database.host")
+    let db_port  = cfg.get_path("database.port")
+    println("  app:       " + app_name)
+    println("  database:  " + db_host + ":" + str(db_port))
+
+    // 3. Wildcard query — collect all server hosts
+    let hosts = cfg.get_path("servers[*].host")
+    println("  hosts:     " + stringify(hosts))
+
+    // 4. Check existence
+    println("  has debug? " + str(cfg.has_path("app.debug")))
+    println("  has tls?   " + str(cfg.has_path("app.tls")))
+
+    // 5. Modify: bump version, disable debug, add a new section
+    let modified = cfg
+        .set_path("app.version", "2.0.0")
+        .set_path("app.debug", false)
+        .set_path("deploy.target", "production")
+        .set_path("deploy.replicas", 3)
+        .delete_path("servers[2]")
+
+    println("  version:   " + modified.get_path("app.version"))
+    println("  debug:     " + str(modified.get_path("app.debug")))
+    println("  target:    " + modified.get_path("deploy.target"))
+    println("  servers:   " + str(modified.get_path("servers").len()))
+
+    // 6. List all leaf paths for introspection
+    let paths = modified.paths()
+    println("  paths:     " + str(paths.len()) + " leaf keys")
+
+    // 7. Convert across formats and write
+    config.write(path("./build/config.yaml"), modified)
+    config.write(path("./build/config.toml"), modified)
+    config.write(path("./build/config.modified.json"), modified)
+    println("  wrote build/config.yaml")
+    println("  wrote build/config.toml")
+    println("  wrote build/config.modified.json")
+
+    // 8. Round-trip: read YAML back and verify
+    let reloaded = config.read(path("./build/config.yaml")).unwrap()
+    println("  yaml round-trip app.name: " + reloaded.get_path("app.name"))
+
+    // 9. Stream integration: read JSON via stream, parse, query
+    let from_stream = stream.file(path("./data/config.json")).parse_json()
+    println("  stream-parsed features: " + stringify(from_stream.get_path("features")))
+
+    // 10. Merge two configs
+    let defaults = parse("{\"app\": {\"port\": 8080, \"workers\": 4}}").unwrap()
+    let merged = defaults.deep_merge(modified)
+    println("  merged port:    " + str(merged.get_path("app.port")))
+    println("  merged version: " + merged.get_path("app.version"))
+
+    // 11. Inline serialization methods on maps
+    let small = {"format": "demo", "ok": true}
+    println("  as json: " + small.to_json())
+    println("  as yaml: " + small.to_yaml().trim())
+
+    println("  -- done --")
+}
+
+// -- Showcase: introspection --------------------------------------------------
+
+@description("List all tasks with their metadata")
+task list_all {
+    let all = tasks()
+    println("  " + str(all.len()) + " tasks registered:\n")
+    for name in all.keys() {
+        let t = all[name]
+        let desc = t.description ?? "(no description)"
+        let deps = t.deps()
+        let dep_str = if deps.len() > 0 { " -> [" + deps.join(", ") + "]" } else { "" }
+        println("  - " + name + dep_str)
+        println("    " + desc)
+    }
+}

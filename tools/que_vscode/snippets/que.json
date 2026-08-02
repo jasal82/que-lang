@@ -1,0 +1,246 @@
+{
+  "Task Declaration": {
+    "prefix": "task",
+    "body": [
+      "@description(\"${2:description}\")",
+      "task ${1:name} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Declare a new task"
+  },
+  "Task with Dependencies": {
+    "prefix": "taskdep",
+    "body": [
+      "@description(\"${3:description}\")",
+      "@deps([${2:deps}])",
+      "@inputs([${4:inputs}])",
+      "@outputs([${5:outputs}])",
+      "task ${1:name} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Declare a task with dependencies, inputs, and outputs"
+  },
+  "Function": {
+    "prefix": "fn",
+    "body": [
+      "fn ${1:name}(${2:params}) {",
+      "    $0",
+      "}"
+    ],
+    "description": "Declare a function"
+  },
+  "Public Function": {
+    "prefix": "pubfn",
+    "body": [
+      "pub fn ${1:name}(${2:params}) {",
+      "    $0",
+      "}"
+    ],
+    "description": "Declare a public function"
+  },
+  "Function with Return Type": {
+    "prefix": "fnr",
+    "body": [
+      "fn ${1:name}(${2:params}) -> ${3:ReturnType} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Declare a function with explicit return type"
+  },
+  "Let Binding": {
+    "prefix": "let",
+    "body": "let ${1:name} = ${0:value}",
+    "description": "Immutable variable binding"
+  },
+  "Mutable Binding": {
+    "prefix": "mut",
+    "body": "mut ${1:name} = ${0:value}",
+    "description": "Mutable variable binding"
+  },
+  "If/Else": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition} {",
+      "    $0",
+      "} else {",
+      "    ",
+      "}"
+    ],
+    "description": "If/else block"
+  },
+  "If Let": {
+    "prefix": "iflet",
+    "body": [
+      "if let ${1:Ok(val)} = ${2:expr} {",
+      "    $0",
+      "}"
+    ],
+    "description": "If-let pattern match"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": [
+      "match ${1:value} {",
+      "    ${2:pattern} => ${3:expr},",
+      "    _ => ${0:default},",
+      "}"
+    ],
+    "description": "Pattern match expression"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": [
+      "for ${1:item} in ${2:iterable} {",
+      "    $0",
+      "}"
+    ],
+    "description": "For-in loop"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": [
+      "while ${1:condition} {",
+      "    $0",
+      "}"
+    ],
+    "description": "While loop"
+  },
+  "Loop": {
+    "prefix": "loop",
+    "body": [
+      "loop {",
+      "    $0",
+      "    if ${1:condition} { break }",
+      "}"
+    ],
+    "description": "Infinite loop with break"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": "import ${0:module}",
+    "description": "Import a module"
+  },
+  "Import Local": {
+    "prefix": "importl",
+    "body": "import .${0:module}",
+    "description": "Import a local module"
+  },
+  "Import Selective": {
+    "prefix": "imports",
+    "body": "import ${1:module} { ${0:names} }",
+    "description": "Import specific names from a module"
+  },
+
+  "Try/Catch": {
+    "prefix": "try",
+    "body": [
+      "try {",
+      "    $0",
+      "} catch e {",
+      "    println(\"Error: \" + str(e))",
+      "}"
+    ],
+    "description": "Try/catch block"
+  },
+  "Parallel Block": {
+    "prefix": "parallel",
+    "body": [
+      "let (${1:a}, ${2:b}) = parallel {",
+      "    ${3:expr1},",
+      "    ${4:expr2},",
+      "}"
+    ],
+    "description": "Parallel execution block"
+  },
+  "Closure": {
+    "prefix": "closure",
+    "body": "|${1:params}| { $0 }",
+    "description": "Closure / lambda expression"
+  },
+  "Pipe Chain": {
+    "prefix": "pipe",
+    "body": [
+      "${1:value}",
+      "    |> ${2:fn1}",
+      "    |> ${0:fn2}"
+    ],
+    "description": "Pipe operator chain"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:Name} {",
+      "    ${2:Variant1},",
+      "    ${0:Variant2},",
+      "}"
+    ],
+    "description": "Enum declaration"
+  },
+  "Type Alias": {
+    "prefix": "type",
+    "body": "type ${1:Name} = ${0:Type}",
+    "description": "Type alias"
+  },
+  "Struct": {
+    "prefix": "struct",
+    "body": [
+      "type ${1:Name} = {",
+      "    ${2:field}: ${3:Type},",
+      "    $0",
+      "}"
+    ],
+    "description": "Struct type declaration"
+  },
+  "With Temp Dir": {
+    "prefix": "withtmp",
+    "body": [
+      "with temp_dir ${1:tmp} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Scoped temporary directory"
+  },
+  "Env Scope": {
+    "prefix": "withenv",
+    "body": [
+      "with env.scope({",
+      "    \"${1:KEY}\": ${2:value},",
+      "}) {",
+      "    $0",
+      "}"
+    ],
+    "description": "Scoped environment variable override"
+  },
+  "Command Run": {
+    "prefix": "cmd",
+    "body": "`${1:command}`.run()",
+    "description": "Run a shell command (checked)"
+  },
+  "Command Capture": {
+    "prefix": "capture",
+    "body": "let ${1:output} = `${2:command}`.out()",
+    "description": "Capture command output"
+  },
+  "Read File": {
+    "prefix": "readf",
+    "body": "let ${1:content} = fs.read(path(\"${2:./file}\")).unwrap()",
+    "description": "Read a file's contents"
+  },
+  "Write File": {
+    "prefix": "writef",
+    "body": "fs.write(path(\"${1:./file}\"), ${2:content})",
+    "description": "Write content to a file"
+  },
+  "Defer": {
+    "prefix": "defer",
+    "body": "defer ${0:cleanup()}",
+    "description": "Defer statement (runs at scope exit)"
+  },
+  "Println": {
+    "prefix": "pl",
+    "body": "println(\"${0:message}\")",
+    "description": "Print line"
+  }
+}

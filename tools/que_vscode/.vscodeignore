@@ -1,0 +1,20 @@
+# Dev / build files — excluded from .vsix
+.vscode-test/
+.vscode/
+src/**
+**/*.ts
+**/*.map
+tsconfig.json
+build.sh
+
+# Override .gitignore so runtime deps are included in the .vsix
+!node_modules/
+
+# Large dev-only npm packages (excluded after the re-include above)
+node_modules/@types/**
+node_modules/typescript/**
+node_modules/@vscode/vsce/**
+
+# Misc
+*.vsix
+.gitignore

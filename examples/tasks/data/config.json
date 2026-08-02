@@ -1,0 +1,18 @@
+{
+  "app": {
+    "name": "que-example",
+    "version": "1.0.0",
+    "debug": true
+  },
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "que_db"
+  },
+  "features": ["json", "yaml", "toml"],
+  "servers": [
+    {"host": "web-1", "port": 8080, "role": "primary"},
+    {"host": "web-2", "port": 8080, "role": "replica"},
+    {"host": "web-3", "port": 8081, "role": "canary"}
+  ]
+}

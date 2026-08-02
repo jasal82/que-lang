@@ -1,0 +1,158 @@
+// ============================================================================
+//  Que Module System -- Example Project
+// ============================================================================
+//
+//  Demonstrates the module system from spec S30:
+//
+//    - Local imports with dot-prefix:        import .utils
+//    - Nested module paths:                  import .lib.math
+//    - Directory modules (mod.que):         import .lib
+//    - Selective imports:                     import .lib.math { add, mul }
+//    - Aliased imports:                      import .lib.strings as str_utils
+//    - Multi-module shorthand:               import .{utils, config}
+//    - Standard library imports:             import std.fs
+//    - pub import re-exports:                (see lib/mod.que)
+//    - Modules as first-class Map values
+//    - Module caching (single evaluation)
+//
+//  Run from the examples/modules directory:
+//
+//    que main.que
+//
+// ============================================================================
+
+// -- Local imports ------------------------------------------------------------
+
+// Whole-module import: binds as namespace "utils"
+import .utils
+
+// Nested path: binds as "math" (last segment)
+import .lib.math
+
+// Aliased import
+import .lib.strings as str_utils
+
+// Selective import: brings names directly into scope
+import .lib.math { add, mul }
+
+// Directory module (resolves to lib/mod.que)
+import .lib
+
+// Multi-module shorthand: loads both at once
+import .{utils, config}
+
+// -- Standard library imports -------------------------------------------------
+
+import std.fs
+import std.json
+
+
+// ============================================================================
+//  1. Basic module usage -- call functions via namespace
+// ============================================================================
+
+println("=== Module System Demo ===")
+println()
+
+println("-- 1. Namespace imports --")
+println("  utils.greet(\"Que\") => " + utils.greet("Que"))
+println("  utils.slug(\"Hello World\") => " + utils.slug("Hello World"))
+println("  math.add(2, 3) => " + str(math.add(2, 3)))
+println("  math.factorial(6) => " + str(math.factorial(6)))
+println("  str_utils.capitalize(\"que\") => " + str_utils.capitalize("que"))
+
+
+// ============================================================================
+//  2. Selective imports -- names imported directly
+// ============================================================================
+
+println()
+println("-- 2. Selective imports --")
+// `add` and `mul` are in scope directly (from `import .lib.math { add, mul }`)
+println("  add(10, 20) => " + str(add(10, 20)))
+println("  mul(6, 7) => " + str(mul(6, 7)))
+
+
+// ============================================================================
+//  3. Directory module with re-exports
+// ============================================================================
+
+println()
+println("-- 3. Directory module (lib/mod.que) --")
+// lib/mod.que uses `pub import` to re-export its sub-modules
+println("  lib.version() => " + lib.version())
+println("  lib.math_version() => " + lib.math_version())
+println("  lib.strings_version() => " + lib.strings_version())
+
+
+// ============================================================================
+//  4. Config module -- module with pub values
+// ============================================================================
+
+println()
+println("-- 4. Config module --")
+println("  config.app_name() => " + config.app_name())
+println("  config.app_version() => " + config.app_version())
+println("  config.max_retries() => " + str(config.max_retries()))
+println("  config.default_greeting() => " + config.default_greeting())
+
+
+// ============================================================================
+//  5. Modules are Maps -- first-class values
+// ============================================================================
+
+println()
+println("-- 5. Modules as Maps --")
+println("  typeof(utils) => " + typeof(utils))
+println("  typeof(math) => " + typeof(math))
+println("  utils.keys() => " + str(utils.keys()))
+println("  math.keys() => " + str(math.keys()))
+
+// Pass a module as an argument
+fn use_math_module(m) {
+    m.add(100, m.mul(2, 3))
+}
+println("  use_math_module(math) => " + str(use_math_module(math)))
+
+
+// ============================================================================
+//  6. Module caching -- loaded only once
+// ============================================================================
+
+println()
+println("-- 6. Module caching --")
+// Both main.que and lib/mod.que import .lib.math
+// The "Loading math module..." message should appear only once
+// (it printed during the first import above)
+println("  math module was loaded only once (check output above)")
+
+
+// ============================================================================
+//  7. std module usage
+// ============================================================================
+
+println()
+println("-- 7. Standard library --")
+println("  typeof(fs) => " + typeof(fs))
+println("  typeof(fs.exists) => " + typeof(fs.exists))
+println("  typeof(json) => " + typeof(json))
+println("  typeof(json.parse) => " + typeof(json.parse))
+
+// Use std.fs to check if a file exists
+let self_exists = fs.exists(path("./main.que"))
+println("  fs.exists(\"./main.que\") => " + str(self_exists))
+
+// Use std.json to round-trip some data
+let input = "{\"name\": \"Que\", \"version\": \"0.1.0\"}"
+let parsed = json.parse(input)
+println("  json.parse(input) => " + str(parsed))
+
+// Use json.stringify to serialize back
+let round_tripped = json.stringify(parsed, 2)
+println("  stringify(parsed, 2) =>")
+for line in round_tripped.split("\n") {
+    println("    " + line)
+}
+
+println()
+println("=== Done! ===")

@@ -1,0 +1,252 @@
+// ============================================================================
+//  Que Syntax Highlighting Test File
+// ============================================================================
+//  Open this file to verify all grammar scopes render correctly.
+
+/// This is a doc comment attached to the function below.
+
+/* 
+   Multi-line
+   block comment
+*/
+
+// -- Imports ------------------------------------------------------------------
+
+import std.fs
+import std.json
+import std.time
+import std.stream
+import .utils
+import .lib.math
+import .lib.strings as str_utils
+import .lib.math { add, mul }
+import .{utils, config}
+pub import .lib
+
+// -- Variables ----------------------------------------------------------------
+
+let name = "que"
+let count = 42
+let pi = 3.14159
+let hex = 0xFF
+let bin = 0b1010
+let big = 1_000_000
+let active = true
+let nothing = null
+mut counter = 0
+counter += 1
+
+// -- Strings ------------------------------------------------------------------
+
+let greeting = "hello, ${name}!"
+let raw = r"no \escapes here"
+let raw_hash = r#"can contain "quotes""#
+let heredoc = """
+  multi-line
+  string literal
+"""
+
+// -- Special Literals ---------------------------------------------------------
+
+let sources = glob("src/**/*.que")
+let configs = glob("config/*.{yaml,yml,json}")
+let pattern = re"^\d{3}-\d{4}$"
+let version = v"1.2.3"
+let constraint = v">=1.0.0, <2.0.0"
+let src = path("./src/main.rs")
+let joined = path("./build") / "bin" / "app"
+
+// -- Durations ----------------------------------------------------------------
+
+let timeout = 5s
+let delay = 500ms
+let interval = 10m
+let ttl = 2h
+let expiry = 1d
+
+// -- Command Literals ---------------------------------------------------------
+
+let cmd1 = `git status`
+let cmd2 = `docker build -t ${name} .`
+let flags = "--verbose"
+let cmd3 = `cargo build !{flags}`
+
+// -- Functions ----------------------------------------------------------------
+
+fn greet(name: String) -> String {
+    "hello, ${name}"
+}
+
+pub fn add(a: Int, b: Int) -> Int {
+    a + b
+}
+
+fn deploy(target: String, replicas: Int = 3, dryRun: Bool = false) -> Result<(), String> {
+    // ...
+}
+
+// -- Closures -----------------------------------------------------------------
+
+let double = |x: Int| x * 2
+let square = |x| x * x
+let process = |item| {
+    let cleaned = item.trim()
+    cleaned.to_upper()
+}
+
+// -- Control Flow -------------------------------------------------------------
+
+let status = if count == 0 { "empty" } else { "has items" }
+
+if exists(path("./config.yaml")) {
+    println("found config")
+} else if exists(path("./config.json")) {
+    println("found json config")
+} else {
+    println("using defaults")
+}
+
+for file in g"src/*.txt" {
+    println(file.name())
+}
+
+for (i, item) in items.enumerate() {
+    println("${i}: ${item}")
+}
+
+for i in 0..10 {
+    println(str(i))
+}
+
+while counter < 100 {
+    counter += 1
+}
+
+loop {
+    let s = check_status()
+    if s == "ready" { break }
+    sleep(1s)
+}
+
+// -- Pattern Matching ---------------------------------------------------------
+
+match version {
+    v">=2.0.0" => println("v2+"),
+    v">=1.0.0" => println("v1"),
+    _           => println("old"),
+}
+
+match result {
+    Ok(val)  => println("success: " + str(val)),
+    Err(e)   => println("error: " + str(e)),
+}
+
+// -- Types --------------------------------------------------------------------
+
+type FilePair = (Path, Path)
+type BuildFn = fn(Path) -> Result<Path, String>
+
+type Service = {
+    name: String,
+    image: String,
+    port: Int,
+    env: Map<String, String>,
+}
+
+enum DeployTarget {
+    Kubernetes { cluster: String, namespace: String },
+    Docker { host: String },
+    Local,
+}
+
+// -- Tasks --------------------------------------------------------------------
+
+@description("Remove build artifacts")
+task clean {
+    if exists(path("./build")) {
+        path("./build").delete()
+        println("cleaned")
+    }
+}
+
+@description("Build the project")
+@deps([clean])
+@inputs([g"src/**/*.que"])
+@outputs([path("./build/output.txt")])
+task build {
+    let content = fs.read(path("./src/main.que")).unwrap()
+    fs.write(path("./build/output.txt"), content)
+    println("built")
+}
+
+// -- Pipe & Functional --------------------------------------------------------
+
+let result = [1, 2, 3, 4, 5]
+    .filter(|x| x > 2)
+    .map(|x| x * x)
+    .fold(0, |acc, x| acc + x)
+
+let items = sources
+    .map(fs.read)
+    .map(|r| r.unwrap())
+
+// -- Guard / Defer / Try ------------------------------------------------------
+
+guard exists(path("./Cargo.toml")) else {
+    fail("must be run from project root")
+}
+
+defer println("cleanup done")
+
+try {
+    `cargo build`.runChecked()?
+} catch e {
+    println("build failed: " + str(e))
+}
+
+// -- Concurrency --------------------------------------------------------------
+
+let (a, b) = parallel {
+    `make frontend`.runChecked(),
+    `make backend`.runChecked(),
+}
+
+spawn `python -m http.server 8080`
+
+// -- Builtins -----------------------------------------------------------------
+
+let t = typeof(42)
+let info = [1, 2, 3].inspect()
+let n = [1, 2, 3].len()
+let s = str(42)
+println("hello")
+let data = json.parse("{\"key\": 1}").unwrap()
+let output = json.stringify(data, 2)
+let cfg = config.read(path("./config.json")).unwrap()
+let host = cfg.get_path("database.host")
+let now_ts = time.timestamp()
+sleep(100ms)
+let rng = range(0, 10)
+dbg(result)
+
+// -- Temp / Env Blocks --------------------------------------------------------
+
+with temp_dir tmp {
+    fs.write(tmp / "test.txt", "hello")
+}
+
+with env.scope({
+    "NODE_ENV": "production",
+    "LOG_LEVEL": "warn",
+}) {
+    `npm run build`.runChecked()?
+}
+
+// -- Stream Pipeline ----------------------------------------------------------
+
+stream.file(path("./data.txt"))
+    .skip_empty()
+    .to_upper()
+    .enumerate_lines()
+    .head(10)
+    .write_to(path("./build/processed.txt"))

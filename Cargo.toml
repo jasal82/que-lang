@@ -1,0 +1,45 @@
+[workspace]
+members = ["lsp"]
+
+[package]
+name = "que"
+version = "1.0.0"
+edition = "2021"
+description = "The Que scripting language for DevOps and build automation"
+license = "MIT"
+
+[[bin]]
+name = "que"
+path = "src/main.rs"
+
+[dependencies]
+rustyline = "15"
+regex-lite = "0.1"
+glob = "0.3"
+colored = "2"
+console = "0.15"
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml = "0.9"
+toml = { version = "0.8", features = ["preserve_order"] }
+toml_edit = "0.22"
+ureq = "2"
+rustls = { version = "0.23", features = ["ring"] }
+rustls-pemfile = "2"
+webpki-roots = "0.26"
+sha2 = "0.10"
+md-5 = "0.10"
+tar = "0.4"
+flate2 = "1"
+zip = "2"
+chrono = "0.4"
+chrono-tz = "0.10"
+git2 = { version = "0.20", default-features = false }
+
+# Only used to record which signal arrived; the actual interrupt handling is
+# cooperative (see src/interrupt.rs) so `defer` blocks still run.
+[target.'cfg(unix)'.dependencies]
+signal-hook = "0.3"
+
+[lib]
+name = "que_lang"
+path = "src/lib.rs"

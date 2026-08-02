@@ -1,0 +1,21 @@
+[package]
+name = "que-lsp"
+version = "0.1.0"
+edition = "2021"
+description = "Language Server Protocol implementation for the Que language"
+license = "MIT"
+
+[[bin]]
+name = "que-lsp"
+path = "src/main.rs"
+
+[dependencies]
+que_lang = { package = "que", path = ".." }
+tower-lsp = "0.20"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dashmap = "6"
+ropey = "1"
+log = "0.4"
+env_logger = "0.11"

@@ -1,0 +1,112 @@
+/* ==========================================================================
+   Prism theme tuned to the Que site palette
+   ========================================================================== */
+
+pre[class*="language-"],
+code[class*="language-"] {
+    font-family: var(--font-mono);
+    color: #ece5d8;
+    text-shadow: none;
+    tab-size: 4;
+}
+
+pre[class*="language-"] {
+    padding: 18px 20px;
+    position: relative;
+}
+
+.token.comment { color: var(--text-faint); font-style: italic; }
+.token.string,
+.token.regex { color: var(--green); }
+.token.interpolation { color: #ffd08a; }
+.token.interpolation .punctuation { color: var(--accent); opacity: 0.8; }
+.token.number { color: #d9a5ff; }
+.token.keyword { color: var(--accent-strong); font-weight: 600; }
+.token.builtin { color: var(--blue); }
+.token.function { color: #ffd08a; }
+.token.attribute { color: var(--accent); font-weight: 600; }
+.token.operator { color: #e8b4a0; }
+.token.punctuation { color: #8a7f6f; }
+.token.command { color: #f0c9a0; }
+.token.command .punctuation { color: #b0906a; }
+.token.boolean { color: #d9a5ff; }
+.token.property { color: var(--blue); }
+.token.class-name { color: var(--blue); }
+.token.parameter { color: #ece5d8; }
+
+/* bash */
+.token.shell-symbol { color: var(--accent); }
+.token.important { color: var(--accent-strong); }
+
+/* toml */
+.token.table { color: var(--blue); }
+.token.key { color: var(--blue); }
+
+/* toolbar / copy button (base positioning from the Prism toolbar plugin,
+   restyled to match the site) */
+div.code-toolbar { position: relative; }
+div.code-toolbar > .toolbar {
+    position: absolute;
+    z-index: 10;
+    top: 8px;
+    right: 10px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+div.code-toolbar > .toolbar > .toolbar-item { display: inline-block; }
+div.code-toolbar > .toolbar > .toolbar-item > a,
+div.code-toolbar > .toolbar > .toolbar-item > button,
+div.code-toolbar > .toolbar > .toolbar-item > span { cursor: pointer; }
+div.code-toolbar:hover > .toolbar,
+div.code-toolbar:focus-within > .toolbar { opacity: 1; }
+/* Box styling goes on the direct child only (button/a/span) — the
+   copy-to-clipboard plugin nests a <span> inside its <button>, and boxing
+   both produces a border-within-a-border. */
+div.code-toolbar > .toolbar .toolbar-item > button,
+div.code-toolbar > .toolbar .toolbar-item > span,
+div.code-toolbar > .toolbar .toolbar-item > a {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 9px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+div.code-toolbar > .toolbar .toolbar-item > button:hover,
+div.code-toolbar > .toolbar .toolbar-item > a:hover {
+    color: var(--accent-strong);
+    border-color: var(--accent-dim);
+    background: var(--surface-2);
+}
+/* Reset anything nested inside that direct child (e.g. the copy button's
+   inner label span) so it doesn't get boxed a second time. */
+div.code-toolbar > .toolbar .toolbar-item > button > *,
+div.code-toolbar > .toolbar .toolbar-item > a > * {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+}
+
+/* language tag rendered by our own build, not the plugin */
+.code-block { position: relative; }
+.code-block .code-lang {
+    position: absolute;
+    top: 8px;
+    left: 14px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    pointer-events: none;
+    z-index: 1;
+}
+.code-block pre[class*="language-"] { padding-top: 30px; }

@@ -1,0 +1,32 @@
+// ── lib/math.que ───────────────────────────────────────────────────────────
+//
+//  Math utility module.
+//
+//  This message prints when the module is first loaded, demonstrating
+//  single-evaluation semantics (it should print only once even if
+//  multiple files import this module).
+
+println("  [loader] Loading math module...")
+
+pub fn add(a, b) { a + b }
+pub fn sub(a, b) { a - b }
+pub fn mul(a, b) { a * b }
+
+pub fn factorial(n) {
+    if n <= 1 { 1 }
+    else { n * factorial(n - 1) }
+}
+
+pub fn clamp(value, lo, hi) {
+    if value < lo { lo }
+    else if value > hi { hi }
+    else { value }
+}
+
+pub fn module_info() { "math v1.0" }
+
+// Private helper — not exported
+fn checked_div(a, b) {
+    if b == 0 { Err("division by zero") }
+    else { Ok(a / b) }
+}

@@ -1,0 +1,16 @@
+// ── lib/mod.que ────────────────────────────────────────────────────────────
+//
+//  Directory module entry point.
+//
+//  When you `import .lib`, Que loads lib/mod.que.
+//  This file can re-export sub-modules using `pub import`.
+
+pub import .math
+pub import .strings
+
+// A pub value defined directly in the directory module
+pub fn version() { v"1.0.0" }
+
+// Re-export sub-module version info for convenience
+pub fn math_version() { math.module_info() }
+pub fn strings_version() { strings.module_info() }

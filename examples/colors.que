@@ -1,0 +1,203 @@
+// ── examples/colors.que ─────────────────────────────────────────────────────
+//
+// Terminal color and style helpers built around enums.
+//
+// Usage:
+//   import .colors { Color, TextStyle, ColoredString }
+//
+//   println(ColoredString.new("Error").fg(Color.Red).style(TextStyle.Bold))
+//   println(ColoredString.new("Custom").fg(Color.Rgb(r: 120, g: 80, b: 255)))
+//   println(ColoredString.new("Warn").fg(Color.Yellow).on(Color.Black))
+
+let _ESC = "\x1b"
+
+pub let RESET = "\x1b[0m"
+
+pub enum Color {
+    Black
+    Red
+    Green
+    Yellow
+    Blue
+    Magenta
+    Cyan
+    White
+    BrightBlack
+    BrightRed
+    BrightGreen
+    BrightYellow
+    BrightBlue
+    BrightMagenta
+    BrightCyan
+    BrightWhite
+    Indexed { code: Int }
+    Rgb { r: Int, g: Int, b: Int }
+}
+
+pub enum TextStyle {
+    Bold
+    Dim
+    Italic
+    Underline
+    Blink
+    Reverse
+    Strike
+}
+
+pub impl Color {
+    fn fg_code(self) -> String {
+        match self {
+            Black => "${_ESC}[30m",
+            Red => "${_ESC}[31m",
+            Green => "${_ESC}[32m",
+            Yellow => "${_ESC}[33m",
+            Blue => "${_ESC}[34m",
+            Magenta => "${_ESC}[35m",
+            Cyan => "${_ESC}[36m",
+            White => "${_ESC}[37m",
+            BrightBlack => "${_ESC}[90m",
+            BrightRed => "${_ESC}[91m",
+            BrightGreen => "${_ESC}[92m",
+            BrightYellow => "${_ESC}[93m",
+            BrightBlue => "${_ESC}[94m",
+            BrightMagenta => "${_ESC}[95m",
+            BrightCyan => "${_ESC}[96m",
+            BrightWhite => "${_ESC}[97m",
+            Indexed { code } => "${_ESC}[38;5;${str(code)}m",
+            Rgb { r, g, b } => "${_ESC}[38;2;${str(r)};${str(g)};${str(b)}m",
+        }
+    }
+
+    fn bg_code(self) -> String {
+        match self {
+            Black => "${_ESC}[40m",
+            Red => "${_ESC}[41m",
+            Green => "${_ESC}[42m",
+            Yellow => "${_ESC}[43m",
+            Blue => "${_ESC}[44m",
+            Magenta => "${_ESC}[45m",
+            Cyan => "${_ESC}[46m",
+            White => "${_ESC}[47m",
+            BrightBlack => "${_ESC}[100m",
+            BrightRed => "${_ESC}[101m",
+            BrightGreen => "${_ESC}[102m",
+            BrightYellow => "${_ESC}[103m",
+            BrightBlue => "${_ESC}[104m",
+            BrightMagenta => "${_ESC}[105m",
+            BrightCyan => "${_ESC}[106m",
+            BrightWhite => "${_ESC}[107m",
+            Indexed { code } => "${_ESC}[48;5;${str(code)}m",
+            Rgb { r, g, b } => "${_ESC}[48;2;${str(r)};${str(g)};${str(b)}m",
+        }
+    }
+}
+
+pub impl TextStyle {
+    fn code(self) -> String {
+        match self {
+            Bold => "${_ESC}[1m",
+            Dim => "${_ESC}[2m",
+            Italic => "${_ESC}[3m",
+            Underline => "${_ESC}[4m",
+            Blink => "${_ESC}[5m",
+            Reverse => "${_ESC}[7m",
+            Strike => "${_ESC}[9m",
+        }
+    }
+}
+
+pub fn strip(text) {
+    let ansi_re = regex(r"\x1b\[[0-9;]*m").unwrap()
+    ansi_re.replace_all(text, "")
+}
+
+pub struct ColoredString {
+    text: String
+    fg: Color = null
+    bg: Color = null
+    styles: List = []
+}
+
+pub impl ColoredString {
+    fn new(text) -> ColoredString {
+        ColoredString { text: text, fg: null, bg: null, styles: [] }
+    }
+
+    fn fg(self, color) -> ColoredString {
+        ColoredString { text: self.text, fg: color, bg: self.bg, styles: self.styles }
+    }
+
+    fn on(self, color) -> ColoredString {
+        ColoredString { text: self.text, fg: self.fg, bg: color, styles: self.styles }
+    }
+
+    fn style(self, style) -> ColoredString {
+        ColoredString { text: self.text, fg: self.fg, bg: self.bg, styles: self.styles + [style] }
+    }
+
+    fn black(self) -> ColoredString { self.fg(Color.Black) }
+    fn red(self) -> ColoredString { self.fg(Color.Red) }
+    fn green(self) -> ColoredString { self.fg(Color.Green) }
+    fn yellow(self) -> ColoredString { self.fg(Color.Yellow) }
+    fn blue(self) -> ColoredString { self.fg(Color.Blue) }
+    fn magenta(self) -> ColoredString { self.fg(Color.Magenta) }
+    fn cyan(self) -> ColoredString { self.fg(Color.Cyan) }
+    fn white(self) -> ColoredString { self.fg(Color.White) }
+
+    fn on_black(self) -> ColoredString { self.on(Color.Black) }
+    fn on_red(self) -> ColoredString { self.on(Color.Red) }
+    fn on_green(self) -> ColoredString { self.on(Color.Green) }
+    fn on_yellow(self) -> ColoredString { self.on(Color.Yellow) }
+    fn on_blue(self) -> ColoredString { self.on(Color.Blue) }
+    fn on_magenta(self) -> ColoredString { self.on(Color.Magenta) }
+    fn on_cyan(self) -> ColoredString { self.on(Color.Cyan) }
+    fn on_white(self) -> ColoredString { self.on(Color.White) }
+
+    fn bold(self) -> ColoredString { self.style(TextStyle.Bold) }
+    fn dim(self) -> ColoredString { self.style(TextStyle.Dim) }
+    fn italic(self) -> ColoredString { self.style(TextStyle.Italic) }
+    fn underline(self) -> ColoredString { self.style(TextStyle.Underline) }
+    fn blink(self) -> ColoredString { self.style(TextStyle.Blink) }
+    fn reverse(self) -> ColoredString { self.style(TextStyle.Reverse) }
+    fn strike(self) -> ColoredString { self.style(TextStyle.Strike) }
+
+    fn render(self) -> String {
+        if env.get("NO_COLOR") != null {
+            return self.text
+        }
+        // On Windows, only emit ANSI codes when a known ANSI-capable terminal is
+        // detected. Without one of these, plain cmd.exe / old PowerShell will show
+        // raw escape characters instead of colors.
+        if os.family == "windows" {
+            let wt      = env.get("WT_SESSION")    // Windows Terminal
+            let vt      = env.get("TERM_PROGRAM")  // VS Code terminal, mintty, …
+            let term    = env.get("TERM")          // Git Bash, Cygwin, MSYS2
+            let ansicon = env.get("ANSICON")       // ANSICON shim for legacy cmd.exe
+            let ps      = env.get("PSModulePath")  // PowerShell 5.1+ and 7+
+            if wt == null && vt == null && term == null && ansicon == null && ps == null {
+                return self.text
+            }
+        }
+
+        let fg_prefix = self.fg?.fg_code() ?? ""
+        let bg_prefix = self.bg?.bg_code() ?? ""
+
+        let prefix = self.styles.fold(fg_prefix + bg_prefix, |acc, style| acc + style.code())
+
+        if prefix == "" {
+            self.text
+        } else {
+            prefix + self.text + RESET
+        }
+    }
+}
+
+pub impl Display for ColoredString {
+    fn to_string(self) -> String {
+        self.render()
+    }
+}
+
+pub fn colored(text) -> ColoredString {
+    ColoredString.new(text)
+}

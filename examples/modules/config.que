@@ -1,0 +1,11 @@
+// ── config.que ─────────────────────────────────────────────────────────────
+//
+//  A configuration module demonstrating pub values and functions.
+
+pub fn app_name() { "Que Module Demo" }
+pub fn app_version() { v"1.0.0" }
+pub fn max_retries() { 3 }
+
+pub fn default_greeting() {
+    "Welcome to " + app_name() + " v" + app_version()
+}
