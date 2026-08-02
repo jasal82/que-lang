@@ -1,6 +1,6 @@
 [package]
 name = "que-lsp"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 description = "Language Server Protocol implementation for the Que language"
 license = "MIT"

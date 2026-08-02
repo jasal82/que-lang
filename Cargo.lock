@@ -1284,7 +1284,7 @@ dependencies = [
 
 [[package]]
 name = "que-lsp"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "dashmap 6.1.0",
  "env_logger",

@@ -1,9 +1,12 @@
 [workspace]
 members = ["lsp"]
 
+[workspace.package]
+version = "1.0.0"
+
 [package]
 name = "que"
-version = "1.0.0"
+version.workspace = true
 edition = "2021"
 description = "The Que scripting language for DevOps and build automation"
 license = "MIT"
