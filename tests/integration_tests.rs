@@ -3546,6 +3546,115 @@ println(after)
 }
 
 #[test]
+fn a_dependency_hands_its_value_to_the_task_that_needed_it() {
+    let source = r#"
+task get_profiles { "/tmp/profiles-1" }
+
+@deps([get_profiles])
+task install {
+    println("into " + get_profiles.result())
+}
+install()
+"#;
+    assert_output(source, &[
+        "[RUN]  get_profiles",
+        "[DONE] get_profiles",
+        "[RUN]  install",
+        "into /tmp/profiles-1",
+        "[DONE] install",
+    ]);
+}
+
+#[test]
+fn a_task_result_is_reachable_as_a_method_too() {
+    let source = r#"
+task build { 42 }
+build()
+println(build.result())
+"#;
+    assert_output(source, &[
+        "[RUN]  build",
+        "[DONE] build",
+        "42",
+    ]);
+}
+
+#[test]
+fn a_task_that_has_not_run_has_no_result_to_give() {
+    assert_error_contains(
+        r#"
+task build { 42 }
+println(build.result())
+"#,
+        "has not run yet",
+    );
+}
+
+#[test]
+fn run_task_does_not_run_a_task_that_already_succeeded() {
+    let source = r#"
+task get_profiles {
+    println("fetching")
+    "/tmp/profiles-1"
+}
+
+@deps([get_profiles])
+task install {
+    println("into " + run_task("get_profiles"))
+}
+install()
+"#;
+    assert_output(source, &[
+        "[RUN]  get_profiles",
+        "fetching",
+        "[DONE] get_profiles",
+        "[RUN]  install",
+        "into /tmp/profiles-1",
+        "[DONE] install",
+    ]);
+}
+
+#[test]
+fn run_task_with_arguments_still_runs() {
+    let source = r#"
+task greet(name) {
+    println("hello " + name)
+    name
+}
+greet("a")
+run_task("greet", "b")
+"#;
+    assert_output(source, &[
+        "[RUN]  greet",
+        "hello a",
+        "[DONE] greet",
+        "[RUN]  greet",
+        "hello b",
+        "[DONE] greet",
+    ]);
+}
+
+#[test]
+fn the_run_method_is_unconditional() {
+    let source = r#"
+task build {
+    println("compiling")
+    1
+}
+build()
+build.run()
+"#;
+    assert_output(source, &[
+        "[RUN]  build",
+        "compiling",
+        "[DONE] build",
+        "[RUN]  build",
+        "compiling",
+        "[DONE] build",
+    ]);
+}
+
+#[test]
 fn task_metadata_access() {
     let source = r#"
 @description("Compile sources")

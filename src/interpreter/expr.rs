@@ -1433,6 +1433,7 @@ impl Interpreter {
                             None => Ok(Value::String("pending".to_string())),
                         }
                     }
+                    "result" => self.task_result(t.name.as_str()),
                     "env" | "env_keys" => Ok(Value::List(
                         t.env_keys.iter().map(|k| Value::String(k.clone())).collect(),
                     )),

@@ -377,7 +377,7 @@ pub fn builtin_functions() -> Vec<BuiltinInfo> {
         BuiltinInfo {
             name: "run_task",
             signature: "run_task(name: String, args?: Map) -> value",
-            documentation: "Run a registered task by name.",
+            documentation: "Run a registered task by name, resolving its dependencies first. Returns the value the task's body evaluated to.\n\nA task that already succeeded in this run is not run a second time: its recorded value is returned instead. `@deps` decides the same way, so a task can name a dependency and still ask what it produced.\n\n```que\n@deps([get_profiles])\ntask install {\n    let dir = run_task(\"get_profiles\")   // already ran; no second run\n    `install --prefix ${dir}`\n}\n```\n\nPassing arguments always executes, since they may not be the ones the earlier run used. `task.run()` names the action rather than the outcome and is likewise unconditional.",
             kind: BuiltinKind::Function,
         },
 

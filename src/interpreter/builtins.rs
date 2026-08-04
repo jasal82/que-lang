@@ -799,6 +799,22 @@ impl Interpreter {
                         format!("no task named '{}'", task_name),
                     ))
                 })?;
+                // A task that already succeeded in this run hands back what it
+                // returned instead of running a second time. `@deps` decides the
+                // same way, and a task that is a dependency of two others should
+                // not run once or twice depending on which of them asked. Passing
+                // arguments is a different question — those may not be the ones
+                // it ran with — so that always executes. `task.run()` names the
+                // action rather than the outcome and stays unconditional.
+                if task_args.is_empty() {
+                    if let Some(("succeeded", value)) = self
+                        .task_status
+                        .get(task_name.as_str())
+                        .map(|(s, v)| (s.as_str(), v))
+                    {
+                        return Ok(value.clone());
+                    }
+                }
                 match task {
                     Value::Task(t) => {
                         self.execute_task(&t, task_args)

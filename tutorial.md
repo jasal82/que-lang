@@ -5104,7 +5104,40 @@ Status values: `"pending"`, `"succeeded"`, `"failed"`, `"skipped"`.
 | `.inputs()` | Evaluated list of input paths |
 | `.outputs()` | Evaluated list of output paths |
 | `.status()` | Current execution status |
+| `.result()` | The value the task's body evaluated to |
 | `.description()` | Description or `null` |
+
+### Passing Data Between Tasks
+
+A dependency often produces something the task that needs it has to know about:
+a temporary directory, a version string, a list of files. The value a task's
+body evaluates to is kept, and `.result()` hands it over:
+
+```que
+import std.fs
+
+task get_profiles {
+    let dir = fs.temp_dir("profiles_").unwrap()
+    `curl -sL $PROFILE_URL | tar -xz -C ${dir}`
+    dir                              // the task's result
+}
+
+@deps([get_profiles])
+task install {
+    let dir = get_profiles.result()  // /tmp/profiles_xxxx
+    `install --prefix ${dir}`
+}
+```
+
+`run_task("get_profiles")` returns the same value, and does not run the task
+again if it already succeeded in this run — so it works whether or not the task
+is also named in `@deps`.
+
+Two edges are worth knowing. A task that was **skipped** because its declared
+outputs were up to date never ran its body, so its result is `null`; the files
+it declared as `@outputs` are what it produced in that case. And asking for the
+result of a task that has not run at all is an error rather than a silent
+`null`, since that is almost always a missing `@deps`.
 
 ### The `tasks()` and `run_task()` Builtins
 

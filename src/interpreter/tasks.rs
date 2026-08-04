@@ -65,6 +65,7 @@ impl Interpreter {
                     None => Ok(Value::String("pending".to_string())),
                 }
             }
+            "result" => self.task_result(&task.name),
             "description" => {
                 Ok(task.description.as_ref()
                     .map(|d| Value::String(d.clone()))
@@ -78,6 +79,35 @@ impl Interpreter {
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
                 format!("Task has no method '{}'", method),
+            ))),
+        }
+    }
+
+    /// The value a task's body evaluated to on its last run.
+    ///
+    /// A dependency that produces something — a temporary directory, a version
+    /// string, a list of files — has nowhere to put it: `@deps` runs it and
+    /// throws the value away. Without this, the two tasks have to agree on a
+    /// path out of band, or the dependent task re-runs its dependency just to
+    /// see what it returns. The value is already recorded next to the status,
+    /// so handing it back costs nothing.
+    pub(crate) fn task_result(&self, name: &str) -> IResult {
+        match self.task_status.get(name) {
+            Some((status, value)) if status == "succeeded" => Ok(value.clone()),
+            // A skipped task's outputs were already on disk and its body never
+            // ran, so there is no value from this run to hand over. The files
+            // it declared as outputs are what it produced in that case.
+            Some((status, _)) if status == "skipped" => Ok(Value::Null),
+            Some((status, _)) if status == "failed" => Err(Signal::Error(QueError::new(
+                ErrorKind::Runtime,
+                format!("task '{}' failed, so it has no result", name),
+            ))),
+            _ => Err(Signal::Error(QueError::new(
+                ErrorKind::Runtime,
+                format!(
+                    "task '{}' has not run yet, so it has no result; name it in @deps or call run_task(\"{}\") first",
+                    name, name
+                ),
             ))),
         }
     }
