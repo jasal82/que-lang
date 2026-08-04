@@ -139,6 +139,7 @@ syntax keyword queBuiltinFn
       \ assert compose
       \ secret fail sleep quefile_dir script_dir dry_run
       \ path glob open which retry timeout semver_parse regex
+      \ cd
       \ dbg help args
       \ tasks run_task strict
 

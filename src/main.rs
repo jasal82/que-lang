@@ -170,12 +170,18 @@ fn print_usage() {
     eprintln!();
     eprintln!("Run options:");
     eprintln!("  -f <file>                   Use a specific Quefile (default: auto-detect)");
+    eprintln!("  -g, --global                Use the global Quefile ($QUE_HOME, ~/.config/que, ~/.que)");
     eprintln!("  --help, -h                  Show argument help for the task");
     eprintln!("  --dry-run                   Print effects instead of performing them");
     eprintln!("  --allow <cap>[=<list>]      Grant a capability (see Sandbox options)");
     eprintln!("  --deny <cap>                Deny a capability (see Sandbox options)");
     eprintln!("  -- arg1 arg2 ...            Pass positional arguments to the task");
     eprintln!("  -- key=value ...            Pass named arguments to the task");
+    eprintln!();
+    eprintln!("Quefile discovery:");
+    eprintln!("  The nearest Quefile at or above the current directory is used, and its");
+    eprintln!("  tasks run in its own directory. A task it does not define is looked up in");
+    eprintln!("  the global Quefile, whose tasks run in the current directory instead.");
     eprintln!();
     eprintln!("Test options:");
     eprintln!("  --filter <text>             Only run tests whose name contains <text>");
@@ -202,11 +208,125 @@ fn print_usage() {
     eprintln!("With no arguments, starts an interactive REPL.");
 }
 
-/// Resolve the Quefile path: use `-f <file>` if provided, otherwise
-/// search for `Quefile`, `Quefile.que`, or `quefile.que` in the
-/// current directory.
-fn resolve_quefile(args: &[String]) -> (String, Vec<String>) {
+/// Filenames accepted as a Quefile, in the order they are tried.
+const QUEFILE_NAMES: [&str; 3] = ["Quefile", "Quefile.que", "quefile.que"];
+
+/// A Quefile the CLI can load, and where it came from.
+#[derive(Clone)]
+struct QuefileSource {
+    /// Path to read: a bare filename when it sits in the current directory,
+    /// the path walked up to otherwise.
+    path: String,
+    /// The user's global Quefile rather than a project one.
+    global: bool,
+}
+
+impl QuefileSource {
+    /// How a caller would invoke `que run` for a task in this file.
+    fn run_prefix(&self) -> String {
+        if self.global {
+            "que run -g".to_string()
+        } else {
+            format!("que run [-f {}]", self.path)
+        }
+    }
+}
+
+/// The Quefiles a command should consider, in precedence order.
+struct QuefileSelection {
+    /// `-f <file>`, or the nearest Quefile at or above the current directory.
+    project: Option<QuefileSource>,
+    /// The user's global Quefile, consulted for tasks the project file does
+    /// not define. `None` once `-f` or a missing global rules it out.
+    global: Option<QuefileSource>,
+}
+
+/// Directories searched for the global Quefile, in order.
+fn global_quefile_dirs() -> Vec<std::path::PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(h) = env::var("QUE_HOME") {
+        if !h.is_empty() {
+            dirs.push(std::path::PathBuf::from(h));
+        }
+    }
+    if let Ok(x) = env::var("XDG_CONFIG_HOME") {
+        if !x.is_empty() {
+            dirs.push(Path::new(&x).join("que"));
+        }
+    }
+    if let Some(home) = que_lang::interpreter::home_dir() {
+        dirs.push(Path::new(&home).join(".config").join("que"));
+        dirs.push(Path::new(&home).join(".que"));
+    }
+    dirs
+}
+
+/// The nearest Quefile at or above the current directory.
+///
+/// Walking up is what lets `que run test` work from a subdirectory of a
+/// project, the same way `git` works from anywhere inside a checkout. The
+/// directory is *not* changed to match: a task runs where the user is
+/// standing, so relative paths mean what they would have meant in the shell.
+/// A Quefile that wants its own directory asks for `quefile_dir()`.
+fn find_project_quefile() -> Option<QuefileSource> {
+    let cwd = env::current_dir().ok()?;
+    let mut dir = cwd.as_path();
+    loop {
+        for name in QUEFILE_NAMES {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some(if dir == cwd {
+                    QuefileSource { path: name.to_string(), global: false }
+                } else {
+                    QuefileSource { path: candidate.display().to_string(), global: false }
+                });
+            }
+        }
+        dir = dir.parent()?;
+    }
+}
+
+/// The user's global Quefile, if they have written one.
+fn find_global_quefile() -> Option<QuefileSource> {
+    for dir in global_quefile_dirs() {
+        for name in QUEFILE_NAMES {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some(QuefileSource {
+                    path: candidate.display().to_string(),
+                    global: true,
+                });
+            }
+        }
+    }
+    None
+}
+
+/// Report that there is nothing to run and exit.
+fn exit_no_quefile(global_only: bool) -> ! {
+    if global_only {
+        eprintln!("error: no global Quefile found");
+    } else {
+        eprintln!("error: no Quefile found in this directory or any parent, and no global Quefile");
+        eprintln!("Looked for: {}", QUEFILE_NAMES.join(", "));
+    }
+    let dirs: Vec<String> = global_quefile_dirs()
+        .iter()
+        .map(|d| d.display().to_string())
+        .collect();
+    eprintln!("Global locations: {}", dirs.join(", "));
+    if !global_only {
+        eprintln!("Use -f <file> to specify a file explicitly.");
+    }
+    process::exit(EXIT_USAGE);
+}
+
+/// Resolve which Quefiles to use: `-f <file>` pins one, `-g` selects the
+/// global one, and otherwise the nearest project file is used with the
+/// global file behind it as a fallback.
+fn resolve_quefile(args: &[String]) -> (QuefileSelection, Vec<String>) {
     let mut file: Option<String> = None;
+    let mut force_global = false;
     let mut rest: Vec<String> = Vec::new();
     let mut i = 0;
     while i < args.len() {
@@ -217,33 +337,47 @@ fn resolve_quefile(args: &[String]) -> (String, Vec<String>) {
             }
             file = Some(args[i + 1].clone());
             i += 2;
+        } else if args[i] == "-g" || args[i] == "--global" {
+            force_global = true;
+            i += 1;
         } else {
             rest.push(args[i].clone());
             i += 1;
         }
     }
 
-    let path = if let Some(f) = file {
-        f
-    } else {
-        // Auto-detect Quefile in current directory
-        let candidates = ["Quefile", "Quefile.que", "quefile.que"];
-        match candidates.iter().find(|c| Path::new(c).exists()) {
-            Some(c) => c.to_string(),
-            None => {
-                eprintln!("error: no Quefile found in current directory");
-                eprintln!("Looked for: {}", candidates.join(", "));
-                eprintln!("Use -f <file> to specify a file explicitly.");
-                process::exit(EXIT_USAGE);
-            }
+    if file.is_some() && force_global {
+        eprintln!("error: -f and -g cannot be combined");
+        process::exit(EXIT_USAGE);
+    }
+
+    let selection = if let Some(f) = file {
+        QuefileSelection {
+            project: Some(QuefileSource { path: f, global: false }),
+            global: None,
         }
+    } else if force_global {
+        match find_global_quefile() {
+            Some(g) => QuefileSelection { project: None, global: Some(g) },
+            None => exit_no_quefile(true),
+        }
+    } else {
+        let selection = QuefileSelection {
+            project: find_project_quefile(),
+            global: find_global_quefile(),
+        };
+        if selection.project.is_none() && selection.global.is_none() {
+            exit_no_quefile(false);
+        }
+        selection
     };
-    (path, rest)
+    (selection, rest)
 }
 
 /// Load and execute a Quefile, returning the interpreter with all
 /// definitions in scope.
-fn load_quefile(path: &str) -> Interpreter {
+fn load_quefile(file: &QuefileSource) -> Interpreter {
+    let path = file.path.as_str();
     let source = match fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
@@ -271,6 +405,15 @@ fn load_quefile(path: &str) -> Interpreter {
     interp.direct_output = true;
     let abs_path = std::fs::canonicalize(path).unwrap_or_else(|_| Path::new(path).to_path_buf());
     interp.set_script_path(abs_path);
+    // A global task reads and writes files where the user is standing, not
+    // where the Quefile lives, so its skip-detection cache belongs there too.
+    // One cache under the home directory would otherwise describe every
+    // project the user has ever run a global task in.
+    if file.global {
+        if let Ok(cwd) = env::current_dir() {
+            interp.set_task_cache_dir(cwd);
+        }
+    }
     interp.init_module_loader();
     match interp.exec_module(&module) {
         Ok(_) => {}
@@ -304,11 +447,11 @@ fn collect_tasks(interp: &Interpreter) -> Vec<(String, Box<que_lang::value::Task
     tasks
 }
 
-/// Parse run args: extract -f, task name, --help/--dry-run flags, and optional task args after `--`.
+/// Parse run args: extract -f/-g, task name, --help/--dry-run flags, and optional task args after `--`.
 fn parse_run_args(
     args: &[String],
 ) -> (
-    String,
+    QuefileSelection,
     Option<String>,
     bool,
     bool,
@@ -322,7 +465,7 @@ fn parse_run_args(
         (args, Vec::new())
     };
 
-    let (path, rest) = resolve_quefile(before_sep);
+    let (selection, rest) = resolve_quefile(before_sep);
     let mut task_name: Option<String> = None;
     let mut help = false;
     let mut dry_run = false;
@@ -345,12 +488,50 @@ fn parse_run_args(
         }
         idx += 1;
     }
-    (path, task_name, help, dry_run, policy, task_args)
+    (selection, task_name, help, dry_run, policy, task_args)
 }
 
-/// `que run [-f file] [--help] <task> [-- arg1 arg2 ...]`
+/// The outcome of looking a task name up across the selected Quefiles.
+enum TaskLookup {
+    Found(QuefileSource, Interpreter, Box<que_lang::value::TaskData>),
+    /// The name exists but is bound to something else — reported rather than
+    /// fallen through, because a collision like that is a mistake worth seeing.
+    NotATask(QuefileSource, String),
+    Missing,
+}
+
+/// Find `task_name`, trying the project Quefile first and the global one only
+/// if the project file does not define it.
+///
+/// The global file is not merely searched last, it is not *executed* at all
+/// unless it is needed: a project run should never pay for — nor be disturbed
+/// by — whatever the user keeps in their home directory.
+fn lookup_task(selection: &QuefileSelection, task_name: &str) -> TaskLookup {
+    if let Some(project) = &selection.project {
+        let interp = load_quefile(project);
+        match interp.env.get(task_name) {
+            Some(Value::Task(t)) => return TaskLookup::Found(project.clone(), interp, t),
+            Some(other) => {
+                return TaskLookup::NotATask(project.clone(), other.type_name().to_string())
+            }
+            None => {}
+        }
+    }
+
+    let Some(global) = &selection.global else {
+        return TaskLookup::Missing;
+    };
+    let interp = load_quefile(global);
+    match interp.env.get(task_name) {
+        Some(Value::Task(t)) => TaskLookup::Found(global.clone(), interp, t),
+        Some(other) => TaskLookup::NotATask(global.clone(), other.type_name().to_string()),
+        None => TaskLookup::Missing,
+    }
+}
+
+/// `que run [-f file | -g] [--help] <task> [-- arg1 arg2 ...]`
 fn cmd_run(args: &[String]) {
-    let (path, task_name, help, dry_run, policy, task_args) = parse_run_args(args);
+    let (selection, task_name, help, dry_run, policy, task_args) = parse_run_args(args);
 
     let task_name = match task_name {
         Some(n) => n,
@@ -361,67 +542,78 @@ fn cmd_run(args: &[String]) {
         }
     };
 
-    let mut interp = load_quefile(&path);
-    interp.dry_run = dry_run;
-    interp.permissions = policy;
-    let task_val = match interp.env.get(&task_name) {
-        Some(v) => v,
-        None => {
-            eprintln!("error: no task named '{}' in {}", task_name, path);
+    let (source, mut interp, task) = match lookup_task(&selection, &task_name) {
+        TaskLookup::Found(source, interp, task) => (source, interp, task),
+        TaskLookup::NotATask(source, kind) => {
+            eprintln!(
+                "error: '{}' in {} is not a task (it's a {})",
+                task_name, source.path, kind
+            );
+            process::exit(EXIT_USAGE);
+        }
+        TaskLookup::Missing => {
+            match (&selection.project, &selection.global) {
+                (Some(project), Some(global)) => {
+                    eprintln!("error: no task named '{}' in {}", task_name, project.path);
+                    eprintln!("       and none in the global Quefile {}", global.path);
+                }
+                (Some(project), None) => {
+                    eprintln!("error: no task named '{}' in {}", task_name, project.path);
+                }
+                (None, Some(global)) => {
+                    eprintln!(
+                        "error: no task named '{}' in the global Quefile {}",
+                        task_name, global.path
+                    );
+                }
+                (None, None) => eprintln!("error: no task named '{}'", task_name),
+            }
             process::exit(EXIT_USAGE);
         }
     };
 
-    match task_val {
-        Value::Task(t) => {
-            if help {
-                print_task_help(&path, &t);
-                return;
+    interp.dry_run = dry_run;
+    interp.permissions = policy;
+
+    if help {
+        print_task_help(&source, &task);
+        return;
+    }
+    // Parse task args: `key=value` → named, plain values → positional
+    let arg_values: Vec<(Option<String>, Value)> = task_args
+        .iter()
+        .map(|s| {
+            if let Some(eq_pos) = s.find('=') {
+                let key = s[..eq_pos].to_string();
+                let val = s[eq_pos + 1..].to_string();
+                (Some(key), Value::String(val))
+            } else {
+                (None, Value::String(s.clone()))
             }
-            // Parse task args: `key=value` → named, plain values → positional
-            let arg_values: Vec<(Option<String>, Value)> = task_args
-                .iter()
-                .map(|s| {
-                    if let Some(eq_pos) = s.find('=') {
-                        let key = s[..eq_pos].to_string();
-                        let val = s[eq_pos + 1..].to_string();
-                        (Some(key), Value::String(val))
-                    } else {
-                        (None, Value::String(s.clone()))
-                    }
-                })
-                .collect();
-            match interp.execute_task(&t, arg_values) {
-                Ok(_) => {}
-                Err(Signal::Error(e)) => {
-                    eprintln!("task '{}' failed: {}", task_name, e);
-                    process::exit(e.process_exit_code());
-                }
-                Err(Signal::Exit(code)) => {
-                    process::exit(code);
-                }
-                Err(Signal::Interrupted(sig)) => exit_interrupted(sig),
-                Err(_) => {}
-            }
+        })
+        .collect();
+    match interp.execute_task(&task, arg_values) {
+        Ok(_) => {}
+        Err(Signal::Error(e)) => {
+            eprintln!("task '{}' failed: {}", task_name, e);
+            process::exit(e.process_exit_code());
         }
-        _ => {
-            eprintln!(
-                "error: '{}' is not a task (it's a {})",
-                task_name,
-                task_val.type_name()
-            );
-            process::exit(EXIT_USAGE);
+        Err(Signal::Exit(code)) => {
+            process::exit(code);
         }
+        Err(Signal::Interrupted(sig)) => exit_interrupted(sig),
+        Err(_) => {}
     }
 }
 
 /// Print usage/argument help for a single task.
-fn print_task_help(quefile_path: &str, task: &que_lang::value::TaskData) {
+fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
+    let run = source.run_prefix();
     // Usage line — show both positional and named forms for params
     if task.params.is_empty() {
         println!(
-            "Usage: que run [-f {}] {}",
-            quefile_path, task.name
+            "Usage: {} {}",
+            run, task.name
         );
     } else {
         let param_usage: Vec<String> = task.params.iter().map(|p| {
@@ -432,8 +624,8 @@ fn print_task_help(quefile_path: &str, task: &que_lang::value::TaskData) {
             }
         }).collect();
         println!(
-            "Usage: que run [-f {}] {} -- {}",
-            quefile_path, task.name, param_usage.join(" ")
+            "Usage: {} {} -- {}",
+            run, task.name, param_usage.join(" ")
         );
         // Also show positional form if params exist
         let positional_usage: Vec<String> = task.params.iter().map(|p| {
@@ -444,8 +636,8 @@ fn print_task_help(quefile_path: &str, task: &que_lang::value::TaskData) {
             }
         }).collect();
         println!(
-            "       que run [-f {}] {} -- {}  (positional)",
-            quefile_path, task.name, positional_usage.join(" ")
+            "       {} {} -- {}  (positional)",
+            run, task.name, positional_usage.join(" ")
         );
     }
 
@@ -488,38 +680,81 @@ fn print_task_help(quefile_path: &str, task: &que_lang::value::TaskData) {
     }
 }
 
-/// `que tasks [-f file]`
+/// `que tasks [-f file | -g]`
 fn cmd_tasks(args: &[String]) {
-    let (path, extra) = resolve_quefile(args);
+    let (selection, extra) = resolve_quefile(args);
 
     if !extra.is_empty() {
         eprintln!("error: unexpected arguments: {}", extra.join(" "));
-        eprintln!("Usage: que tasks [-f <file>]");
+        eprintln!("Usage: que tasks [-f <file>] [-g]");
         process::exit(EXIT_USAGE);
     }
 
-    let interp = load_quefile(&path);
-    let tasks = collect_tasks(&interp);
+    let mut project_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut printed = false;
 
-    if tasks.is_empty() {
-        println!("No tasks defined in {}", path);
-        return;
+    if let Some(project) = &selection.project {
+        let interp = load_quefile(project);
+        let tasks = collect_tasks(&interp);
+        project_names = tasks.iter().map(|(n, _)| n.clone()).collect();
+        if tasks.is_empty() {
+            println!("No tasks defined in {}", project.path);
+        } else {
+            print_task_section(
+                &format!("Tasks in {}:", project.path),
+                &tasks,
+                &std::collections::HashSet::new(),
+            );
+        }
+        printed = true;
     }
 
+    if let Some(global) = &selection.global {
+        let interp = load_quefile(global);
+        let tasks = collect_tasks(&interp);
+        if !tasks.is_empty() {
+            if printed {
+                println!();
+            }
+            // Names the project file already defines are unreachable without
+            // `-g`, so they are listed but marked rather than quietly dropped.
+            print_task_section(
+                &format!("Global tasks in {}:", global.path),
+                &tasks,
+                &project_names,
+            );
+            printed = true;
+        }
+    }
+
+    if !printed {
+        println!("No tasks defined");
+    }
+}
+
+/// Print one titled block of tasks, marking any name in `shadowed_by`.
+fn print_task_section(
+    title: &str,
+    tasks: &[(String, Box<que_lang::value::TaskData>)],
+    shadowed_by: &std::collections::HashSet<String>,
+) {
     // Build display strings and find the longest left column for alignment
     let entries: Vec<(String, String)> = tasks.iter().map(|(name, data)| {
-        let left = if data.depends_on.is_empty() {
+        let mut left = if data.depends_on.is_empty() {
             name.clone()
         } else {
             format!("{} [{}]", name, data.depends_on.join(", "))
         };
+        if shadowed_by.contains(name) {
+            left.push_str(" (shadowed)");
+        }
         let desc = data.description.as_deref().unwrap_or("").to_string();
         (left, desc)
     }).collect();
 
     let max_left = entries.iter().map(|(l, _)| l.len()).max().unwrap_or(0);
 
-    println!("Tasks in {}:", path);
+    println!("{}", title);
     println!();
     for (left, desc) in &entries {
         if desc.is_empty() {

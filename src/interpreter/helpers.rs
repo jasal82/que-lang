@@ -126,7 +126,7 @@ pub(crate) fn shell_command(text: &str) -> std::process::Command {
 ///
 /// `HOME` first so a POSIX-style override keeps working under MSYS/Cygwin,
 /// then Windows' `USERPROFILE`, then its `HOMEDRIVE`+`HOMEPATH` pair.
-pub(crate) fn home_dir() -> Option<String> {
+pub fn home_dir() -> Option<String> {
     if let Ok(h) = std::env::var("HOME") {
         if !h.is_empty() {
             return Some(h);

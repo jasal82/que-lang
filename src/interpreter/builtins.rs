@@ -534,6 +534,48 @@ impl Interpreter {
                 };
                 Ok(Value::Path(crate::interpreter::helpers::expand_tilde(&s)))
             }
+            "cd" => {
+                // Change the working directory of the whole `que` process and
+                // hand back the one we left. Returning the old directory is
+                // what lets a scoped form be written in Que rather than baked
+                // into the language:
+                //
+                //     impl Contextual for Dir {
+                //         fn enter(self) -> Path { cd(self.path) }
+                //         fn exit(self, previous) { cd(previous) }
+                //     }
+                //
+                // The capability policy is unaffected: its path grants were
+                // resolved to absolute paths when the flags were parsed, so
+                // `cd` moves the script, never the fence around it.
+                let val = args.first().ok_or_else(|| {
+                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "cd() requires 1 argument"))
+                })?;
+                let target = match val {
+                    Value::String(s) | Value::Path(s) => {
+                        crate::interpreter::helpers::expand_tilde(s)
+                    }
+                    other => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            format!("cd() requires a string or path, got {}", other.type_name()),
+                        )))
+                    }
+                };
+                let previous = std::env::current_dir()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                // A dry run still moves: the directory a later command would
+                // have run in is part of the plan the run exists to show, and
+                // every effect that directory feeds is suppressed on its own.
+                std::env::set_current_dir(&target).map_err(|e| {
+                    Signal::Error(QueError::new(
+                        ErrorKind::IoError,
+                        format!("cd '{}': {}", target, e),
+                    ))
+                })?;
+                Ok(Value::Path(previous))
+            }
             // The global spelling only; `"a/b".to_path()` is still a String
             // method, and that is the form worth keeping.
             "to_path" => {
@@ -1325,7 +1367,7 @@ fn builtin_groups() -> Vec<(&'static str, Vec<&'static str>)> {
         ("Types",          vec!["typeof", "str", "int", "float", "bool"]),
         ("Numbers",        vec!["abs", "min", "max", "range"]),
         ("Strings",        vec!["chr", "ord"]),
-        ("Paths & FS",     vec!["path", "glob", "open", "quefile_dir", "script_dir"]),
+        ("Paths & FS",     vec!["path", "glob", "open", "cd", "quefile_dir", "script_dir"]),
         ("Errors/Results", vec!["Ok", "Err", "fail", "assert"]),
         ("Process",        vec!["which", "retry", "timeout", "sleep", "dry_run"]),
         ("Tasks",          vec!["tasks", "run_task"]),

@@ -112,7 +112,7 @@
 
         'keyword': /\b(?:let|mut|fn|pub|task|struct|enum|impl|trait|type|if|else|match|for|in|while|loop|return|break|continue|import|as|true|false|null|defer|try|catch|finally|with|spawn|parallel)\b/,
 
-        'builtin': /\b(?:env|os|path|glob|args|println|print|typeof|str|int|float|bool|abs|min|max|range|chr|ord|Ok|Err|open|secret|assert|fail|dry_run|sleep|compose|retry|timeout|semver_parse|which|dbg|strict|tasks|run_task|regex|input|confirm|script_dir|quefile_dir|help)\b/,
+        'builtin': /\b(?:env|os|path|cd|glob|args|println|print|typeof|str|int|float|bool|abs|min|max|range|chr|ord|Ok|Err|open|secret|assert|fail|dry_run|sleep|compose|retry|timeout|semver_parse|which|dbg|strict|tasks|run_task|regex|input|confirm|script_dir|quefile_dir|help)\b/,
 
         'number': /\b0x[0-9a-fA-F]+\b|\b0o[0-7]+\b|\b\d[\d_]*(?:\.\d+)?\b/,
 

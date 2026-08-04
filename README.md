@@ -54,7 +54,13 @@ Run tasks from a Quefile:
 ```sh
 que run build          # run a task
 que tasks              # list available tasks
+que run -g backup      # run a task from the global Quefile (~/.que/Quefile)
 ```
+
+The nearest Quefile at or above the current directory is used, so `que run`
+works from anywhere inside a project. Tasks run in the directory you invoked
+`que` from — use `quefile_dir()` for paths relative to the Quefile itself.
+Tasks it does not define fall back to your global Quefile.
 
 Run tests:
 

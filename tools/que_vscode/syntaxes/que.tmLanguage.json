@@ -563,7 +563,7 @@
       "patterns": [
         {
           "comment": "Built-in function calls",
-          "match": "\\b(print|println|input|confirm|typeof|str|int|float|bool|abs|min|max|range|chr|ord|assert|compose|secret|fail|sleep|quefile_dir|script_dir|dry_run|path|glob|open|which|retry|timeout|semver_parse|regex|dbg|help|args|tasks|run_task|strict)\\s*(?=\\()",
+          "match": "\\b(print|println|input|confirm|typeof|str|int|float|bool|abs|min|max|range|chr|ord|assert|compose|secret|fail|sleep|quefile_dir|script_dir|dry_run|path|cd|glob|open|which|retry|timeout|semver_parse|regex|dbg|help|args|tasks|run_task|strict)\\s*(?=\\()",
           "captures": {
             "1": { "name": "support.function.builtin.que" }
           }

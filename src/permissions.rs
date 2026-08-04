@@ -436,6 +436,11 @@ pub fn global_effect(name: &str) -> Option<GlobalEffect> {
         // ── filesystem ──
         "glob" => Needs(Read, Some(0)),
         "which" => Needs(Read, None),
+        // Moving the process into a directory is a read of it: the directory
+        // has to exist, and every relative path afterwards resolves through
+        // it. The grants themselves were made absolute when the flags were
+        // parsed, so `cd` moves the script and not the fence around it.
+        "cd" => Needs(Read, Some(0)),
         // `with TempDir {}` / `with TempFile {}` desugar to these. Entering
         // creates under a base directory named by a field; exiting deletes
         // the path it is handed back.

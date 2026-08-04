@@ -292,12 +292,16 @@ impl Interpreter {
         Ok(paths)
     }
 
-    /// Directory holding the cache file: next to the script being run.
+    /// Directory holding the cache file: next to the script being run, unless
+    /// a caller pinned it elsewhere with `set_task_cache_dir`.
     ///
     /// `None` for source evaluated from memory (the REPL, embedding, tests).
     /// There is no project directory to anchor a cache to, and writing one into
     /// whatever the current directory happens to be would be a surprise.
     fn task_cache_dir(&self) -> Option<std::path::PathBuf> {
+        if let Some(dir) = &self.task_cache_dir_override {
+            return Some(dir.clone());
+        }
         self.script_path
             .as_ref()?
             .parent()

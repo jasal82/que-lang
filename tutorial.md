@@ -115,6 +115,7 @@ println("hi")   // inline comment
 | `que run <task> --help` | Show task usage and argument table |
 | `que run <task> -- arg1 arg2` | Run task with positional arguments |
 | `que run <task> -- key=val` | Run task with named arguments |
+| `que run -g <task>` | Run a task from the global Quefile |
 | `que tasks` | List available tasks |
 | `que fmt` | Format source files |
 | `que lint` | Lint source files |
@@ -5119,6 +5120,7 @@ Then use the CLI:
 que tasks                              # list all tasks
 que run deploy                         # run a task (with dependencies)
 que run -f build/pipeline.que deploy   # use a specific Quefile
+que run -g backup                      # run a task from the global Quefile
 que run build --help                   # show task usage and argument table
 que run build -- linux-amd64           # positional arguments
 que run build -- target=linux mode=release  # named arguments
@@ -5126,6 +5128,29 @@ que run build -- target=linux mode=release  # named arguments
 
 `que run` accepts exactly one task name. Dependencies are resolved and run
 automatically before the named task.
+
+#### Where the Quefile comes from
+
+Without `-f`, Que looks for `Quefile`, `Quefile.que`, or `quefile.que` in the
+current directory and then in each parent, so `que run test` works from
+anywhere inside a project. The task runs in the Quefile's own directory, which
+is what its relative paths were written against.
+
+A task the project Quefile does not define is looked up in your **global
+Quefile**, the first of these that exists:
+
+```
+$QUE_HOME/Quefile
+$XDG_CONFIG_HOME/que/Quefile
+~/.config/que/Quefile
+~/.que/Quefile
+```
+
+Global tasks are the ones you want everywhere — `backup`, `sync-dotfiles`,
+`scaffold` — so they run in the directory you invoked `que` from, not in your
+home directory. A project task shadows a global task of the same name; `-g`
+ignores the project Quefile and goes straight to the global one. `que tasks`
+lists both, marking shadowed global names.
 
 ---
 
@@ -6129,8 +6154,10 @@ pattern if guard            // guard
 | `que run <task> -- arg1 arg2` | Run task with positional arguments |
 | `que run <task> -- key=val` | Run task with named arguments |
 | `que run -f <file> <task>` | Run task from a specific file |
+| `que run -g <task>` | Run task from the global Quefile (`~/.que/Quefile`) |
 | `que tasks` | List available tasks |
 | `que tasks -f <file>` | List tasks in a specific file |
+| `que tasks -g` | List tasks in the global Quefile |
 | `que fmt` | Format source files |
 | `que fmt --check` | Check formatting (CI) |
 | `que lint` | Lint source files |
@@ -6167,6 +6194,7 @@ pattern if guard            // guard
 | `path(str)` | Create a typed Path |
 | `path.home()` | Home directory as Path |
 | `script_dir()` / `quefile_dir()` | Directory of the running script, as Path |
+| `cd(dir)` | Change the process working directory, returns the old one |
 | `glob(pattern)` | Create a typed Glob |
 | `regex(str)` | Create a Regex from a runtime string (returns `Result`) |
 | `secret(str)` | Create a Secret value |

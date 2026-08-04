@@ -23,6 +23,8 @@ pub(crate) mod std_modules;
 pub(crate) mod task_cache;
 mod tasks;
 
+pub use helpers::home_dir;
+
 // ── Assignment path segments ─────────────────────────────────────────
 
 enum AssignSegment {
@@ -93,6 +95,12 @@ pub struct Interpreter {
     /// On-disk record of the contents each task last consumed and produced,
     /// used when file timestamps are not trustworthy. Loaded on first task.
     task_cache_file: task_cache::TaskCache,
+    /// Directory the on-disk task cache anchors to, when it must not follow
+    /// the script. A global Quefile lives in the user's home but its tasks
+    /// read and write files in whatever directory `que` was invoked from,
+    /// so one shared cache next to the script would describe every project
+    /// at once.
+    task_cache_dir_override: Option<std::path::PathBuf>,
     /// Module loader: resolves imports, caches loaded modules, detects cycles.
     pub(crate) module_loader: Option<ModuleLoader>,
     /// Path of the script/module being executed (for resolving local imports).
@@ -157,7 +165,7 @@ pub const BUILTIN_NAMES: &[&str] = &[
         // Additional builtins
         "secret", "fail", "sleep", "input", "confirm",
         "quefile_dir", "script_dir", "dry_run",
-        "path",
+        "path", "cd",
         "glob",
         // File handle
         "open",
@@ -213,6 +221,7 @@ impl Interpreter {
             task_status: std::collections::HashMap::new(),
             task_cache: std::collections::HashMap::new(),
             task_cache_file: task_cache::TaskCache::default(),
+            task_cache_dir_override: None,
             dry_run: false,
             permissions: None,
             secrets: Vec::new(),
@@ -244,6 +253,13 @@ impl Interpreter {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned());
         self.script_path = Some(path);
+    }
+
+    /// Anchor the on-disk task cache to `dir` instead of the script's own
+    /// directory. Used for the global Quefile, whose tasks operate on the
+    /// directory the user is standing in.
+    pub fn set_task_cache_dir(&mut self, dir: std::path::PathBuf) {
+        self.task_cache_dir_override = Some(dir);
     }
 
     /// Set the script's command-line arguments (returned by the `args()` builtin).

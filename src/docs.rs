@@ -355,6 +355,12 @@ pub fn builtin_functions() -> Vec<BuiltinInfo> {
             kind: BuiltinKind::Function,
         },
         BuiltinInfo {
+            name: "cd",
+            signature: "cd(dir: Path | String) -> Path",
+            documentation: "Change the working directory of the `que` process, returning the directory it left.\n\n`que` itself never changes directory: a task runs where you invoked it, and `quefile_dir()` is there when you want the project root instead. `cd` is the escape hatch for a script that genuinely needs to move.\n\nThe change outlives the block it appears in. Use the returned path to go back, or wrap it in a `Contextual` type so the return is not something you can forget:\n\n```que\nstruct Dir { path }\n\nimpl Contextual for Dir {\n    fn enter(self) -> Path { cd(self.path) }\n    fn exit(self, previous) { cd(previous) }\n}\n\nwith Dir { path: quefile_dir() } {\n    `make -j8`.run()\n}\n```\n\nThe working directory belongs to the process, not to a branch, so a `cd` inside `parallel` moves every other branch with it. Prefer `` `cmd`.dir(p) `` to point a single command somewhere else.\n\nCapability grants are resolved when the flags are parsed, so `cd` cannot widen what `--allow read=./data` covers.",
+            kind: BuiltinKind::Function,
+        },
+        BuiltinInfo {
             name: "args",
             signature: "args() -> List<String>",
             documentation: "Return the command-line arguments passed to the script. Returns an empty list in REPL mode or when no arguments were given.\n\nArguments after the script name are collected; an optional `--` separator can be used to make argument boundaries explicit (everything after `--` is passed through, even if it looks like a flag).\n\n```sh\nque script.que one two three\nque script.que -- --flag a b\n```\n\n```que\nlet a = args()           // [\"one\", \"two\", \"three\"]\nif len(a) < 1 {\n    println(\"usage: script.que <name>\")\n    os.exit(1)\n}\n```",
