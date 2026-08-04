@@ -277,7 +277,14 @@ impl Interpreter {
                 args,
             } => {
                 let obj = self.eval_expr(object)?;
-                self.dispatch_method(obj, method, args)
+                // Whatever an earlier call parked here is not ours; clearing
+                // first means a stale value can never land on this receiver.
+                self.pending_self_writeback = None;
+                let result = self.dispatch_method(obj, method, args);
+                let written = self.apply_self_writeback(object, method);
+                // A failed call still wrote back what it changed, but its own
+                // error is the one worth reporting.
+                result.and_then(|v| written.map(|_| v))
             }
             Expr::FieldAccess { object, field } => {
                 let obj = self.eval_expr(object)?;
@@ -1508,9 +1515,9 @@ impl Interpreter {
         for param in &method.params {
             if param.name == "self" {
                 if let Some(sv) = &self_val {
-                    self.env.define("self", sv.clone(), false);
+                    self.env.define("self", sv.clone(), method.mutates_self);
                 } else {
-                    self.env.define("self", Value::Null, false);
+                    self.env.define("self", Value::Null, method.mutates_self);
                 }
             } else {
                 let val = arg_iter.next()
@@ -1521,16 +1528,66 @@ impl Interpreter {
         }
 
         let result = self.eval_block(&method.body);
+        // Read `self` back before the frame goes away. Even a failed body has
+        // to hand back what it managed to change: the alternative is a method
+        // that half-updated a struct and then discarded the evidence.
+        let updated_self = if method.mutates_self {
+            self.env.get("self")
+        } else {
+            None
+        };
         self.env.pop_scope();
         self.env = saved_env;
         self.current_span = saved_span;
         self.current_file = saved_file;
         self.call_stack.pop();
+        if method.mutates_self {
+            self.pending_self_writeback = updated_self;
+        }
 
         match result {
             Ok(v) => Ok(v),
             Err(Signal::Return(v)) => Ok(v),
             Err(e) => Err(e),
+        }
+    }
+
+    /// Store what a `mut self` method left in `self` back over the expression
+    /// it was called on.
+    ///
+    /// `c.bump()` has to mean `c = <c after bump>`, and the only expressions
+    /// that can express is a variable or a path into one. Anything else —
+    /// `Counter().bump()`, `list_of()[0].bump()` — would mutate a value that
+    /// is discarded on the next line, so it is an error rather than a no-op
+    /// nobody can see.
+    fn apply_self_writeback(&mut self, receiver: &Expr, method: &str) -> Result<(), Signal> {
+        let Some(new_self) = self.pending_self_writeback.take() else {
+            return Ok(());
+        };
+        match receiver {
+            Expr::Ident(_) | Expr::FieldAccess { .. } | Expr::Index { .. } => {
+                self.assign_target(receiver, new_self).map_err(|e| match e {
+                    // The generic "cannot assign to X" is true but hides why
+                    // an ordinary-looking call needs a mutable binding.
+                    Signal::Error(err) if err.kind == ErrorKind::ImmutableVariable => {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ImmutableVariable,
+                            format!(
+                                "{}() takes `mut self`, so what it is called on has to be declared with `mut` rather than `let`",
+                                method
+                            ),
+                        ))
+                    }
+                    other => other,
+                })
+            }
+            _ => Err(Signal::Error(QueError::new(
+                ErrorKind::InvalidAssignmentTarget,
+                format!(
+                    "{}() takes `mut self`, so it needs a receiver it can write back to: call it on a variable, not on a temporary",
+                    method
+                ),
+            ))),
         }
     }
 
@@ -1849,6 +1906,10 @@ impl Interpreter {
                 format!("Contextual impl for '{}' missing 'enter'", type_name),
             )))?;
         let resource = self.call_method_def(enter_method, Some(mgr.clone()), vec![])?;
+        // A `mut self` enter() has nowhere to write itself back to — the
+        // manager is usually a temporary like `with Dir("/tmp")` — so the
+        // block owns it, and exit() sees what enter() changed.
+        let mgr = self.pending_self_writeback.take().unwrap_or(mgr);
 
         // Run body in new scope with resource bound to name
         self.env.push_scope();
@@ -1860,6 +1921,7 @@ impl Interpreter {
         let exit_method = self.find_instance_method(&type_name, "exit");
         if let Some(exit_m) = exit_method {
             let _ = self.call_method_def(exit_m, Some(mgr), vec![resource]);
+            self.pending_self_writeback = None;
         }
 
         body_result

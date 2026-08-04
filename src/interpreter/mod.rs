@@ -146,6 +146,14 @@ pub struct Interpreter {
     /// `--` on the `que script.que -- ...` command line). Empty for the REPL
     /// and for the `que run` task subcommand (tasks consume their own args).
     pub(crate) script_args: Vec<String>,
+    /// What a `mut self` method left in `self`, waiting to be written back
+    /// over the expression it was called on.
+    ///
+    /// An instance is a value, not a reference, so the method mutates a copy;
+    /// the copy only becomes the caller's if someone stores it. The call site
+    /// is the only place that knows *where* to store it, so the value is
+    /// parked here for the one step between the two.
+    pub(crate) pending_self_writeback: Option<Value>,
 }
 
 impl Default for Interpreter {
@@ -241,6 +249,7 @@ impl Interpreter {
             log_format: helpers::LogFormat::Text,
             log_sinks: vec![helpers::default_console_sink()],
             script_args: Vec::new(),
+            pending_self_writeback: None,
         };
         interp.register_builtins();
         interp
@@ -585,6 +594,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 return Ok(crate::value::MethodDef {
                     name: decl.name,
                     is_static,
+                    mutates_self: decl.mutates_self,
                     params: decl.params,
                     body: decl.body,
                     closure_env: crate::environment::Environment::new(),
@@ -621,6 +631,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             crate::value::MethodDef {
                 name: d.name.clone(),
                 is_static,
+                mutates_self: d.mutates_self,
                 params: d.params.clone(),
                 body: d.body.clone(),
                 closure_env: self.env.clone(),
@@ -960,6 +971,10 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                                 defaults_to_add.push(crate::value::MethodDef {
                                     name: default_method.name.clone(),
                                     is_static,
+                                    // A trait's default body is shared by every
+                                    // implementor, so it cannot claim the
+                                    // receiver of any one of them.
+                                    mutates_self: false,
                                     params: default_method.params.clone(),
                                     body: body.clone(),
                                     closure_env: self.env.clone(),
@@ -1363,7 +1378,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         }
     }
 
-    fn assign_target(&mut self, target: &Expr, value: Value) -> Result<(), Signal> {
+    pub(crate) fn assign_target(&mut self, target: &Expr, value: Value) -> Result<(), Signal> {
         match target {
             Expr::Ident(name) => self.env.set(name, value).map_err(|msg| {
                 Signal::Error(QueError::new(ErrorKind::ImmutableVariable, msg))

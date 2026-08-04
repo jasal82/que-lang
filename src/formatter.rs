@@ -106,6 +106,9 @@ impl Formatter {
         self.push_str("fn ");
         self.push_str(&f.name);
         self.push_str("(");
+        if f.mutates_self {
+            self.push_str("mut ");
+        }
         self.format_params(&f.params);
         self.push_str(")");
         if let Some(ref ty) = f.return_type {

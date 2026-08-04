@@ -8748,6 +8748,113 @@ c.value
 }
 
 #[test]
+fn a_mut_self_method_updates_the_value_it_was_called_on() {
+    assert_result(r#"
+struct Counter { n: Int = 0 }
+impl Counter {
+    fn bump(mut self) { self.n = self.n + 1 }
+}
+mut c = Counter {}
+c.bump()
+c.bump()
+c.n
+"#, Value::Int(2));
+}
+
+#[test]
+fn a_mut_self_method_still_returns_a_value() {
+    assert_result(r#"
+struct Counter { n: Int = 0 }
+impl Counter {
+    fn add(mut self, k) -> Int { self.n = self.n + k; self.n }
+}
+mut c = Counter {}
+let doubled = c.add(4) + c.add(0)
+[c.n, doubled]
+"#, Value::List(vec![Value::Int(4), Value::Int(8)]));
+}
+
+#[test]
+fn a_mut_self_method_reaches_through_a_field_path() {
+    assert_result(r#"
+struct Counter { n: Int = 0 }
+struct Box { inner }
+impl Counter {
+    fn bump(mut self) { self.n = self.n + 1 }
+}
+mut b = Box { inner: Counter {} }
+b.inner.bump()
+b.inner.n
+"#, Value::Int(1));
+}
+
+#[test]
+fn a_mut_self_method_needs_a_mut_binding() {
+    // The write-back is an assignment, so `let` refuses it — and says why,
+    // rather than reporting a bare "immutable variable" for a line that
+    // contains no assignment.
+    assert_error_contains(r#"
+struct Counter { n: Int = 0 }
+impl Counter {
+    fn bump(mut self) { self.n = self.n + 1 }
+}
+let c = Counter {}
+c.bump()
+"#, "bump() takes `mut self`");
+}
+
+#[test]
+fn a_mut_self_method_refuses_a_receiver_nobody_can_see_again() {
+    assert_error_contains(r#"
+struct Counter { n: Int = 0 }
+impl Counter {
+    fn new() -> Counter { Counter {} }
+    fn bump(mut self) { self.n = self.n + 1 }
+}
+Counter().bump()
+"#, "call it on a variable, not on a temporary");
+}
+
+#[test]
+fn a_plain_self_is_still_a_copy_the_method_cannot_write_to() {
+    assert_error_contains(r#"
+struct Counter { n: Int = 0 }
+impl Counter {
+    fn bump(self) { self.n = self.n + 1 }
+}
+mut c = Counter {}
+c.bump()
+"#, "cannot assign to immutable variable 'self'");
+}
+
+#[test]
+fn only_the_receiver_can_be_declared_mut() {
+    assert_error_contains(
+        "fn f(mut a) { a }",
+        "only `self` can be declared `mut`",
+    );
+}
+
+#[test]
+fn a_mut_self_enter_is_visible_to_exit() {
+    // `with Dir(...)` has no variable to write the manager back to, so the
+    // `with` itself carries what enter() changed through to exit().
+    assert_output(r#"
+struct Trace { mark }
+impl Trace {
+    fn new() -> Trace { Trace { mark: "unset" } }
+}
+impl Contextual for Trace {
+    fn enter(mut self) { self.mark = "entered" }
+    fn exit(self, resource) { println("exit saw " + self.mark) }
+}
+with Trace() {
+    println("body")
+}
+"#, &["body", "exit saw entered"]);
+}
+
+#[test]
 fn struct_typeof() {
     assert_output(r#"
 struct Dog { name: String }

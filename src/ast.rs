@@ -93,6 +93,9 @@ pub struct FnDecl {
     pub return_type: Option<TypeExpr>,
     pub body: Block,
     pub is_pub: bool,
+    /// Declared `fn m(mut self, ...)`: the method may reassign `self`, and the
+    /// value it leaves behind is written back over the receiver.
+    pub mutates_self: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

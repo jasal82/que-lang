@@ -20,6 +20,9 @@ pub struct MethodDef {
     pub name: String,
     /// True if this method has no `self` first parameter (static / constructor).
     pub is_static: bool,
+    /// True for `fn m(mut self, ...)`: the receiver is rebound from the value
+    /// `self` holds when the body finishes.
+    pub mutates_self: bool,
     pub params: Vec<Param>,
     pub body: Block,
     pub closure_env: crate::environment::Environment,

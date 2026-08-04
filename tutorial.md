@@ -1240,6 +1240,39 @@ c = c.increment()
 println(c.value())    // 2
 ```
 
+**`mut self`** — a method that declares its receiver `mut` may assign to its
+own fields, and what it leaves in `self` is written back over the value it was
+called on:
+
+```que
+impl Counter {
+    fn bump(mut self) { self.count = self.count + 1 }
+}
+
+mut c = Counter {}
+c.bump()
+c.bump()
+println(c.value())    // 2
+```
+
+This is a rebinding, not a reference: `c.bump()` means `c = <c after bump>`.
+Two consequences follow from that, and both are errors rather than surprises:
+
+- The receiver must be declared with `mut`, because the call assigns to it.
+  `let c = Counter {}` then `c.bump()` is rejected.
+- The receiver must be something that can be assigned to. `Counter().bump()`
+  is rejected, because the mutation would land in a value that is discarded on
+  the same line.
+
+A plain `self` stays immutable, so a method cannot change its receiver by
+accident — assigning to `self.field` without `mut self` is an error. And `mut`
+is only allowed on the receiver: an ordinary parameter is a copy the caller
+never sees again, so marking it mutable would promise something Que does not do.
+
+Two names never refer to one instance. If you need shared mutable state, reach
+for a value that is genuinely one resource — a `Stream`, a file handle, a
+process handle — rather than a struct.
+
 ### Traits
 
 A **trait** defines a set of methods that a type must implement:

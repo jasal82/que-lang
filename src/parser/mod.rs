@@ -479,6 +479,27 @@ impl Parser {
         self.skip_newlines();
         let name = self.expect_ident()?;
         self.expect(&TokenKind::LParen)?;
+        // `mut` is only meaningful on the receiver: it is what turns a method
+        // into one that writes its changes back over the value it was called
+        // on. On any other parameter it would suggest the caller's argument
+        // changes too, which is not what happens, so it is rejected here
+        // rather than quietly ignored.
+        let mutates_self = if matches!(self.peek(), TokenKind::Mut) {
+            self.advance();
+            match self.peek() {
+                TokenKind::Ident(n) if n == "self" => {}
+                _ => {
+                    return Err(QueError::parser(
+                        crate::error::ErrorKind::UnexpectedToken,
+                        "only `self` can be declared `mut`; a parameter is a copy the caller never sees again",
+                        self.current_span(),
+                    ))
+                }
+            }
+            true
+        } else {
+            false
+        };
         let params = self.parse_param_list()?;
         self.expect(&TokenKind::RParen)?;
 
@@ -498,6 +519,7 @@ impl Parser {
             return_type,
             body,
             is_pub,
+            mutates_self,
         })
     }
 
