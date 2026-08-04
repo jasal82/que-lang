@@ -2311,6 +2311,55 @@ fn cmd_try_does_not_raise() {
 }
 
 #[test]
+fn bare_command_as_last_statement_of_a_task_runs() {
+    // The parser turns a block's last statement into its trailing expression;
+    // a command written there is still in statement position and must run.
+    let source = r#"
+task boom {
+    `exit 3`
+}
+@deps([boom])
+task after {
+    println("should not be reached")
+}
+after()
+"#;
+    assert_error(source);
+}
+
+#[test]
+fn bare_command_as_last_statement_of_a_loop_body_runs() {
+    assert_error("for i in [1] {\n    `exit 3`\n}");
+}
+
+#[test]
+fn bare_deferred_command_runs() {
+    // A deferred command literal is a command in statement position too, so it
+    // has to run when the block unwinds rather than be dropped as a value.
+    let marker = std::env::temp_dir().join(format!("que_defer_marker_{}", std::process::id()));
+    let _ = std::fs::remove_file(&marker);
+    let source = format!(
+        "fn f() {{\n    defer `touch {}`\n}}\nf()\n",
+        marker.display()
+    );
+    run(&source).unwrap_or_else(|e| panic!("execution failed: {}", e));
+    assert!(marker.exists(), "deferred command did not run");
+    let _ = std::fs::remove_file(&marker);
+}
+
+#[test]
+fn a_bound_cmd_returned_from_a_block_stays_lazy() {
+    let source = r#"
+fn build() {
+    let c = `exit 3`
+    c
+}
+typeof(build())
+"#;
+    assert_result(source, Value::String("Cmd".into()));
+}
+
+#[test]
 fn removed_cmd_methods_are_rejected() {
     assert_error("`echo hi`.run_checked()");
     assert_error("`echo hi`.capture()");

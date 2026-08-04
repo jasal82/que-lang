@@ -30,6 +30,22 @@ enum AssignSegment {
     Index(Value),
 }
 
+/// Whether an expression is syntactically rooted in a backtick literal.
+///
+/// This is what separates a command *written* at the end of a block —
+/// `` `ls` `` or `` `ls`.dir(d) `` — from one merely *produced* there, such as
+/// a bound `Cmd` value being returned. Only the former is in statement
+/// position and therefore runs.
+fn is_cmd_rooted(expr: &Expr) -> bool {
+    match expr {
+        Expr::CmdLit(_) => true,
+        Expr::MethodCall { object, .. } | Expr::OptionalAccess { object, .. } => {
+            is_cmd_rooted(object)
+        }
+        _ => false,
+    }
+}
+
 /// Turn an `Err(payload)` value into a raised error.
 ///
 /// Que has one error *value* (`Err`) and one error *channel* (`Signal::Error`).
@@ -1173,20 +1189,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                     // A command in statement position runs, and raises if it fails.
                     // Binding it (`let c = `cmd``) keeps it lazy so builder methods
                     // like `.dir()` and `.env()` still work.
-                    Value::Cmd(parts, mods) => {
-                        // Nothing consumes the output here, so stream it to the
-                        // terminal instead of capturing it into a dropped value.
-                        // An attached command already writes to the terminal
-                        // itself, so wrapping it in sinks would only get in the way.
-                        let mut mods = *mods;
-                        if !mods.silent && !mods.attach {
-                            mods.forward_stdout
-                                .get_or_insert_with(|| Box::new(crate::value::StreamSink::Stdout));
-                            mods.forward_stderr
-                                .get_or_insert_with(|| Box::new(crate::value::StreamSink::Stderr));
-                        }
-                        self.run_cmd_checked(&parts, &mods)
-                    }
+                    Value::Cmd(parts, mods) => self.run_cmd_in_stmt_position(&parts, *mods),
                     // An `Err` that nobody bound, matched on or unwrapped is an
                     // unhandled error. Dropping it silently is how a script gets
                     // to step 10 after step 3 failed.
@@ -1497,7 +1500,19 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         // Update span for the trailing expression so errors point to the right location.
         // current_span was already set by the last statement in stmts (if any).
         let result = if let Some(expr) = &block.expr {
-            match self.eval_expr(expr) {
+            let evaluated = self.eval_expr(expr);
+            // The parser turns a block's last statement into its trailing
+            // expression, but a backtick literal written on its own is still a
+            // command in statement position: it has to run. Only syntactically
+            // command-rooted expressions run, so returning a bound `Cmd` value
+            // (`let c = `cmd`` … `c`) stays lazy.
+            let evaluated = match evaluated {
+                Ok(Value::Cmd(parts, mods)) if is_cmd_rooted(expr) => {
+                    self.run_cmd_in_stmt_position(&parts, *mods)
+                }
+                other => other,
+            };
+            match evaluated {
                 Ok(v) => v,
                 Err(Signal::Error(mut e)) => {
                     if e.span.is_none() {
@@ -1526,6 +1541,25 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         Ok(result)
     }
 
+    /// Run a command that reached statement position: nothing consumes its
+    /// output, so stream it to the terminal and raise if it fails.
+    fn run_cmd_in_stmt_position(
+        &mut self,
+        parts: &[crate::value::CmdPart],
+        mut mods: crate::value::CmdModifiers,
+    ) -> IResult {
+        // Stream to the terminal instead of capturing into a dropped value.
+        // An attached command already writes to the terminal itself, so
+        // wrapping it in sinks would only get in the way.
+        if !mods.silent && !mods.attach {
+            mods.forward_stdout
+                .get_or_insert_with(|| Box::new(crate::value::StreamSink::Stdout));
+            mods.forward_stderr
+                .get_or_insert_with(|| Box::new(crate::value::StreamSink::Stderr));
+        }
+        self.run_cmd_checked(parts, &mods)
+    }
+
     /// Evaluate a block in a new scope.
     pub(crate) fn eval_block_scoped(&mut self, block: &Block) -> IResult {
         self.env.push_scope();
@@ -1540,7 +1574,14 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         self.in_cleanup = true;
         while self.deferred.len() > start {
             if let Some(expr) = self.deferred.pop() {
-                let _ = self.eval_expr(&expr);
+                // `defer `cmd`` is a command in statement position too — the
+                // whole point of deferring it is to have it run.
+                match self.eval_expr(&expr) {
+                    Ok(Value::Cmd(parts, mods)) if is_cmd_rooted(&expr) => {
+                        let _ = self.run_cmd_in_stmt_position(&parts, *mods);
+                    }
+                    _ => {}
+                }
             }
         }
         self.in_cleanup = was_in_cleanup;
