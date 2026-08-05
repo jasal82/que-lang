@@ -240,3 +240,38 @@ fn f_and_g_cannot_be_combined() {
         output
     );
 }
+
+#[test]
+fn a_glob_rooted_at_the_quefile_directory_still_detects_a_changed_input() {
+    // `quefile_dir() / "src/*.txt"` produces a Path, not a String. Left
+    // unexpanded it would name a file that cannot exist, so nothing would ever
+    // look stale and the task would skip for good.
+    let fixture = Fixture::new(
+        "rooted-glob",
+        Some(concat!(
+            "import std.fs { read, write }\n",
+            "@inputs([quefile_dir() / \"src/*.txt\"])\n",
+            "@outputs([quefile_dir() / \"build/out.txt\"])\n",
+            "task build {\n",
+            "    let d = quefile_dir() / \"build\"\n",
+            "    d.mkdir()\n",
+            "    write(d / \"out.txt\", read(quefile_dir() / \"src/a.txt\").unwrap())\n",
+            "}\n",
+        )),
+        None,
+    );
+    let src = fixture.root.join("project/src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("a.txt"), "v1\n").unwrap();
+
+    let first = fixture.que("project/sub", &["run", "build"]);
+    assert!(first.status.success(), "{:?}", first);
+    assert!(stdout(&first).contains("[DONE] build"), "{}", stdout(&first));
+
+    let second = fixture.que("project/sub", &["run", "build"]);
+    assert!(stdout(&second).contains("[SKIP] build"), "{}", stdout(&second));
+
+    fs::write(src.join("a.txt"), "v2\n").unwrap();
+    let third = fixture.que("project/sub", &["run", "build"]);
+    assert!(stdout(&third).contains("[DONE] build"), "{}", stdout(&third));
+}

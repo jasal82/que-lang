@@ -270,12 +270,44 @@ impl Interpreter {
         s.contains('*') || s.contains('?') || s.contains('[')
     }
 
+    /// Reject a wildcard in `outputs:`.
+    ///
+    /// A pattern there cannot be matched — the files it describes do not exist
+    /// until the task has run — so it is kept as written, and a literal `*`
+    /// never names a file. The freshness check would see an output that is
+    /// always missing and rerun the task forever, which looks like the cache
+    /// not working rather than like a mistake in the declaration.
+    ///
+    /// Only `*` and `?` are refused. A `[` is a glob metacharacter too, but it
+    /// is also a legal character in a filename, and an output that names a real
+    /// file with a bracket in it works today.
+    fn reject_output_pattern(s: &str) -> Result<(), Signal> {
+        if !s.contains('*') && !s.contains('?') {
+            return Ok(());
+        }
+        Err(Signal::Error(QueError::new(
+            ErrorKind::Runtime,
+            format!(
+                "task output '{}' is a pattern, but @outputs must name concrete \
+                 paths: the files do not exist yet when the check runs, so a \
+                 pattern would never match and the task could never be skipped. \
+                 Name the directory, or a stamp file the task writes last.",
+                s
+            ),
+        )))
+    }
+
     /// Flatten one `inputs:` / `outputs:` value into file paths.
     ///
     /// `expand_globs` is off for outputs: a pattern there describes files the
     /// task is about to create, so matching it against what exists now would
-    /// silently declare no outputs at all on the first run.
-    fn collect_task_paths(value: Value, expand_globs: bool, out: &mut Vec<String>) {
+    /// silently declare no outputs at all on the first run. A pattern written
+    /// there anyway is an error rather than a path that can never match.
+    fn collect_task_paths(
+        value: Value,
+        expand_globs: bool,
+        out: &mut Vec<String>,
+    ) -> Result<(), Signal> {
         let expand = |pattern: &str, out: &mut Vec<String>| {
             if let Ok(entries) = glob::glob(pattern) {
                 for entry in entries.flatten() {
@@ -284,28 +316,48 @@ impl Interpreter {
             }
         };
         match value {
-            Value::Path(p) => out.push(p),
-            Value::String(s) => {
-                if expand_globs && Self::is_glob_pattern(&s) {
-                    expand(&s, out);
-                } else {
-                    out.push(s);
+            // A Path carrying a pattern is treated like a String one. Rooting a
+            // pattern at the project — `quefile_dir() / "src/*.txt"` — is the
+            // natural way to write it, and leaving it unexpanded would leave the
+            // task with an input path that never exists, so nothing ever looks
+            // stale and it skips forever.
+            Value::Path(p) | Value::String(p) => {
+                if Self::is_glob_pattern(&p) {
+                    if expand_globs {
+                        expand(&p, out);
+                        return Ok(());
+                    }
+                    Self::reject_output_pattern(&p)?;
                 }
+                out.push(p);
             }
+            // An explicit `g"..."` says "pattern" out loud, so it is refused in
+            // outputs whatever characters it happens to contain.
             Value::Glob(pattern) => {
                 if expand_globs {
                     expand(&pattern, out);
                 } else {
-                    out.push(pattern);
+                    return Err(Signal::Error(QueError::new(
+                        ErrorKind::Runtime,
+                        format!(
+                            "task output '{}' is a glob, but @outputs must name \
+                             concrete paths: the files do not exist yet when the \
+                             check runs, so a pattern would never match and the \
+                             task could never be skipped. Name the directory, or \
+                             a stamp file the task writes last.",
+                            pattern
+                        ),
+                    )));
                 }
             }
             Value::List(items) => {
                 for item in items {
-                    Self::collect_task_paths(item, expand_globs, out);
+                    Self::collect_task_paths(item, expand_globs, out)?;
                 }
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Evaluate a list of path expressions to concrete paths.
@@ -317,7 +369,7 @@ impl Interpreter {
         let mut paths = Vec::new();
         for expr in exprs {
             let val = self.eval_expr(expr)?;
-            Self::collect_task_paths(val, expand_globs, &mut paths);
+            Self::collect_task_paths(val, expand_globs, &mut paths)?;
         }
         Ok(paths)
     }

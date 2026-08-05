@@ -180,8 +180,9 @@ fn print_usage() {
     eprintln!();
     eprintln!("Quefile discovery:");
     eprintln!("  The nearest Quefile at or above the current directory is used, and its");
-    eprintln!("  tasks run in its own directory. A task it does not define is looked up in");
-    eprintln!("  the global Quefile, whose tasks run in the current directory instead.");
+    eprintln!("  tasks run in the current directory — use quefile_dir() for paths relative");
+    eprintln!("  to the Quefile. A task it does not define is looked up in the global");
+    eprintln!("  Quefile.");
     eprintln!();
     eprintln!("Test options:");
     eprintln!("  --filter <text>             Only run tests whose name contains <text>");

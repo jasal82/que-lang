@@ -5199,8 +5199,9 @@ automatically before the named task.
 
 Without `-f`, Que looks for `Quefile`, `Quefile.que`, or `quefile.que` in the
 current directory and then in each parent, so `que run test` works from
-anywhere inside a project. The task runs in the Quefile's own directory, which
-is what its relative paths were written against.
+anywhere inside a project. Walking up to find the Quefile does not move you:
+the task still runs in the directory you invoked `que` from, so a relative path
+means what it would have meant in your shell.
 
 A task the project Quefile does not define is looked up in your **global
 Quefile**, the first of these that exists:
@@ -5217,6 +5218,67 @@ Global tasks are the ones you want everywhere — `backup`, `sync-dotfiles`,
 home directory. A project task shadows a global task of the same name; `-g`
 ignores the project Quefile and goes straight to the global one. `que tasks`
 lists both, marking shadowed global names.
+
+#### Rooting paths at the project or at the caller
+
+Since every relative path resolves against the caller's directory, a Quefile
+usually wants both roots. A `fmt` task that formats what you are standing in
+wants the caller's directory; a `build` task wants the project's `build/`
+wherever you ran it from. Name them both at the top of the Quefile and neither
+is in doubt:
+
+```que
+import std.fs { write }
+
+let project = quefile_dir()        // where the Quefile lives
+let here    = path(".").resolve()  // where `que` was invoked
+
+@inputs([project / "src/*.que"])
+@outputs([project / "build/app"])
+task build {
+    (project / "build").mkdir()
+    println("building into " + str(project / "build"))
+}
+
+@outputs([here / "report.txt"])
+task report {
+    write(here / "report.txt", "done")
+}
+```
+
+Binding the root once matters more than it looks: `@inputs` and `@outputs` are
+evaluated outside the task body — before it runs, to decide whether it can be
+skipped, and after, to record what it produced. A shared binding is what keeps
+the attributes and the body pointing at the same files.
+
+Glob patterns are expanded in `@inputs` however you write them — a plain
+string, a `g"..."` literal, or a pattern joined onto a root with `/`:
+
+```que
+@inputs([project / "src/*.que"])              // expands
+@inputs(["${quefile_dir()}/src/*.que"])       // expands
+@inputs([g"${quefile_dir()}/src/*.que"])      // expands
+```
+
+In `@outputs` a pattern is kept as written, since those files do not exist yet
+and matching them against the disk would declare no outputs at all on the
+first run.
+
+If nearly every task in a Quefile is project-rooted, `cd` at the top of the
+file moves the process once, before any task runs. It returns the directory it
+left, so you keep the caller's directory too:
+
+```que
+let here = cd(quefile_dir())   // now: cwd is the project, `here` is the caller
+```
+
+Prefer that to a `cd` inside a task body. The working directory belongs to the
+process, not to a task, so a `cd` in one `parallel` branch moves every other
+branch with it — point a single command somewhere else with `` `cmd`.dir(p) ``
+instead.
+
+The same applies to plain scripts, where `script_dir()` is the name for the
+directory the running `.que` file lives in.
 
 ---
 
