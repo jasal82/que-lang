@@ -173,6 +173,7 @@ fn print_usage() {
     eprintln!("  -g, --global                Use the global Quefile ($QUE_HOME, ~/.config/que, ~/.que)");
     eprintln!("  --help, -h                  Show argument help for the task");
     eprintln!("  --dry-run                   Print effects instead of performing them");
+    eprintln!("  --force, -B                 Run even if inputs and outputs say it is up to date");
     eprintln!("  --allow <cap>[=<list>]      Grant a capability (see Sandbox options)");
     eprintln!("  --deny <cap>                Deny a capability (see Sandbox options)");
     eprintln!("  -- arg1 arg2 ...            Pass positional arguments to the task");
@@ -448,12 +449,13 @@ fn collect_tasks(interp: &Interpreter) -> Vec<(String, Box<que_lang::value::Task
     tasks
 }
 
-/// Parse run args: extract -f/-g, task name, --help/--dry-run flags, and optional task args after `--`.
+/// Parse run args: extract -f/-g, task name, --help/--dry-run/--force flags, and optional task args after `--`.
 fn parse_run_args(
     args: &[String],
 ) -> (
     QuefileSelection,
     Option<String>,
+    bool,
     bool,
     bool,
     Option<que_lang::permissions::Policy>,
@@ -470,6 +472,7 @@ fn parse_run_args(
     let mut task_name: Option<String> = None;
     let mut help = false;
     let mut dry_run = false;
+    let mut force = false;
     let mut policy: Option<que_lang::permissions::Policy> = None;
     let mut idx = 0;
     while idx < rest.len() {
@@ -478,6 +481,8 @@ fn parse_run_args(
             help = true;
         } else if arg == "--dry-run" {
             dry_run = true;
+        } else if arg == "--force" || arg == "-B" {
+            force = true;
         } else if let Some(spec) = permission_flag(&rest, &mut idx) {
             apply_permission(&mut policy, &spec);
         } else if task_name.is_none() {
@@ -489,7 +494,7 @@ fn parse_run_args(
         }
         idx += 1;
     }
-    (selection, task_name, help, dry_run, policy, task_args)
+    (selection, task_name, help, dry_run, force, policy, task_args)
 }
 
 /// The outcome of looking a task name up across the selected Quefiles.
@@ -532,7 +537,7 @@ fn lookup_task(selection: &QuefileSelection, task_name: &str) -> TaskLookup {
 
 /// `que run [-f file | -g] [--help] <task> [-- arg1 arg2 ...]`
 fn cmd_run(args: &[String]) {
-    let (selection, task_name, help, dry_run, policy, task_args) = parse_run_args(args);
+    let (selection, task_name, help, dry_run, force, policy, task_args) = parse_run_args(args);
 
     let task_name = match task_name {
         Some(n) => n,
@@ -574,6 +579,7 @@ fn cmd_run(args: &[String]) {
     };
 
     interp.dry_run = dry_run;
+    interp.force_run = force;
     interp.permissions = policy;
 
     if help {

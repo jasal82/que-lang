@@ -5076,9 +5076,30 @@ rewrite timestamps without changing a byte. With timestamps alone, every one
 of those turns into a full rebuild.
 
 The record lives in `.que/task-cache.json` next to your script. Add `.que/` to
-`.gitignore`; deleting it costs one rebuild and nothing else. Nothing is
+`.gitignore`; deleting it is safe, and costs at most one rebuild. Nothing is
 written for scripts run from the REPL or embedded, since there is no project
 directory to anchor a cache to.
+
+#### Running anyway
+
+`--force` (or `-B`) runs the task whether or not it looks up to date:
+
+```
+que run --force compile
+```
+
+Dependencies are forced too, so `--force` on a task at the top of a chain
+rebuilds the chain. The run is still recorded, so the next plain `que run`
+skips again.
+
+Reach for it rather than trying to provoke a rerun by hand — the two obvious
+tricks do not work, and for the same reason each exists. Deleting
+`.que/task-cache.json` does nothing if every input is already older than every
+output, because question 2 answers before the cache is consulted. And `touch`
+does nothing either, because question 3 hashes the contents and finds them
+unchanged — ignoring a timestamp bump with no edit behind it is the whole point
+of that step. Deleting an output does force a run, since question 1 fails, but
+`--force` says what you mean without removing anything.
 
 ### Task Status and Introspection
 
@@ -5260,9 +5281,16 @@ string, a `g"..."` literal, or a pattern joined onto a root with `/`:
 @inputs([g"${quefile_dir()}/src/*.que"])      // expands
 ```
 
-In `@outputs` a pattern is kept as written, since those files do not exist yet
-and matching them against the disk would declare no outputs at all on the
-first run.
+In `@outputs` a pattern is an error. Those files do not exist yet when the
+freshness check runs, so a pattern could never match one — the task would look
+permanently unfinished and rerun every time. Name the directory, or a stamp
+file the task writes last:
+
+```que
+@outputs([project / "build/*.o"])       // error: not a concrete path
+@outputs([project / "build"])           // the directory
+@outputs([project / "build/.stamp"])    // a file the task writes at the end
+```
 
 If nearly every task in a Quefile is project-rooted, `cd` at the top of the
 file moves the process once, before any task runs. It returns the directory it

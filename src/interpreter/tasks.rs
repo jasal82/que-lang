@@ -448,6 +448,18 @@ impl Interpreter {
 
         let output_paths = self.eval_task_paths(&task.outputs.clone(), false)?;
 
+        // Asked for explicitly, so no evidence on disk gets to argue.
+        //
+        // The outputs are still evaluated first: a malformed declaration is an
+        // error under `--force` exactly as it is without one, since a check
+        // that a flag can switch off is a check nobody finds out they failed.
+        //
+        // Dependencies see the same flag, since they run through this function
+        // too — forcing a task forces what it is built on.
+        if self.force_run {
+            return Ok(false);
+        }
+
         // If any output doesn't exist, must run.
         let mut oldest_output = std::time::SystemTime::UNIX_EPOCH;
         let mut first = true;

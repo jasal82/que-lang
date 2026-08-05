@@ -130,6 +130,10 @@ pub struct Interpreter {
     /// When true, operations that change the world outside the process are
     /// announced instead of performed. See `Interpreter::dry_run_skip`.
     pub dry_run: bool,
+    /// When true, tasks run even when their inputs and outputs say they are up
+    /// to date. The result is still recorded, so the next run without this can
+    /// skip again.
+    pub force_run: bool,
     /// Capability policy, or `None` for unrestricted. Opt-in: a script with
     /// no policy behaves exactly as before. See `crate::permissions`.
     pub permissions: Option<crate::permissions::Policy>,
@@ -231,6 +235,7 @@ impl Interpreter {
             task_cache_file: task_cache::TaskCache::default(),
             task_cache_dir_override: None,
             dry_run: false,
+            force_run: false,
             permissions: None,
             secrets: Vec::new(),
             module_loader: None,

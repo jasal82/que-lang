@@ -3811,6 +3811,40 @@ println(typeof(build.inputs()[0]))
 }
 
 #[test]
+fn task_outputs_reject_glob_patterns() {
+    // A pattern in @outputs can never match: the files it describes do not
+    // exist when the check runs, so the task would rerun forever instead of
+    // ever being skipped. Say so rather than degrading silently.
+    for outputs in [
+        r#"["./build/**/profile_*"]"#,
+        r#"[path("./build") / "x_*"]"#,
+        r#"[g"./build/*.o"]"#,
+        r#"["./build/app-?"]"#,
+    ] {
+        let source = format!(
+            "@outputs({})\ntask build {{\n    null\n}}\nbuild()\n",
+            outputs
+        );
+        let msg = assert_error_contains(&source, "@outputs must name concrete paths");
+        assert!(msg.contains("stamp file"), "unhelpful message: {}", msg);
+    }
+}
+
+#[test]
+fn task_outputs_allow_a_bracket_in_a_filename() {
+    // `[` is a glob metacharacter but also a legal filename character, and an
+    // output naming a real file with a bracket in it has always worked.
+    let source = r#"
+@outputs(["./build/app[1]"])
+task build {
+    null
+}
+println(build.outputs())
+"#;
+    assert_output(source, &["[./build/app[1]]"]);
+}
+
+#[test]
 fn task_param_hash_invalidation() {
     // Changing a param should cause a task to re-run even if outputs exist.
     // Task defined at top level, temp dir created inside with block.

@@ -275,3 +275,50 @@ fn a_glob_rooted_at_the_quefile_directory_still_detects_a_changed_input() {
     let third = fixture.que("project/sub", &["run", "build"]);
     assert!(stdout(&third).contains("[DONE] build"), "{}", stdout(&third));
 }
+
+#[test]
+fn force_runs_a_task_that_would_otherwise_be_skipped() {
+    // Deleting the cache file is not enough on its own — the mtime fast path
+    // answers before the cache is ever consulted — so there has to be a way to
+    // say "run it anyway" that does not involve deleting build artifacts.
+    let fixture = Fixture::new(
+        "force-run",
+        Some(concat!(
+            "import std.fs { read, write }\n",
+            "@inputs([quefile_dir() / \"src/a.txt\"])\n",
+            "@outputs([quefile_dir() / \"build/out.txt\"])\n",
+            "task build {\n",
+            "    let d = quefile_dir() / \"build\"\n",
+            "    d.mkdir()\n",
+            "    write(d / \"out.txt\", read(quefile_dir() / \"src/a.txt\").unwrap())\n",
+            "}\n",
+        )),
+        None,
+    );
+    let src = fixture.root.join("project/src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("a.txt"), "v1\n").unwrap();
+
+    let first = fixture.que("project/sub", &["run", "build"]);
+    assert!(first.status.success(), "{:?}", first);
+    assert!(stdout(&first).contains("[DONE] build"), "{}", stdout(&first));
+
+    let second = fixture.que("project/sub", &["run", "build"]);
+    assert!(stdout(&second).contains("[SKIP] build"), "{}", stdout(&second));
+
+    for flag in ["--force", "-B"] {
+        let forced = fixture.que("project/sub", &["run", flag, "build"]);
+        assert!(forced.status.success(), "{:?}", forced);
+        assert!(
+            stdout(&forced).contains("[DONE] build"),
+            "{} did not force a run: {}",
+            flag,
+            stdout(&forced)
+        );
+    }
+
+    // A forced run still records what it produced, so the next plain run can
+    // skip again — forcing once must not poison the cache.
+    let after = fixture.que("project/sub", &["run", "build"]);
+    assert!(stdout(&after).contains("[SKIP] build"), "{}", stdout(&after));
+}
