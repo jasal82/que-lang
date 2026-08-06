@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Builds website/docs/index.html from ../tutorial2.md (the single source of
+Builds website/docs/index.html from ../tutorial.md (the single source of
 truth for Que's documentation). No third-party dependencies — stdlib only,
 so this runs anywhere Python 3 runs, including CI.
 
@@ -8,7 +8,7 @@ Usage:
     python3 website/build/build_docs.py
     python3 website/build/build_docs.py --watch      # rebuild on save
 
-The markdown subset understood here is exactly the subset tutorial2.md
+The markdown subset understood here is exactly the subset tutorial.md
 uses: ATX headings (#..####), fenced code blocks, GFM tables, blockquotes
 (including a fenced code block nested inside one), unordered/ordered lists,
 horizontal rules, and inline **bold** / `code` / [text](link) / plain text.
@@ -22,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SITE = Path(__file__).resolve().parent.parent
-TUTORIAL = ROOT / "tutorial2.md"
+TUTORIAL = ROOT / "tutorial.md"
 OUT_DIR = SITE / "docs"
 OUT_FILE = OUT_DIR / "index.html"
 TEMPLATE = Path(__file__).resolve().parent / "docs_template.html"
@@ -40,7 +40,7 @@ FENCE_LANG_MAP = {
 
 def slugify(text: str) -> str:
     """Mirrors GitHub's markdown heading slugger closely enough that the
-    #N-anchor links already written throughout tutorial2.md resolve."""
+    #N-anchor links already written throughout tutorial.md resolve."""
     text = text.lower()
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"\s", "-", text)
@@ -248,7 +248,7 @@ class Parser:
             text = m.group(1)
             self.i += 1
             # lazy continuation: an indented or plain follow-up line that
-            # belongs to the same item (tutorial2.md uses this rarely, but
+            # belongs to the same item (tutorial.md uses this rarely, but
             # the "Discovery."-style bullets sometimes wrap).
             while self.i < self.n and self.lines[self.i].strip() != "" and not pattern.match(self.lines[self.i]) \
                     and not self.lines[self.i].startswith("#") and not self.lines[self.i].startswith("```") \
