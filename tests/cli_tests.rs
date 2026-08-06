@@ -200,6 +200,80 @@ task boom {
     assert!(out.contains(&format!("unwind={}", project.display())), "{out}");
 }
 
+// ── Task parameters: the rest parameter ──────────────────────────────
+
+#[test]
+fn a_rest_parameter_collects_every_remaining_command_line_argument() {
+    // The count is the caller's, not the Quefile's: a task fed from a shell
+    // has no say in how many paths the glob expanded to.
+    let quefile = r#"
+task build(target, ...files) {
+    println("target=" + target)
+    println("n=" + str(files.len()))
+    for f in files { println("file=" + f) }
+}
+"#;
+    let fixture = Fixture::new("rest-param", Some(quefile), None);
+
+    let output = fixture.que("project", &["run", "build", "--", "app", "a.txt", "b.txt", "c.txt"]);
+    assert!(output.status.success(), "{:?}", output);
+    let out = stdout(&output);
+    assert!(out.contains("target=app"), "{out}");
+    assert!(out.contains("n=3"), "{out}");
+    for f in ["a.txt", "b.txt", "c.txt"] {
+        assert!(out.contains(&format!("file={f}")), "{out}");
+    }
+
+    // Nothing left over is an empty list, not a missing argument: a rest
+    // parameter is never required.
+    let empty = fixture.que("project", &["run", "build", "--", "app"]);
+    assert!(empty.status.success(), "{:?}", empty);
+    assert!(stdout(&empty).contains("n=0"), "{}", stdout(&empty));
+}
+
+#[test]
+fn arguments_no_parameter_can_claim_are_refused_rather_than_dropped() {
+    // Quietly ignoring the tail turns a typo into a run that looks like it
+    // worked, so the count is checked before the body gets to start.
+    let quefile = "task build(target) {\n    println(\"target=\" + target)\n}\n";
+    let fixture = Fixture::new("extra-args", Some(quefile), None);
+
+    let output = fixture.que("project", &["run", "build", "--", "app", "stray"]);
+
+    assert!(!output.status.success(), "{:?}", output);
+    let err = String::from_utf8_lossy(&output.stderr);
+    assert!(err.contains("takes 1 positional argument, but 2 were given"), "{err}");
+    assert!(err.contains("...name"), "{err}");
+    // The check runs ahead of the body, so the task never started.
+    assert!(!stdout(&output).contains("target=app"), "{}", stdout(&output));
+}
+
+#[test]
+fn a_rest_parameter_is_a_task_spelling_and_must_come_last() {
+    let cases = [
+        (
+            "task build(...files, target) {\n    println(target)\n}\n",
+            "must be the last parameter",
+        ),
+        (
+            "task build(...files = []) {\n    println(str(files))\n}\n",
+            "cannot have a default",
+        ),
+        (
+            "fn f(...xs) {\n    println(str(xs))\n}\ntask build {\n    f()\n}\n",
+            "only allowed on a task parameter",
+        ),
+    ];
+
+    for (quefile, expected) in cases {
+        let fixture = Fixture::new("rest-invalid", Some(quefile), None);
+        let output = fixture.que("project", &["run", "build"]);
+        assert!(!output.status.success(), "{quefile}\n{:?}", output);
+        let err = String::from_utf8_lossy(&output.stderr);
+        assert!(err.contains(expected), "{quefile}\nexpected {expected:?}, got: {err}");
+    }
+}
+
 #[test]
 fn a_task_the_project_quefile_lacks_comes_from_the_global_one() {    let fixture = Fixture::new(
         "fallback",

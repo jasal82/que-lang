@@ -462,7 +462,7 @@ impl Interpreter {
         self.trait_defs.insert("Display".to_string(), vec![
             crate::value::TraitMethodDef {
                 name: "to_string".to_string(),
-                params: vec![Param { name: "self".to_string(), type_ann: None, default: None }],
+                params: vec![Param { name: "self".to_string(), type_ann: None, default: None, rest: false }],
                 default_body: None,
             },
         ]);
@@ -474,8 +474,8 @@ impl Interpreter {
             crate::value::TraitMethodDef {
                 name: "equals".to_string(),
                 params: vec![
-                    Param { name: "self".to_string(), type_ann: None, default: None },
-                    Param { name: "other".to_string(), type_ann: None, default: None },
+                    Param { name: "self".to_string(), type_ann: None, default: None, rest: false },
+                    Param { name: "other".to_string(), type_ann: None, default: None, rest: false },
                 ],
                 default_body: None,
             },
@@ -488,8 +488,8 @@ impl Interpreter {
             crate::value::TraitMethodDef {
                 name: "compare".to_string(),
                 params: vec![
-                    Param { name: "self".to_string(), type_ann: None, default: None },
-                    Param { name: "other".to_string(), type_ann: None, default: None },
+                    Param { name: "self".to_string(), type_ann: None, default: None, rest: false },
+                    Param { name: "other".to_string(), type_ann: None, default: None, rest: false },
                 ],
                 default_body: None,
             },
@@ -501,7 +501,7 @@ impl Interpreter {
         self.trait_defs.insert("Hash".to_string(), vec![
             crate::value::TraitMethodDef {
                 name: "hash".to_string(),
-                params: vec![Param { name: "self".to_string(), type_ann: None, default: None }],
+                params: vec![Param { name: "self".to_string(), type_ann: None, default: None, rest: false }],
                 default_body: None,
             },
         ]);
@@ -512,14 +512,14 @@ impl Interpreter {
         self.trait_defs.insert("Contextual".to_string(), vec![
             crate::value::TraitMethodDef {
                 name: "enter".to_string(),
-                params: vec![Param { name: "self".to_string(), type_ann: None, default: None }],
+                params: vec![Param { name: "self".to_string(), type_ann: None, default: None, rest: false }],
                 default_body: None,
             },
             crate::value::TraitMethodDef {
                 name: "exit".to_string(),
                 params: vec![
-                    Param { name: "self".to_string(), type_ann: None, default: None },
-                    Param { name: "resource".to_string(), type_ann: None, default: None },
+                    Param { name: "self".to_string(), type_ann: None, default: None, rest: false },
+                    Param { name: "resource".to_string(), type_ann: None, default: None, rest: false },
                 ],
                 default_body: None,
             },

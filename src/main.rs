@@ -624,7 +624,9 @@ fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
         );
     } else {
         let param_usage: Vec<String> = task.params.iter().map(|p| {
-            if p.default.is_some() {
+            if p.rest {
+                format!("[{}...]", p.name)
+            } else if p.default.is_some() {
                 format!("[{}=<{}>]", p.name, p.name)
             } else {
                 format!("{}=<{}>", p.name, p.name)
@@ -636,7 +638,9 @@ fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
         );
         // Also show positional form if params exist
         let positional_usage: Vec<String> = task.params.iter().map(|p| {
-            if p.default.is_some() {
+            if p.rest {
+                format!("[{}...]", p.name)
+            } else if p.default.is_some() {
                 format!("[{}]", p.name)
             } else {
                 format!("<{}>", p.name)
@@ -670,8 +674,10 @@ fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
                 .type_ann
                 .as_ref()
                 .map(|t| t.to_string())
-                .unwrap_or_else(|| "any".to_string());
-            let opt_str = if param.default.is_some() {
+                .unwrap_or_else(|| if param.rest { "List".to_string() } else { "any".to_string() });
+            let opt_str = if param.rest {
+                " [rest]"
+            } else if param.default.is_some() {
                 " [optional]"
             } else {
                 " [required]"

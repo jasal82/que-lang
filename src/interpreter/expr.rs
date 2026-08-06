@@ -202,6 +202,7 @@ impl Interpreter {
                             name: name.clone(),
                             type_ann: None,
                             default: None,
+                            rest: false,
                         })
                         .collect();
                     // Build call expression for the body

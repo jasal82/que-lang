@@ -1044,6 +1044,9 @@ impl Formatter {
             if i > 0 {
                 self.push_str(", ");
             }
+            if param.rest {
+                self.push_str("...");
+            }
             self.push_str(&param.name);
             if let Some(ref ty) = param.type_ann {
                 self.push_str(": ");

@@ -103,6 +103,10 @@ pub struct Param {
     pub name: String,
     pub type_ann: Option<TypeExpr>,
     pub default: Option<Expr>,
+    /// Declared `...name`: binds every remaining positional argument as a
+    /// list rather than a single value. Only the last parameter may set it,
+    /// and only on a task.
+    pub rest: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

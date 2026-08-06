@@ -166,6 +166,33 @@ impl Interpreter {
             }
         }
 
+        // Arguments nobody can claim are a mistake worth naming, and worth
+        // naming before the task runs: silently dropping them turns a typo on
+        // the command line into a run that looks like it worked. A rest
+        // parameter accepts any number, so the check only applies without one.
+        if !params.last().map(|p| p.rest).unwrap_or(false) {
+            // Named arguments consume their parameter by name, so the slots
+            // left for positional ones are the parameters no name matched.
+            let slots = params
+                .iter()
+                .filter(|p| !named.iter().any(|(n, _)| n == &p.name))
+                .count();
+            if positional.len() > slots {
+                return Err(Signal::Error(QueError::new(
+                    ErrorKind::ArityMismatch,
+                    format!(
+                        "task '{}' takes {} positional argument{}, but {} {} given; \
+                         declare the last parameter as `...name` to collect the rest",
+                        name,
+                        slots,
+                        if slots == 1 { "" } else { "s" },
+                        positional.len(),
+                        if positional.len() == 1 { "was" } else { "were" },
+                    ),
+                )));
+            }
+        }
+
         // Flat values for hashing (order: positional then named values)
         let hash_args: Vec<Value> = positional.iter().chain(named.iter().map(|(_, v)| v)).cloned().collect();
 
@@ -195,6 +222,14 @@ impl Interpreter {
         // Bind parameters: named args first (by name), then positional in order, then defaults
         let mut pos_idx = 0;
         for param in params.iter() {
+            // A rest parameter takes everything the earlier parameters left
+            // behind, so it is never missing — only empty.
+            if param.rest {
+                let collected: Vec<Value> = positional[pos_idx.min(positional.len())..].to_vec();
+                pos_idx = positional.len();
+                self.env.define(&param.name, Value::List(collected), false);
+                continue;
+            }
             let val = if let Some(idx) = named.iter().position(|(n, _)| n == &param.name) {
                 named.remove(idx).1
             } else if pos_idx < positional.len() {

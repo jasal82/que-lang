@@ -524,9 +524,46 @@ impl Parser {
     }
 
     fn parse_param_list(&mut self) -> Result<Vec<Param>, QueError> {
-        let mut params = Vec::new();
+        self.parse_param_list_inner(false)
+    }
+
+    /// `allow_rest` opens the `...name` spelling, which collects every
+    /// remaining positional argument into a list. Only tasks take it: they are
+    /// the ones fed straight from a command line, where the argument count is
+    /// not something the caller controls.
+    fn parse_param_list_inner(&mut self, allow_rest: bool) -> Result<Vec<Param>, QueError> {
+        let mut params: Vec<Param> = Vec::new();
         self.skip_newlines();
         while !matches!(self.peek(), TokenKind::RParen | TokenKind::Eof) {
+            let rest_span = self.current_span();
+            let rest = if matches!(self.peek(), TokenKind::Spread) {
+                self.advance();
+                true
+            } else {
+                false
+            };
+            if rest && !allow_rest {
+                return Err(QueError::parser(
+                    crate::error::ErrorKind::UnexpectedToken,
+                    "`...name` collects command-line arguments and is only allowed on a task parameter",
+                    rest_span,
+                ));
+            }
+            // A rest parameter that is not last could never receive anything
+            // the parameters after it would not also claim, so the ambiguity
+            // is refused rather than resolved.
+            if let Some(prev) = params.last() {
+                if prev.rest {
+                    return Err(QueError::parser(
+                        crate::error::ErrorKind::UnexpectedToken,
+                        format!(
+                            "`...{}` must be the last parameter",
+                            prev.name
+                        ),
+                        rest_span,
+                    ));
+                }
+            }
             let name = self.expect_ident()?;
             let type_ann = if matches!(self.peek(), TokenKind::Colon) {
                 self.advance();
@@ -540,10 +577,24 @@ impl Parser {
             } else {
                 None
             };
+            // A rest parameter already has a default: no arguments left means
+            // an empty list. A second one would only be reachable by never
+            // being used.
+            if rest && default.is_some() {
+                return Err(QueError::parser(
+                    crate::error::ErrorKind::UnexpectedToken,
+                    format!(
+                        "`...{}` cannot have a default; it is an empty list when no arguments remain",
+                        name
+                    ),
+                    rest_span,
+                ));
+            }
             params.push(Param {
                 name,
                 type_ann,
                 default,
+                rest,
             });
             self.skip_newlines();
             if matches!(self.peek(), TokenKind::Comma) {
@@ -562,7 +613,7 @@ impl Parser {
 
         let params = if matches!(self.peek(), TokenKind::LParen) {
             self.advance();
-            let p = self.parse_param_list()?;
+            let p = self.parse_param_list_inner(true)?;
             self.expect(&TokenKind::RParen)?;
             p
         } else {

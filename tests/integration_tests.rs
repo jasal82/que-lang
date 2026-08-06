@@ -10236,6 +10236,12 @@ fn fmt_function_declaration() {
 }
 
 #[test]
+fn fmt_task_rest_parameter_keeps_its_marker() {
+    let out = format_source("task  build( target ,  ...files )  {  println(target)  }");
+    assert!(out.contains("task build(target, ...files) {"), "{out}");
+}
+
+#[test]
 fn fmt_if_else() {
     let out = format_source("if  true  {  1  }  else  {  2  }");
     assert!(out.contains("if true {"));

@@ -5045,6 +5045,41 @@ que run build --help
 #   mode    default: "debug"
 ```
 
+An argument no parameter can claim is an error, not something quietly dropped:
+
+```sh
+que run build -- linux-amd64 release oops
+# task 'build' takes 2 positional arguments, but 3 were given
+```
+
+#### Rest Parameters
+
+When the number of arguments is the caller's to decide — a list of files a
+shell glob expanded to, say — declare the last parameter with `...`. It
+collects every remaining positional argument into a list:
+
+```que
+task lint(...files) {
+    if files.len() == 0 {
+        println("nothing to lint")
+        return
+    }
+    for f in files {
+        println("linting ${f}")
+    }
+}
+```
+
+```sh
+que run lint -- src/a.que src/b.que src/c.que
+que run lint                            # files == []
+```
+
+A rest parameter is never required: with nothing left over it is an empty
+list, so it takes no default. It must come last, and it is a task spelling
+only — a `fn` has a caller that knows its own argument count, so it does not
+need one.
+
 ### Incremental Builds (Freshness)
 
 When a task declares both `inputs` and `outputs`, Que decides whether it still

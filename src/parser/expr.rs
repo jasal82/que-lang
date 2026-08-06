@@ -893,6 +893,7 @@ impl Parser {
                         name,
                         type_ann,
                         default,
+                        rest: false,
                     });
                     if matches!(self.peek(), TokenKind::Comma) {
                         self.advance();
