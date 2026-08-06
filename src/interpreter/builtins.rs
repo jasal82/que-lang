@@ -66,6 +66,15 @@ impl Interpreter {
                 };
                 return self.check_permission(Capability::Write, &base);
             }
+            GlobalEffect::DirTarget => {
+                let target = match args.first() {
+                    Some(Value::Instance { fields, .. }) => {
+                        fields.get("path").map(|v| v.display_string()).unwrap_or_default()
+                    }
+                    other => other.map(|v| v.display_string()).unwrap_or_default(),
+                };
+                return self.check_permission(Capability::Read, &target);
+            }
         };
         let subject = match idx.and_then(|i| args.get(i)) {
             Some(v) => v.display_string(),
@@ -575,6 +584,67 @@ impl Interpreter {
                     ))
                 })?;
                 Ok(Value::Path(previous))
+            }
+            // `with dir(p"sub") { ... }` — the scoped spelling of `cd`.
+            //
+            // A constructor rather than a struct literal so the common case is
+            // one word, matching `env.scope(...)`. The move itself happens in
+            // `__ctx_dir_enter`, so building one and never entering it does
+            // nothing.
+            "dir" => {
+                let val = args.first().ok_or_else(|| {
+                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "dir() requires 1 argument"))
+                })?;
+                let path = match val {
+                    Value::String(s) | Value::Path(s) => s.clone(),
+                    other => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            format!("dir() requires a string or path, got {}", other.type_name()),
+                        )))
+                    }
+                };
+                let mut fields = BTreeMap::new();
+                fields.insert("path".to_string(), Value::Path(path));
+                Ok(Value::Instance {
+                    type_name: "Dir".to_string(),
+                    fields,
+                })
+            }
+            // Entering hands the old directory to `exit` as the resource, so
+            // the restore needs nothing stored on the instance.
+            "__ctx_dir_enter" => {
+                let target = match args.first() {
+                    Some(Value::Instance { fields, .. }) => fields
+                        .get("path")
+                        .map(|v| crate::interpreter::helpers::expand_tilde(&v.display_string()))
+                        .unwrap_or_default(),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "with dir(...) requires a path",
+                        )))
+                    }
+                };
+                let previous = std::env::current_dir()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                std::env::set_current_dir(&target).map_err(|e| {
+                    Signal::Error(QueError::new(
+                        ErrorKind::IoError,
+                        format!("dir '{}': {}", target, e),
+                    ))
+                })?;
+                Ok(Value::Path(previous))
+            }
+            // Restoring is best-effort: the block's own result is what the
+            // caller is waiting on, and a directory that has since been
+            // removed should not turn a successful block into a failure.
+            "__ctx_dir_exit" => {
+                if let Some(previous) = args.get(1).and_then(|v| v.as_path()) {
+                    let _ = std::env::set_current_dir(&previous);
+                }
+                Ok(Value::Null)
             }
             // The global spelling only; `"a/b".to_path()` is still a String
             // method, and that is the form worth keeping.

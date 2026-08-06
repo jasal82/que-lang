@@ -164,8 +164,44 @@ task build {
 }
 
 #[test]
-fn a_task_the_project_quefile_lacks_comes_from_the_global_one() {
-    let fixture = Fixture::new(
+fn with_dir_scopes_the_move_to_the_block_including_on_failure() {
+    // The built-in spelling of the Contextual above. Restoring on the error
+    // path is the half a hand-written `cd` pair usually gets wrong, so the
+    // failing case is the one worth pinning down.
+    let quefile = r#"
+task build {
+    println("before=" + str(path(".").resolve()))
+    with dir(p"sub") {
+        println("inside=" + str(path(".").resolve()))
+    }
+    println("after=" + str(path(".").resolve()))
+}
+
+task boom {
+    defer { println("unwind=" + str(path(".").resolve())) }
+    with dir(p"sub") {
+        fail("boom")
+    }
+}
+"#;
+    let fixture = Fixture::new("with-dir", Some(quefile), None);
+    let project = fixture.root.join("project");
+
+    let output = fixture.que("project", &["run", "build"]);
+    assert!(output.status.success(), "{:?}", output);
+    let out = stdout(&output);
+    assert!(out.contains(&format!("before={}", project.display())), "{out}");
+    assert!(out.contains(&format!("inside={}", project.join("sub").display())), "{out}");
+    assert!(out.contains(&format!("after={}", project.display())), "{out}");
+
+    let failed = fixture.que("project", &["run", "boom"]);
+    assert!(!failed.status.success(), "{:?}", failed);
+    let out = stdout(&failed);
+    assert!(out.contains(&format!("unwind={}", project.display())), "{out}");
+}
+
+#[test]
+fn a_task_the_project_quefile_lacks_comes_from_the_global_one() {    let fixture = Fixture::new(
         "fallback",
         Some("task build {\n    println(\"project build\")\n}\n"),
         Some("task backup {\n    println(\"global backup\")\n}\n"),

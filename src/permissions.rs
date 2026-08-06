@@ -418,6 +418,11 @@ pub enum GlobalEffect {
     /// A `with TempDir {}` / `with TempFile {}` hook: a `Write` scoped to the
     /// base directory the temporary will be created in.
     TempBase,
+    /// A `with dir(...)` hook: a `Read` scoped to the `path` field of the
+    /// context object. The instance is the argument, so the path has to be
+    /// dug out of it — checking the argument itself would test a grant
+    /// against the words `Dir { path: ... }`.
+    DirTarget,
 }
 
 /// Classification for a global builtin.
@@ -441,6 +446,11 @@ pub fn global_effect(name: &str) -> Option<GlobalEffect> {
         // it. The grants themselves were made absolute when the flags were
         // parsed, so `cd` moves the script and not the fence around it.
         "cd" => Needs(Read, Some(0)),
+        // `dir(path)` only builds the context object; the move happens when the
+        // `with` block enters it, so that is where the read is checked.
+        "dir" => Pure,
+        "__ctx_dir_enter" => DirTarget,
+        "__ctx_dir_exit" => Pure,
         // `with TempDir {}` / `with TempFile {}` desugar to these. Entering
         // creates under a base directory named by a field; exiting deletes
         // the path it is handed back.

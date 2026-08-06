@@ -177,7 +177,7 @@ pub const BUILTIN_NAMES: &[&str] = &[
         // Additional builtins
         "secret", "fail", "sleep", "input", "confirm",
         "quefile_dir", "script_dir", "dry_run",
-        "path", "cd",
+        "path", "cd", "dir",
         "glob",
         // File handle
         "open",
@@ -216,6 +216,7 @@ pub const BUILTIN_NAMES: &[&str] = &[
         "__ctx_tempdir_enter", "__ctx_tempdir_exit",
         "__ctx_tempfile_enter", "__ctx_tempfile_exit",
         "__ctx_envscope_enter", "__ctx_envscope_exit",
+        "__ctx_dir_enter", "__ctx_dir_exit",
 ];
 
 impl Interpreter {
@@ -583,6 +584,20 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         self.struct_defs.insert("EnvScope".to_string(), env_scope_fields);
 
         self.register_builtin_contextual("EnvScope", "__ctx_envscope_enter", "__ctx_envscope_exit");
+
+        // ── Dir ── produced by `dir(path)`, used as `with dir(p"sub") { ... }`
+        //
+        // The scoped spelling of `cd`, built in so that the restore is not
+        // something a script has to remember. `cd` stays: it is the primitive
+        // this is made of, and a Quefile that wants every task rooted at the
+        // project has to move once at load time, which no block can express.
+        let dir_fields = vec![crate::value::FieldDef {
+            name: "path".to_string(),
+            default: None,
+        }];
+        self.struct_defs.insert("Dir".to_string(), dir_fields);
+
+        self.register_builtin_contextual("Dir", "__ctx_dir_enter", "__ctx_dir_exit");
     }
 
     /// Parse a single `fn` declaration from Que source for use as a MethodDef.

@@ -5300,10 +5300,27 @@ left, so you keep the caller's directory too:
 let here = cd(quefile_dir())   // now: cwd is the project, `here` is the caller
 ```
 
-Prefer that to a `cd` inside a task body. The working directory belongs to the
-process, not to a task, so a `cd` in one `parallel` branch moves every other
-branch with it — point a single command somewhere else with `` `cmd`.dir(p) ``
-instead.
+That is what `cd` is for: a move meant to outlive the block it appears in.
+Inside a task body, where the move is meant to end, use `with dir(...)`, which
+restores the old directory on the way out — including when the block fails:
+
+```que
+task build {
+    with dir(quefile_dir() / "build") {
+        `make`.run()
+    }
+    // back where the task started, whether or not make succeeded
+}
+```
+
+A bare `cd(...)` whose return value is discarded is reported by `que lint` as
+`unscoped-cd`, since nothing is left to move back with.
+
+Neither form is safe inside `parallel`. The working directory belongs to the
+process, not to a task or a block, so a `with dir(...)` open in one branch
+moves every other branch for as long as it is open — scoping bounds the change
+in time, not across threads. Point a single command somewhere else with
+`` `cmd`.dir(p) ``, which never moves the process at all.
 
 The same applies to plain scripts, where `script_dir()` is the name for the
 directory the running `.que` file lives in.
@@ -6351,6 +6368,7 @@ pattern if guard            // guard
 | `path.home()` | Home directory as Path |
 | `script_dir()` / `quefile_dir()` | Directory of the running script, as Path |
 | `cd(dir)` | Change the process working directory, returns the old one |
+| `dir(path)` | A directory change scoped to a `with` block |
 | `glob(pattern)` | Create a typed Glob |
 | `regex(str)` | Create a Regex from a runtime string (returns `Result`) |
 | `secret(str)` | Create a Secret value |

@@ -3,6 +3,7 @@
 /// Walks the AST without executing it, reporting potential issues:
 /// - undefined-name / arity: see `crate::resolver`
 /// - unused-result: HTTP result discarded
+/// - unscoped-cd: cd() result discarded, leaving nothing to move back with
 /// - unreachable-code: statements after return/break/continue/fail
 /// - secret-interpolation: Secret value used in string interpolation
 /// - empty-block: empty block body (likely mistake)
@@ -390,6 +391,21 @@ impl Linter {
                                 "{}() result is discarded — consider checking the response",
                                 name
                             ),
+                        );
+                    }
+                    // `cd` returns the directory it left, and that return value
+                    // is the only way back. Thrown away, the move outlives the
+                    // block, the function and the task it appears in — it is
+                    // the process that moved, and nothing restores it.
+                    //
+                    // Only the discarded form is flagged: `let previous = cd(x)`
+                    // has kept what it needs, whether or not it uses it.
+                    if name == "cd" {
+                        self.warn(
+                            "unscoped-cd",
+                            "cd() result is discarded, so nothing can move back — \
+                             use `with dir(...) { ... }` to scope the change to a \
+                             block, or keep the returned path to return to it",
                         );
                     }
                 }

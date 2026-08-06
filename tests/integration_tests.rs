@@ -10687,6 +10687,26 @@ fn lint_no_unused_when_assigned() {
 }
 
 #[test]
+fn lint_unscoped_cd() {
+    // Throwing away what `cd` returns leaves nothing to move back with, and
+    // the process stays moved for the rest of the run.
+    let diags = lint_source("cd(p\"sub\")\nprintln(\"after\")\n");
+    assert!(diags.iter().any(|d| d.rule == "unscoped-cd"), "{:?}", diags);
+}
+
+#[test]
+fn lint_no_unscoped_cd_when_the_way_back_is_kept() {
+    let diags = lint_source("let previous = cd(p\"sub\")\nprintln(\"after\")\n");
+    assert!(diags.iter().all(|d| d.rule != "unscoped-cd"), "{:?}", diags);
+}
+
+#[test]
+fn lint_no_unscoped_cd_for_a_with_dir_block() {
+    let diags = lint_source("with dir(p\"sub\") {\n    println(\"hi\")\n}\nprintln(\"after\")\n");
+    assert!(diags.iter().all(|d| d.rule != "unscoped-cd"), "{:?}", diags);
+}
+
+#[test]
 fn lint_empty_function_body() {
     let diags = lint_source("fn empty() {}");
     assert!(diags.iter().any(|d| d.rule == "empty-block"));
