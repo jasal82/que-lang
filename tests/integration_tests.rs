@@ -5861,6 +5861,109 @@ println(path("{}/a.txt").read().unwrap())
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+#[test]
+fn every_way_of_expanding_a_glob_agrees_on_the_matches() {
+    // `Glob.expand()` brace-expanded and `Path.glob()` did not, so the same
+    // pattern matched two files in one spelling and none in the other. Every
+    // spelling now goes through the one expander.
+    let dir = std::env::temp_dir().join("que_test_glob_consistency");
+    let _ = std::fs::remove_dir_all(&dir);
+    for sub in ["alpha", "beta", "gamma"] {
+        std::fs::create_dir_all(dir.join(sub)).unwrap();
+        std::fs::write(dir.join(sub).join("f.txt"), sub).unwrap();
+    }
+
+    let source = format!(
+        r#"
+let base = path("{}")
+println(base.glob("{{alpha,beta}}/*.txt").len())
+println(glob("{}/{{alpha,beta}}/*.txt").expand().len())
+println(glob("{}/{{alpha,beta}}/*.txt").count())
+mut n = 0
+for f in glob("{}/{{alpha,beta}}/*.txt") {{ n = n + 1 }}
+println(n)
+"#,
+        dir.display(),
+        dir.display(),
+        dir.display(),
+        dir.display(),
+    );
+    let (output, _) = run(&source).unwrap();
+    assert_eq!(output, vec!["2", "2", "2", "2"]);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_tilde_in_a_glob_is_a_home_directory_in_every_spelling() {
+    // Not a home directory literally named `~`, which is what `glob::glob`
+    // looks for and never finds.
+    let home = match std::env::var("HOME") {
+        Ok(h) if !h.is_empty() => std::path::PathBuf::from(h),
+        _ => return,
+    };
+    let dir = home.join(".que_test_glob_tilde");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("f.txt"), "x").unwrap();
+
+    let source = r#"
+println(glob("~/.que_test_glob_tilde/*.txt").expand().len())
+mut n = 0
+for f in glob("~/.que_test_glob_tilde/*.txt") { n = n + 1 }
+println(n)
+"#;
+    let (output, _) = run(source).unwrap();
+    assert_eq!(output, vec!["1", "1"]);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_trailing_slash_on_the_directory_does_not_change_what_glob_matches() {
+    let dir = std::env::temp_dir().join("que_test_glob_slash");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("f.txt"), "x").unwrap();
+
+    let source = format!(
+        r#"
+println(path("{}").glob("*.txt").len())
+println(path("{}/").glob("*.txt").len())
+"#,
+        dir.display(),
+        dir.display(),
+    );
+    let (output, _) = run(&source).unwrap();
+    assert_eq!(output, vec!["1", "1"]);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn glob_first_and_any_see_past_the_first_alternative() {
+    // `first()` used to stop at the first *alternative* that matched nothing
+    // only by luck of ordering; both now read off the same expansion.
+    let dir = std::env::temp_dir().join("que_test_glob_alternatives");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("second")).unwrap();
+    std::fs::write(dir.join("second/f.txt"), "x").unwrap();
+
+    let source = format!(
+        r#"
+let g = glob("{}/{{first,second}}/*.txt")
+println(g.any())
+println(g.first().name())
+println(g.count())
+"#,
+        dir.display(),
+    );
+    let (output, _) = run(&source).unwrap();
+    assert_eq!(output, vec!["true", "f.txt", "1"]);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // 26. WITH TEMP_DIR / TEMP_FILE
 // ════════════════════════════════════════════════════════════════════════

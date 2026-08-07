@@ -1673,14 +1673,11 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             Value::Tuple(items) => Ok(items),
             Value::Glob(pattern) => {
                 // Expand glob pattern against filesystem
-                let expanded = helpers::expand_tilde(&pattern);
-                let mut results = Vec::new();
-                if let Ok(paths) = glob::glob(&expanded) {
-                    for entry in paths.flatten() {
-                        results.push(Value::Path(entry.to_string_lossy().to_string()));
-                    }
-                }
-                Ok(results)
+                Ok(helpers::glob_expand(&pattern)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|entry| Value::Path(entry.to_string_lossy().into_owned()))
+                    .collect())
             }
             Value::Path(p) => {
                 let path = std::path::Path::new(&p);

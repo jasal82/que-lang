@@ -1644,7 +1644,7 @@ pub fn method_doc(name: &str) -> Option<String> {
         "walk" => "```que\n.walk() -> List<Path>\n```\n\nRecursively walk the directory tree, returning all descendants (files and directories), sorted.\n\n**Available on:** Path",
         "files" => "```que\n.files() -> List<Path>\n```\n\nRecursively walk the directory tree, returning only files, sorted.\n\n**Available on:** Path",
         "dirs" => "```que\n.dirs() -> List<Path>\n```\n\nRecursively walk the directory tree, returning only directories, sorted.\n\n**Available on:** Path",
-        "glob" => "```que\n.glob(pattern: String) -> List<Path>\n```\n\nMatch files within the directory using a glob pattern.\n\n**Available on:** Path",
+        "glob" => "```que\n.glob(pattern: String) -> List<Path>\n```\n\nMatch files within the directory using a glob pattern.\n\nThe pattern is expanded exactly as a standalone `g\"...\"` would be, including `{a,b}` alternation.\n\n**Available on:** Path",
         "append_text" => "```que\n.append_text(content: String) -> Result\n```\n\nAppend text to the file.\n\n**Available on:** Path",
 
         // ── Stream methods ──
@@ -1719,7 +1719,7 @@ pub fn method_doc(name: &str) -> Option<String> {
 
         // ── Glob methods ──
         "test" => "```que\n.test(value) -> Bool\n```\n\nTest if a value matches the pattern.\n\n**Available on:** Glob, Regex",
-        "expand" => "```que\n.expand() -> List<Path>\n```\n\nExpand the glob pattern against the filesystem.\n\n**Available on:** Glob",
+        "expand" => "```que\n.expand() -> List<Path>\n```\n\nExpand the glob pattern against the filesystem.\n\nA leading `~` becomes the home directory and `{a,b}` is expanded into its alternatives before matching.\n\n**Available on:** Glob",
         "pattern" => "```que\n.pattern() -> String\n```\n\nReturn the glob pattern string.\n\n**Available on:** Glob",
         "count" => "```que\n.count() -> Int\n```\n\nCount the number of paths that match the glob pattern.\n\n**Available on:** Glob",
         "find_all" => "```que\n.find_all(str: String) -> List<String>\n```\n\nFind all regex matches in the string.\n\n**Available on:** Regex",

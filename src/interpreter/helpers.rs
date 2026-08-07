@@ -65,6 +65,33 @@ pub(crate) fn glob_base(pattern: &str) -> &str {
     }
 }
 
+/// Match a glob pattern against the filesystem.
+///
+/// Every glob expansion in the language goes through here. They did not use
+/// to: `Glob.expand()` expanded `~` and `{a,b}` before matching, while
+/// `Path.glob()`, `for x in g"..."` and task `@inputs` handed the pattern to
+/// `glob::glob` raw. Since `glob::glob` understands neither form, the same
+/// pattern quietly meant different things depending on where it was written
+/// — a `~` was looked for as a directory literally named `~`, and `{a,b}` as
+/// one literally named `{a,b}`, so the mismatch showed up as "no matches"
+/// rather than as an error.
+///
+/// Alternatives are expanded in the order written and their match sets
+/// concatenated, the way a shell does it; `glob::glob` sorts within one
+/// alternative. A malformed pattern is reported rather than swallowed, so a
+/// caller that can fail — `copy_to`, `move_to` — can say so instead of
+/// quietly copying nothing.
+pub(crate) fn glob_expand(pattern: &str) -> Result<Vec<std::path::PathBuf>, String> {
+    let mut results = Vec::new();
+    for pat in expand_braces(&expand_tilde(pattern)) {
+        match glob::glob(&pat) {
+            Ok(entries) => results.extend(entries.flatten()),
+            Err(e) => return Err(format!("invalid glob pattern '{}': {}", pat, e)),
+        }
+    }
+    Ok(results)
+}
+
 pub(crate) fn duration_to_ms(val: f64, unit: DurationUnit) -> f64 {
     match unit {
         DurationUnit::Milliseconds => val,

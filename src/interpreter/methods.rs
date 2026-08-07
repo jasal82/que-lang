@@ -2652,13 +2652,14 @@ impl Interpreter {
             }
             "glob" => {
                 let pattern = arg_str(_args, 0, "glob")?;
-                let full_pattern = format!("{}/{}", p, pattern);
-                let mut results = Vec::new();
-                if let Ok(entries) = glob::glob(&full_pattern) {
-                    for entry in entries.flatten() {
-                        results.push(Value::Path(entry.to_string_lossy().to_string()));
-                    }
-                }
+                // Rooted at this directory, then expanded exactly as a
+                // standalone `g"..."` would be — `{a,b}` and all.
+                let full_pattern = format!("{}/{}", p.trim_end_matches('/'), pattern);
+                let results = glob_expand(&full_pattern)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|entry| Value::Path(entry.to_string_lossy().into_owned()))
+                    .collect();
                 Ok(Value::List(results))
             }
             "join" => {
@@ -2900,43 +2901,19 @@ impl Interpreter {
                 Ok(Value::Bool(matches))
             }
             "expand" => {
-                // Expand glob against filesystem; brace-expand first since glob::glob
-                // does not support {a,b} alternation natively.
-                let mut results = Vec::new();
-                for pat in expand_braces(&expand_tilde(pattern)) {
-                    if let Ok(entries) = glob::glob(&pat) {
-                        for entry in entries.flatten() {
-                            results.push(Value::Path(entry.to_string_lossy().to_string()));
-                        }
-                    }
-                }
+                let results = glob_expand(pattern)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|entry| Value::Path(entry.to_string_lossy().into_owned()))
+                    .collect();
                 Ok(Value::List(results))
             }
-            "first" => {
-                for pat in expand_braces(&expand_tilde(pattern)) {
-                    if let Ok(mut entries) = glob::glob(&pat) {
-                        if let Some(Ok(entry)) = entries.next() {
-                            return Ok(Value::Path(entry.to_string_lossy().to_string()));
-                        }
-                    }
-                }
-                Ok(Value::Null)
-            }
-            "count" => {
-                let count: usize = expand_braces(&expand_tilde(pattern))
-                    .iter()
-                    .filter_map(|pat| glob::glob(pat).ok())
-                    .flat_map(|entries| entries.flatten())
-                    .count();
-                Ok(Value::Int(count as i64))
-            }
-            "any" => {
-                let has_match = expand_braces(&expand_tilde(pattern))
-                    .iter()
-                    .filter_map(|pat| glob::glob(pat).ok())
-                    .any(|mut entries| entries.any(|e| e.is_ok()));
-                Ok(Value::Bool(has_match))
-            }
+            "first" => match glob_expand(pattern).unwrap_or_default().into_iter().next() {
+                Some(entry) => Ok(Value::Path(entry.to_string_lossy().into_owned())),
+                None => Ok(Value::Null),
+            },
+            "count" => Ok(Value::Int(glob_expand(pattern).unwrap_or_default().len() as i64)),
+            "any" => Ok(Value::Bool(!glob_expand(pattern).unwrap_or_default().is_empty())),
             "pattern" => Ok(Value::String(pattern.to_string())),
             "to_string" => Ok(Value::String(pattern.to_string())),
             "copy_to" | "move_to" => self.glob_transfer(pattern, method, args),
@@ -2972,15 +2949,10 @@ impl Interpreter {
 
         // Expand fully before touching anything: copying into a directory the
         // pattern also covers would otherwise keep re-matching what it wrote.
-        let mut sources = Vec::new();
-        for pat in expand_braces(&pattern) {
-            match glob::glob(&pat) {
-                Ok(entries) => sources.extend(entries.flatten()),
-                Err(e) => {
-                    return Ok(Value::Err(Box::new(Value::String(e.to_string()))));
-                }
-            }
-        }
+        let sources = match glob_expand(&pattern) {
+            Ok(sources) => sources,
+            Err(e) => return Ok(Value::Err(Box::new(Value::String(e)))),
+        };
 
         let mut moved = Vec::new();
         for src in sources {

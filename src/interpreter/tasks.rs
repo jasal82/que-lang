@@ -344,10 +344,8 @@ impl Interpreter {
         out: &mut Vec<String>,
     ) -> Result<(), Signal> {
         let expand = |pattern: &str, out: &mut Vec<String>| {
-            if let Ok(entries) = glob::glob(pattern) {
-                for entry in entries.flatten() {
-                    out.push(entry.to_string_lossy().to_string());
-                }
+            for entry in super::helpers::glob_expand(pattern).unwrap_or_default() {
+                out.push(entry.to_string_lossy().into_owned());
             }
         };
         match value {

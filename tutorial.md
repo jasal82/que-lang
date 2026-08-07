@@ -2644,6 +2644,16 @@ for file in g"src/*.rs" {
 let rust_files = p"./src".glob("*.rs")
 ```
 
+Every one of these spellings — `.expand()`, a `for` loop, `.first()`,
+`.count()`, `.any()`, `.copy_to()`, `Path.glob()` and a glob in `@inputs` —
+expands the pattern the same way: `~` becomes the home directory and `{a,b}`
+is expanded into its alternatives before matching.
+
+```que
+p"~/projects".glob("{web,api}/*.toml")   // same matches as
+g"~/projects/{web,api}/*.toml".expand()  // this
+```
+
 **Combining with pipelines:**
 
 ```que
