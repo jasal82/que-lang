@@ -264,6 +264,82 @@ impl Parser {
         }
     }
 
+    /// True when the next operator is one of `ops`, looking past newlines
+    /// when that operator can only ever continue an expression.
+    ///
+    /// `a +\n b` has always worked, because every operator loop skips
+    /// newlines once it has consumed the operator. The mirror image,
+    /// `a\n + b`, did not — and it is the form a long chain wants, most of
+    /// all for `/`, which composes paths and globs:
+    ///
+    /// ```que
+    /// let pattern = base
+    ///     / "profiles"
+    ///     / "*.toml"
+    /// ```
+    ///
+    /// This is safe precisely because of [`Self::opens_continuation`]: a line
+    /// beginning with one of those operators cannot be a statement of its
+    /// own, so joining it to the line above is the only reading that parses
+    /// at all. No program that used to compile changes meaning.
+    fn at_binary_op(&mut self, ops: &[TokenKind]) -> bool {
+        if ops.contains(self.peek()) {
+            return true;
+        }
+        if !matches!(self.peek(), TokenKind::Newline) {
+            return false;
+        }
+        let mut lookahead = self.pos;
+        while matches!(self.peek_at(lookahead), TokenKind::Newline) {
+            lookahead += 1;
+        }
+        let next = self.peek_at(lookahead);
+        if ops.contains(next) && Self::opens_continuation(next) {
+            // Step over exactly the newlines that were scanned. `skip_newlines`
+            // would also swallow a `;`, which does end the statement — but a
+            // `;` between the two lines stops the scan above, so control never
+            // reaches here in that case.
+            self.pos = lookahead;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Whether an operator may open a continuation line.
+    ///
+    /// Every binary operator qualifies except the two that can also *begin* an
+    /// expression: `-` is unary negation, and `|` opens a lambda. For those a
+    /// leading line break is genuinely ambiguous — `a\n -b` could be a
+    /// subtraction or a fresh statement — so they still have to be written
+    /// trailing. `!` and `~` never appear as binary operators at all.
+    fn opens_continuation(kind: &TokenKind) -> bool {
+        matches!(
+            kind,
+            TokenKind::PipeArrow
+                | TokenKind::NullCoalesce
+                | TokenKind::Or
+                | TokenKind::And
+                | TokenKind::BitXor
+                | TokenKind::BitAnd
+                | TokenKind::EqEq
+                | TokenKind::BangEq
+                | TokenKind::Lt
+                | TokenKind::Gt
+                | TokenKind::LtEq
+                | TokenKind::GtEq
+                | TokenKind::Shl
+                | TokenKind::Shr
+                | TokenKind::Range
+                | TokenKind::RangeInc
+                | TokenKind::Plus
+                | TokenKind::Star
+                | TokenKind::Slash
+                | TokenKind::Percent
+                | TokenKind::Power
+        )
+    }
+
     fn skip_separator(&mut self) {
         while matches!(
             self.peek(),

@@ -1066,6 +1066,98 @@ fn multiline_method_chain() {
 }
 
 #[test]
+fn an_expression_continues_onto_a_line_that_starts_with_an_operator() {
+    // The trailing form (`a +` newline `b`) has always worked. The leading
+    // form is the one a long chain wants, and `/` is the reason it matters
+    // here: it composes paths and globs.
+    let source = r#"
+let base = p"/tmp"
+let composed = base
+    / "profiles"
+    / "linux"
+println(composed)
+
+let pattern = glob("/var/log")
+    / "**"
+    / "*.log"
+println(pattern.pattern())
+
+println(1
+    + 2
+    + 3)
+println(true
+    || false)
+println(6
+    * 7)
+println(null
+    ?? "fallback")
+println(1
+    < 2)
+"#;
+    assert_output(
+        source,
+        &[
+            "/tmp/profiles/linux",
+            "/var/log/**/*.log",
+            "6",
+            "true",
+            "42",
+            "fallback",
+            "true",
+        ],
+    );
+}
+
+#[test]
+fn a_blank_line_does_not_break_a_continued_expression() {
+    let source = r#"
+println(1
+
+    + 2)
+"#;
+    assert_output(source, &["3"]);
+}
+
+#[test]
+fn a_leading_minus_starts_a_new_statement_rather_than_continuing() {
+    // `-` is also unary negation, so a line starting with it is genuinely
+    // ambiguous. It stays a fresh statement, and the trailing form is how a
+    // subtraction gets split.
+    let source = r#"
+let x = 1
+    - 2
+println(x)
+let y = 1 -
+    2
+println(y)
+"#;
+    assert_output(source, &["1", "-1"]);
+}
+
+#[test]
+fn a_leading_pipe_still_opens_a_lambda_rather_than_continuing() {
+    // `|` is bitwise-or *and* the start of a lambda, so it is excluded from
+    // continuation for the same reason as `-`.
+    let source = r#"
+let f = [1, 2, 3]
+let g = |x| x + 1
+println(f.map(g))
+"#;
+    assert_output(source, &["[2, 3, 4]"]);
+}
+
+#[test]
+fn a_semicolon_ends_the_statement_even_when_an_operator_follows() {
+    // The scan for a continuation only steps over newlines, so an explicit
+    // terminator still terminates.
+    let source = r#"
+let x = 1;
+    + 2
+"#;
+    assert_error_contains(source, "expected expression");
+}
+
+#[test]
 fn command_literal_parsing() {
     // Test that we can at least create and handle command results.
     // (Actual command execution depends on the system.)

@@ -949,6 +949,38 @@ let result = [1, 2, 3, 4, 5]
 println(result)   // 35  —  1 + 9 + 25
 ```
 
+### Breaking a Long Expression Across Lines
+
+A statement ends at a newline, but a line that *starts* with a binary operator
+continues the one above it, because it could not be a statement on its own:
+
+```que
+let pattern = base
+    / "profiles"
+    / "*.toml"
+
+let total = subtotal
+    + shipping
+    + tax
+
+let ok = user.is_active()
+    && user.has_licence()
+    && !user.is_banned()
+```
+
+The same holds for `.`, `?.` and `|>`, and blank lines between the parts are
+fine. Two operators are excluded, because they can also *begin* an expression:
+`-` is unary negation and `|` opens a lambda. For those, put the operator at
+the end of the line instead:
+
+```que
+let diff = subtotal -
+    discount
+```
+
+Newlines inside `(`, `[`, `{` and `#{` never end a statement, so arguments,
+collection literals and match arms can be spread out freely.
+
 ---
 
 ## 8. Destructuring and Pattern Matching

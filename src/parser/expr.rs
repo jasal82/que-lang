@@ -15,24 +15,7 @@ impl Parser {
 
     fn parse_pipe_expr(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_null_coalesce()?;
-        loop {
-            // Allow newlines before |> for multiline pipes:
-            //   [1, 2, 3]
-            //       |> |list| list.map(|x| x * x)
-            if matches!(self.peek(), TokenKind::Newline) {
-                let mut la = self.pos;
-                while la < self.tokens.len() && matches!(self.tokens[la].kind, TokenKind::Newline) {
-                    la += 1;
-                }
-                if la < self.tokens.len() && matches!(self.tokens[la].kind, TokenKind::PipeArrow) {
-                    self.skip_newlines();
-                } else {
-                    break;
-                }
-            }
-            if !matches!(self.peek(), TokenKind::PipeArrow) {
-                break;
-            }
+        while self.at_binary_op(&[TokenKind::PipeArrow]) {
             self.advance();
             self.skip_newlines();
             let right = self.parse_null_coalesce()?;
@@ -46,7 +29,7 @@ impl Parser {
 
     fn parse_null_coalesce(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_or()?;
-        while matches!(self.peek(), TokenKind::NullCoalesce) {
+        while self.at_binary_op(&[TokenKind::NullCoalesce]) {
             self.advance();
             self.skip_newlines();
             let right = self.parse_or()?;
@@ -60,7 +43,7 @@ impl Parser {
 
     fn parse_or(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_and()?;
-        while matches!(self.peek(), TokenKind::Or) {
+        while self.at_binary_op(&[TokenKind::Or]) {
             self.advance();
             self.skip_newlines();
             let right = self.parse_and()?;
@@ -75,7 +58,7 @@ impl Parser {
 
     fn parse_and(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_bitor()?;
-        while matches!(self.peek(), TokenKind::And) {
+        while self.at_binary_op(&[TokenKind::And]) {
             self.advance();
             self.skip_newlines();
             let right = self.parse_bitor()?;
@@ -90,7 +73,7 @@ impl Parser {
 
     fn parse_bitor(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_bitxor()?;
-        while matches!(self.peek(), TokenKind::Pipe) {
+        while self.at_binary_op(&[TokenKind::Pipe]) {
             self.advance();
             self.skip_newlines();
             let right = self.parse_bitxor()?;
@@ -105,7 +88,7 @@ impl Parser {
 
     fn parse_bitxor(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_bitand()?;
-        while matches!(self.peek(), TokenKind::BitXor) {
+        while self.at_binary_op(&[TokenKind::BitXor]) {
             self.advance();
             self.skip_newlines();
             let right = self.parse_bitand()?;
@@ -120,7 +103,7 @@ impl Parser {
 
     fn parse_bitand(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_equality()?;
-        while matches!(self.peek(), TokenKind::BitAnd) {
+        while self.at_binary_op(&[TokenKind::BitAnd]) {
             self.advance();
             self.skip_newlines();
             let right = self.parse_equality()?;
@@ -135,7 +118,7 @@ impl Parser {
 
     fn parse_equality(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_comparison()?;
-        while matches!(self.peek(), TokenKind::EqEq | TokenKind::BangEq) {
+        while self.at_binary_op(&[TokenKind::EqEq, TokenKind::BangEq]) {
             let op = match self.advance().kind {
                 TokenKind::EqEq => BinOp::Eq,
                 TokenKind::BangEq => BinOp::NotEq,
@@ -154,10 +137,12 @@ impl Parser {
 
     fn parse_comparison(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_shift()?;
-        while matches!(
-            self.peek(),
-            TokenKind::Lt | TokenKind::Gt | TokenKind::LtEq | TokenKind::GtEq
-        ) {
+        while self.at_binary_op(&[
+            TokenKind::Lt,
+            TokenKind::Gt,
+            TokenKind::LtEq,
+            TokenKind::GtEq,
+        ]) {
             let op = match self.advance().kind {
                 TokenKind::Lt => BinOp::Lt,
                 TokenKind::Gt => BinOp::Gt,
@@ -178,7 +163,7 @@ impl Parser {
 
     fn parse_shift(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_range()?;
-        while matches!(self.peek(), TokenKind::Shl | TokenKind::Shr) {
+        while self.at_binary_op(&[TokenKind::Shl, TokenKind::Shr]) {
             let op = match self.advance().kind {
                 TokenKind::Shl => BinOp::Shl,
                 TokenKind::Shr => BinOp::Shr,
@@ -197,7 +182,7 @@ impl Parser {
 
     fn parse_range(&mut self) -> Result<Expr, QueError> {
         let left = self.parse_addition()?;
-        if matches!(self.peek(), TokenKind::Range | TokenKind::RangeInc) {
+        if self.at_binary_op(&[TokenKind::Range, TokenKind::RangeInc]) {
             let inclusive = matches!(self.peek(), TokenKind::RangeInc);
             self.advance();
             self.skip_newlines();
@@ -214,7 +199,7 @@ impl Parser {
 
     fn parse_addition(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_multiplication()?;
-        while matches!(self.peek(), TokenKind::Plus | TokenKind::Minus) {
+        while self.at_binary_op(&[TokenKind::Plus, TokenKind::Minus]) {
             let op = match self.advance().kind {
                 TokenKind::Plus => BinOp::Add,
                 TokenKind::Minus => BinOp::Sub,
@@ -233,10 +218,11 @@ impl Parser {
 
     fn parse_multiplication(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_power()?;
-        while matches!(
-            self.peek(),
-            TokenKind::Star | TokenKind::Slash | TokenKind::Percent
-        ) {
+        while self.at_binary_op(&[
+            TokenKind::Star,
+            TokenKind::Slash,
+            TokenKind::Percent,
+        ]) {
             // `/` always lowers to BinOp::Div; path-join semantics are
             // resolved at eval time based on operand types.
             let op = match self.advance().kind {
@@ -258,7 +244,7 @@ impl Parser {
 
     fn parse_power(&mut self) -> Result<Expr, QueError> {
         let left = self.parse_unary()?;
-        if matches!(self.peek(), TokenKind::Power) {
+        if self.at_binary_op(&[TokenKind::Power]) {
             self.advance();
             self.skip_newlines();
             let right = self.parse_power()?; // right-associative
