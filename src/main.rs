@@ -22,6 +22,10 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 fn main() {
     let args: Vec<String> = env::args().collect();
 
+    // Ask the console to interpret ANSI escape sequences before anything can
+    // print. Only Windows needs telling, and only once per process.
+    que_lang::interpreter::enable_ansi();
+
     if args.len() == 1 {
         repl();
         return;

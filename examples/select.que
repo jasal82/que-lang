@@ -1,0 +1,185 @@
+// ── examples/select.que ─────────────────────────────────────────────────────
+//
+// An interactive single-choice select prompt, written in pure Que on top of
+// the `std.prompt.read_key` primitive and ANSI escape sequences.
+//
+// Usage:
+//   import .select { select }
+//
+//   let target = select("Deploy to:", ["dev", "staging", "prod"])
+//   if target == null {
+//       println("cancelled")
+//   } else {
+//       println("deploying to ${target}")
+//   }
+//
+// Options may be plain values, or maps with a "label" (what is shown) and a
+// "value" (what is returned):
+//
+//   let region = select("Region:", [
+//       { "label": "Europe (Frankfurt)", "value": "eu-central-1" },
+//       { "label": "US (Oregon)",        "value": "us-west-2" },
+//   ])
+//
+// Keys: up/k and down/j move, page up/page down and home/end jump,
+//       enter selects, esc / q / ctrl-c cancels.
+//
+// Cancelling always returns `null`. Because `null` is never a valid option
+// value here, `result == null` is the cancellation check.
+//
+// When there is no usable terminal — piped stdin, redirected stdout, or a
+// legacy Windows console that does not interpret ANSI escapes — the prompt
+// degrades to a plain numbered list read with `prompt.read_line()`.
+//
+// Options map (third argument, all optional):
+//   "page_size" — max rows shown at once, the list scrolls beyond it (10)
+//   "start"     — index the cursor starts on (0)
+
+import std.prompt
+import std.tty
+
+let _ESC = "\x1b"
+
+let _RESET       = "${_ESC}[0m"
+let _BOLD        = "${_ESC}[1m"
+let _DIM         = "${_ESC}[2m"
+let _CYAN        = "${_ESC}[36m"
+let _HIDE_CURSOR = "${_ESC}[?25l"
+let _SHOW_CURSOR = "${_ESC}[?25h"
+
+/// The menu steers the cursor with escape codes, not just colors, so where
+/// `tty.supports_ansi()` is false the whole interactive rendering has to be
+/// skipped. `NO_COLOR` is a color policy only — it must not disable the cursor
+/// movement the menu depends on, hence the two separate checks.
+fn _colors_on() {
+    tty.supports_ansi() && env.get("NO_COLOR") == null
+}
+
+fn _paint(code, text) {
+    if _colors_on() { code + text + _RESET } else { text }
+}
+
+fn _label_of(opt) {
+    if typeof(opt) == "Map" && opt.contains("label") { str(opt["label"]) }
+    else { str(opt) }
+}
+
+fn _value_of(opt) {
+    if typeof(opt) == "Map" && opt.contains("value") { opt["value"] }
+    else { opt }
+}
+
+/// Scroll offset that keeps `cursor` inside a `visible`-row window.
+fn _window_top(cursor, n, visible, top) {
+    mut t = top
+    if cursor < t { t = cursor }
+    if cursor >= t + visible { t = cursor - visible + 1 }
+    if t > n - visible { t = n - visible }
+    if t < 0 { t = 0 }
+    t
+}
+
+/// Draw the menu and return the number of lines written, so the next frame
+/// knows how far to move the cursor back up.
+fn _render(title, labels, cursor, top, visible) {
+    let n = labels.len()
+    mut lines = 0
+
+    if title != null && title != "" {
+        println(_paint(_BOLD, str(title)))
+        lines = lines + 1
+    }
+
+    for i in range(top, top + visible) {
+        if i == cursor {
+            println(_paint(_CYAN + _BOLD, "> " + labels[i]))
+        } else {
+            println("  " + labels[i])
+        }
+        lines = lines + 1
+    }
+
+    let pos = "(" + str(cursor + 1) + "/" + str(n) + ")"
+    println(_paint(_DIM, "  " + pos + " up/down: move  enter: select  esc: cancel"))
+    lines = lines + 1
+
+    lines
+}
+
+/// Erase the last frame and print a one-line summary in its place.
+fn _finish(drawn, title, summary) {
+    print("${_ESC}[${str(drawn)}A${_ESC}[J" + _SHOW_CURSOR)
+    let prefix = if title != null && title != "" { _paint(_BOLD, str(title)) + " " } else { "" }
+    println(prefix + summary)
+}
+
+/// Non-interactive fallback: print a numbered list and read one line.
+/// Accepts the option number or the option label; anything else cancels.
+fn _fallback(title, options, labels) {
+    let n = labels.len()
+    if title != null && title != "" { println(title) }
+    for i in range(0, n) {
+        println("  " + str(i + 1) + ") " + labels[i])
+    }
+    print("select 1-" + str(n) + " (empty to cancel): ")
+    let answer = prompt.read_line().trim()
+    if answer == "" { return null }
+
+    for i in range(0, n) {
+        if answer == str(i + 1) || answer.to_lower() == labels[i].to_lower() {
+            return _value_of(options[i])
+        }
+    }
+    println("no such option: " + answer)
+    null
+}
+
+/// Ask the user to pick one of `options`.
+/// Returns the selected option's value, or `null` if the user cancelled.
+pub fn select(title, options, opts = {}) {
+    let n = options.len()
+    if n == 0 { fail("select(): 'options' must not be empty") }
+
+    mut labels = []
+    for opt in options {
+        labels = labels + [_label_of(opt)]
+    }
+
+    // Nothing to draw on — piped input, redirected output, or a console that
+    // would print the escape sequences literally (legacy Windows conhost).
+    // Fall back to a plain numbered list, which needs no ANSI at all.
+    if !tty.is_stdin() || !tty.supports_ansi() {
+        return _fallback(title, options, labels)
+    }
+
+    let visible = min(max(opts.get("page_size", 10), 1), n)
+    mut cursor = min(max(opts.get("start", 0), 0), n - 1)
+    mut top = _window_top(cursor, n, visible, 0)
+    mut drawn = 0
+
+    print(_HIDE_CURSOR)
+    loop {
+        if drawn > 0 { print("${_ESC}[${str(drawn)}A${_ESC}[J") }
+        drawn = _render(title, labels, cursor, top, visible)
+
+        match prompt.read_key() {
+            "enter" => {
+                _finish(drawn, title, _paint(_CYAN, labels[cursor]))
+                return _value_of(options[cursor])
+            }
+            "escape" | "q" | "ctrl+c" => {
+                _finish(drawn, title, _paint(_DIM, "(cancelled)"))
+                return null
+            }
+            "up" | "k"      => { cursor = (cursor - 1 + n) % n }
+            "down" | "j"    => { cursor = (cursor + 1) % n }
+            "pageup"        => { cursor = max(cursor - visible, 0) }
+            "pagedown"      => { cursor = min(cursor + visible, n - 1) }
+            "home"          => { cursor = 0 }
+            "end"           => { cursor = n - 1 }
+            _ => {}
+        }
+
+        top = _window_top(cursor, n, visible, top)
+    }
+}

@@ -9,6 +9,8 @@
 //   println(ColoredString.new("Custom").fg(Color.Rgb(r: 120, g: 80, b: 255)))
 //   println(ColoredString.new("Warn").fg(Color.Yellow).on(Color.Black))
 
+import std.tty
+
 let _ESC = "\x1b"
 
 pub let RESET = "\x1b[0m"
@@ -165,18 +167,12 @@ pub impl ColoredString {
         if env.get("NO_COLOR") != null {
             return self.text
         }
-        // On Windows, only emit ANSI codes when a known ANSI-capable terminal is
-        // detected. Without one of these, plain cmd.exe / old PowerShell will show
-        // raw escape characters instead of colors.
-        if os.family == "windows" {
-            let wt      = env.get("WT_SESSION")    // Windows Terminal
-            let vt      = env.get("TERM_PROGRAM")  // VS Code terminal, mintty, …
-            let term    = env.get("TERM")          // Git Bash, Cygwin, MSYS2
-            let ansicon = env.get("ANSICON")       // ANSICON shim for legacy cmd.exe
-            let ps      = env.get("PSModulePath")  // PowerShell 5.1+ and 7+
-            if wt == null && vt == null && term == null && ansicon == null && ps == null {
-                return self.text
-            }
+        // A Windows console shows raw escape characters until a program turns
+        // on virtual-terminal mode; `tty.supports_ansi()` turns it on and
+        // reports whether it took. Elsewhere, whether colored text ends up in
+        // a pipe or a file is the caller's business, so only Windows is gated.
+        if os.family == "windows" && !tty.supports_ansi() {
+            return self.text
         }
 
         let fg_prefix = self.fg?.fg_code() ?? ""

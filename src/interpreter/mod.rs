@@ -24,6 +24,7 @@ pub(crate) mod task_cache;
 mod tasks;
 
 pub use helpers::home_dir;
+pub use std_modules::tty::enable_ansi;
 
 // ── Assignment path segments ─────────────────────────────────────────
 

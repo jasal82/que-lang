@@ -3766,6 +3766,7 @@ tty.is_stdin()    // true if stdin is a TTY (not piped)
 tty.is_stdout()   // true if stdout is a TTY (not redirected)
 tty.is_stderr()   // true if stderr is a TTY
 tty.size()        // {"cols": Int, "rows": Int} or null
+tty.supports_ansi()  // true if stdout interprets ANSI escape sequences
 ```
 
 A typical use is to disable ANSI colors when output is being piped to a file:
@@ -3785,6 +3786,25 @@ between a wide table and a compact list:
 import std.tty
 let sz = tty.size()
 let wide = sz != null && sz["cols"] >= 100
+```
+
+`tty.supports_ansi()` is the stronger check to make before *drawing* rather
+than merely coloring — redrawing a menu in place needs the terminal to act on
+cursor-movement and line-clearing escapes, not just to be a TTY. It ignores
+`NO_COLOR`, which is a color policy and says nothing about cursor positioning,
+and on Windows it switches the console into virtual-terminal mode, which a
+legacy console stays out of until a program asks:
+
+```que
+import std.tty
+
+if tty.supports_ansi() {
+    println("working…")
+    print("\e[1A\e[J")     // erase that line and redraw over it
+    println("done")
+} else {
+    println("done")        // no escapes: append-only output
+}
 ```
 
 ### `input()` and `confirm()` — quick one-liners
@@ -6536,7 +6556,7 @@ pattern if guard            // guard
 | `std.container` | `engine`, `build`, `run`, `exec`, `stop`, `remove`, `logs`, `exists`, `is_running`, `wait_healthy`, `pull`, `push`, `login` |
 | `std.ssh` | `cmd`, `run`, `out`, `check`, `upload`, `download` |
 | `std.watch` | `run`, `wait`, `snapshot` |
-| `std.tty` | `is_stdin`, `is_stdout`, `is_stderr`, `size` |
+| `std.tty` | `is_stdin`, `is_stdout`, `is_stderr`, `size`, `supports_ansi` |
 | `std.prompt` | `read_line`, `read_key` |
 
 ### The `os` Object

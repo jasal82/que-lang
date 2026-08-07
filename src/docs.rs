@@ -957,6 +957,12 @@ pub fn builtin_functions() -> Vec<BuiltinInfo> {
             documentation: "Return the current terminal size as `{cols: Int, rows: Int}`, or `null` if stdout is not a TTY.\n\nUseful for wrapping output to the terminal width or rendering tables.\n\nRequires: `import std.tty`\n\n```que\nimport std.tty\nlet sz = tty.size()\nif sz != null {\n    println(\"terminal is\", sz[\"cols\"], \"x\", sz[\"rows\"])\n}\n```",
             kind: BuiltinKind::Function,
         },
+        BuiltinInfo {
+            name: "tty.supports_ansi",
+            signature: "tty.supports_ansi() -> Bool",
+            documentation: "Return `true` if stdout will interpret ANSI escape sequences.\n\nStronger than `tty.is_stdout()`: use this before drawing with cursor movement or line clearing, which a terminal must actively handle. Unlike color helpers it ignores `NO_COLOR` — that suppresses color, not cursor positioning.\n\nOn Windows this also enables virtual-terminal processing, since a legacy console ignores escape sequences until asked.\n\nRequires: `import std.tty`\n\n```que\nimport std.tty\nif tty.supports_ansi() {\n    print(\"\\e[2A\\e[J\")   // redraw in place\n} else {\n    println(\"...\")      // plain output\n}\n```",
+            kind: BuiltinKind::Function,
+        },
         // ── std.container ───────────────────────────────────
         BuiltinInfo {
             name: "container.engine",

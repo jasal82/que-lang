@@ -23,7 +23,7 @@ mod stream;
 mod template;
 pub(crate) mod time;
 mod toml;
-mod tty;
+pub(crate) mod tty;
 mod watch;
 mod yaml;
 
