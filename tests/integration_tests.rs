@@ -1158,6 +1158,84 @@ let x = 1;
 }
 
 #[test]
+fn an_interpolation_may_be_written_across_lines() {
+    // `${...}` gets its own token stream, which used to start on the newline
+    // rather than on the expression.
+    let source = r#"
+let name = "que"
+let a = 1
+let b = 2
+let list = [3, 1, 2]
+println("hello ${
+    name
+}")
+println("sum ${
+    a
+        + b
+}")
+println("first ${
+    list
+        .sort()
+        .first()
+}")
+let dir = "x"
+println(p"/tmp/${
+    dir
+}/f")
+println(g"/tmp/${
+    dir
+}/*.log".pattern())
+"#;
+    assert_output(source, &["hello que", "sum 3", "first 1", "/tmp/x/f", "/tmp/x/*.log"]);
+}
+
+#[test]
+fn an_empty_interpolation_is_still_an_error() {
+    let source = "println(\"${\n}\")\n";
+    assert_error_contains(source, "expected expression");
+}
+
+#[test]
+fn a_closure_parameter_list_may_be_written_across_lines() {
+    let source = r#"
+let add = |
+    a,
+    b,
+| a + b
+println(add(1, 2))
+
+let mul = |
+    a,
+    b
+| a * b
+println(mul(3, 4))
+
+let annotated = |
+    a: Int,
+    b: Int = 10,
+| a + b
+println(annotated(5))
+
+let blocky = |
+    a,
+    b,
+| {
+    a - b
+}
+println(blocky(9, 4))
+
+let nothing = |
+| 42
+println(nothing())
+
+println([1, 2, 3].map(|
+    x,
+| x * 2))
+"#;
+    assert_output(source, &["3", "12", "15", "5", "42", "[2, 4, 6]"]);
+}
+
+#[test]
 fn command_literal_parsing() {
     // Test that we can at least create and handle command results.
     // (Actual command execution depends on the system.)

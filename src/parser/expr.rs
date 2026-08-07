@@ -858,6 +858,12 @@ impl Parser {
             TokenKind::Pipe => {
                 self.advance();
                 let mut params = Vec::new();
+                // A closure's parameters lay out across lines the same way a
+                // named function's do. They did not use to: `|` followed by a
+                // newline was "expected identifier, got Newline", so a closure
+                // with several annotated parameters had to be written on one
+                // long line however wide it grew.
+                self.skip_newlines();
                 while !matches!(self.peek(), TokenKind::Pipe | TokenKind::Eof) {
                     let name = self.expect_ident()?;
                     let type_ann = if matches!(self.peek(), TokenKind::Colon) {
@@ -881,8 +887,10 @@ impl Parser {
                         default,
                         rest: false,
                     });
+                    self.skip_newlines();
                     if matches!(self.peek(), TokenKind::Comma) {
                         self.advance();
+                        self.skip_newlines();
                     }
                 }
                 self.expect(&TokenKind::Pipe)?;
@@ -1099,6 +1107,13 @@ impl Parser {
             e
         })?;
         let mut parser = Parser::new(tokens);
+        // `${...}` is a bracketed construct like any other, so a line break
+        // after the brace is layout rather than the end of anything. This is
+        // its own token stream, though, which starts at the very first token:
+        // without stepping over the break the expression appeared to be a
+        // newline, and a template written across lines to stay readable was a
+        // parse error pointing at line 1.
+        parser.skip_newlines();
         parser.parse_expr().map_err(|mut e| {
             if e.span.is_none() {
                 e.span = Some(fallback_span);

@@ -979,7 +979,23 @@ let diff = subtotal -
 ```
 
 Newlines inside `(`, `[`, `{` and `#{` never end a statement, so arguments,
-collection literals and match arms can be spread out freely.
+collection literals and match arms can be spread out freely. The same goes for
+a closure's parameter list and for a `${...}` interpolation:
+
+```que
+let describe = |
+    name: Str,
+    version: Str = "dev",
+| "${name}@${version}"
+
+println("report for ${
+    user.name()
+        .to_upper()
+}")
+```
+
+`que fmt` collapses all of these back onto one line, so use them where the
+source reads better, not where the formatter will preserve them.
 
 ---
 
