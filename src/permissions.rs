@@ -348,6 +348,11 @@ pub fn std_extra_effect(module: &str, func: &str) -> Option<Effect> {
         // Downloads land on disk, so they need write access to the
         // destination as well as network access to the host.
         ("http", "download") => (Write, Some(1)),
+        // A clone writes a whole working tree at its destination. When the
+        // destination is left implicit there is no argument to name, so a
+        // scoped write grant refuses it: `git.clone(url, dest)` is the
+        // spelling a sandboxed script has to use.
+        ("git", "clone") => (Write, Some(1)),
         // Building an archive reads the source tree it is packing.
         ("archive", "create") | ("archive", "zip") | ("archive", "tar")
         | ("archive", "targz") => (Read, Some(1)),

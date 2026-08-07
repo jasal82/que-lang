@@ -9969,6 +9969,142 @@ typeof(tags) == "List"
     assert_result(source, Value::Bool(true));
 }
 
+#[test]
+fn git_clone_copies_a_repository_and_returns_the_destination() {
+    // A local bare repo is a real remote as far as `git clone` is concerned,
+    // so this exercises the whole path without touching the network.
+    let Some(fixture) = git_fixture("clone_ok") else {
+        return;
+    };
+    let origin = fixture.join("origin");
+    let dest = fixture.join("cloned");
+    let source = format!(
+        r#"
+import std.git
+let d = git.clone("{}", p"{}", {{ quiet: true }})?
+let readme = d / "README.md"
+d.to_string() == "{}" && readme.read()? == "hello"
+"#,
+        origin.display(),
+        dest.display(),
+        dest.display()
+    );
+    assert_result(&source, Value::Bool(true));
+    let _ = std::fs::remove_dir_all(&fixture);
+}
+
+#[test]
+fn git_clone_infers_the_directory_from_the_url() {
+    let Some(fixture) = git_fixture("clone_default") else {
+        return;
+    };
+    let origin = fixture.join("origin");
+    let workdir = fixture.join("work");
+    std::fs::create_dir_all(&workdir).unwrap();
+    // `git clone <url>` names the directory after the url's last segment;
+    // `.git` is stripped the way git strips it.
+    let source = format!(
+        r#"
+import std.git
+with dir(p"{}") {{
+    let d = git.clone("{}", null, {{ quiet: true }})?
+    d.to_string() == "origin" && p"origin/README.md".exists()
+}}
+"#,
+        workdir.display(),
+        origin.display()
+    );
+    assert_result(&source, Value::Bool(true));
+    let _ = std::fs::remove_dir_all(&fixture);
+}
+
+#[test]
+fn git_clone_reports_a_failure_as_an_err_rather_than_raising() {
+    let dir = std::env::temp_dir().join("que_git_clone_missing");
+    let _ = std::fs::remove_dir_all(&dir);
+    let source = format!(
+        r#"
+import std.git
+let r = git.clone("{}/nope", p"{}/dest", {{ quiet: true }})
+r.is_err()
+"#,
+        dir.display(),
+        dir.display()
+    );
+    assert_result(&source, Value::Bool(true));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn git_clone_does_not_let_a_url_smuggle_in_a_shell_command() {
+    // The url is an `Interpolated` command part, so it is escaped rather
+    // than parsed by the shell.
+    let dir = std::env::temp_dir().join("que_git_clone_inject");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let marker = dir.join("PWNED");
+    let source = format!(
+        r#"
+import std.git
+let r = git.clone("http://x/y.git; touch {}", p"{}/dest", {{ quiet: true }})
+r.is_err()
+"#,
+        marker.display(),
+        dir.display()
+    );
+    assert_result(&source, Value::Bool(true));
+    assert!(!marker.exists(), "the url ran as a shell command");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Build a bare repo with one commit on `main` and return its parent
+/// directory, or `None` when `git` is not installed.
+fn git_fixture(name: &str) -> Option<std::path::PathBuf> {
+    let root = std::env::temp_dir().join(format!("que_git_fixture_{}", name));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).ok()?;
+    let origin = root.join("origin");
+    let seed = root.join("seed");
+    std::fs::create_dir_all(&seed).ok()?;
+
+    let git = |args: &[&str], cwd: &std::path::Path| -> bool {
+        std::process::Command::new("git")
+            .args(args)
+            .current_dir(cwd)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    };
+    let origin_s = origin.to_string_lossy().to_string();
+    let ok = git(&["init", "-q", "--bare", &origin_s], &root)
+        && git(&["init", "-q"], &seed)
+        && {
+            std::fs::write(seed.join("README.md"), "hello").ok()?;
+            true
+        }
+        && git(&["add", "-A"], &seed)
+        && git(
+            &[
+                "-c", "user.email=t@example.com",
+                "-c", "user.name=t",
+                "commit", "-qm", "init",
+            ],
+            &seed,
+        )
+        && git(&["push", "-q", &origin_s, "HEAD:refs/heads/main"], &seed)
+        // A bare repo's HEAD still points at whatever `init` defaulted to,
+        // so aim it at the branch that was actually pushed — otherwise a
+        // clone checks nothing out.
+        && git(&["symbolic-ref", "HEAD", "refs/heads/main"], &origin);
+
+    if ok {
+        Some(root)
+    } else {
+        let _ = std::fs::remove_dir_all(&root);
+        None
+    }
+}
+
 /// ── Tier 2: std.archive ───────────────────────────────────────────────────
 
 #[test]
@@ -11024,6 +11160,132 @@ with TempDir {} as tmp {
 }
 "#;
     assert_output(source, &["3", "a.txt", "b.txt", "sub"]);
+}
+
+#[test]
+fn mkdir_clean_empties_a_directory_that_already_existed() {
+    let source = r#"
+with TempDir {} as tmp {
+    let d = tmp / "build"
+    d.mkdir()?
+    (d / "stale.txt").write_text("old")?
+    d.mkdir({ clean: true })?
+    println(d.is_dir())
+    println((d / "stale.txt").exists())
+}
+"#;
+    assert_output(source, &["true", "false"]);
+}
+
+#[test]
+fn mkdir_clean_is_plain_mkdir_when_nothing_is_there() {
+    let source = r#"
+with TempDir {} as tmp {
+    let d = tmp / "fresh"
+    d.mkdir({ clean: true })?
+    println(d.is_dir())
+}
+"#;
+    assert_output(source, &["true"]);
+}
+
+#[test]
+fn mkdir_clean_replaces_a_file_with_a_directory() {
+    let source = r#"
+with TempDir {} as tmp {
+    let p = tmp / "was_a_file"
+    p.write_text("x")?
+    p.mkdir({ clean: true })?
+    println(p.is_dir())
+}
+"#;
+    assert_output(source, &["true"]);
+}
+
+#[test]
+fn delete_of_a_missing_path_is_an_error_unless_missing_ok_says_otherwise() {
+    // A delete that quietly does nothing is how a script deletes the wrong
+    // thing for a week before anyone notices, so the default still fails.
+    let source = r#"
+with TempDir {} as tmp {
+    let gone = tmp / "not_here"
+    println(gone.delete().is_err())
+    println(gone.delete({ missing_ok: true }).is_ok())
+}
+"#;
+    assert_output(source, &["true", "true"]);
+}
+
+#[test]
+fn delete_unlinks_a_symlink_without_following_it() {
+    let source = r#"
+with TempDir {} as tmp {
+    let target = tmp / "real"
+    target.mkdir()?
+    (target / "keep.txt").write_text("x")?
+    let link = tmp / "link"
+    link.symlink(target)?
+    link.delete()?
+    println(link.exists())
+    println((target / "keep.txt").exists())
+}
+"#;
+    assert_output(source, &["false", "true"]);
+}
+
+#[test]
+fn mkdir_and_delete_reject_a_non_map_option_argument() {
+    // `mkdir(true)` is a typo for `mkdir({ clean: true })`; accepting it
+    // would let the two spellings drift apart.
+    assert_error_contains(
+        "with TempDir {} as tmp { (tmp / \"d\").mkdir(true) }",
+        "options map",
+    );
+    assert_error_contains(
+        "with TempDir {} as tmp { (tmp / \"d\").delete(\"yes\") }",
+        "options map",
+    );
+}
+
+#[test]
+fn contains_all_and_contains_any_take_a_list_or_loose_arguments() {
+    let source = r#"
+let name = "profile_x86_gcc12"
+println(name.contains_all(["x86", "gcc"]))
+println(name.contains_all("x86", "gcc"))
+println(name.contains_all(["x86", "clang"]))
+println(name.contains_any(["clang", "gcc"]))
+println(name.contains_any(["clang", "msvc"]))
+"#;
+    assert_output(source, &["true", "true", "false", "true", "false"]);
+}
+
+#[test]
+fn contains_all_and_contains_any_agree_with_all_and_any_on_an_empty_list() {
+    let source = r#"
+let name = "anything"
+println(name.contains_all([]))
+println(name.contains_any([]))
+"#;
+    assert_output(source, &["true", "false"]);
+}
+
+#[test]
+fn contains_all_accepts_a_set_or_a_tuple_of_needles() {
+    let source = r#"
+let name = "profile_x86_gcc"
+println(name.contains_all(#{"x86", "gcc"}))
+println(name.contains_all(("x86", "gcc")))
+"#;
+    assert_output(source, &["true", "true"]);
+}
+
+#[test]
+fn contains_all_rejects_a_needle_that_is_not_a_string() {
+    assert_error_contains(
+        "\"abc\".contains_all([\"a\", 3])",
+        "needles must be strings",
+    );
 }
 
 #[test]

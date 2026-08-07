@@ -873,6 +873,17 @@ impl Interpreter {
                 let sub = arg_str(args, 0, "contains")?;
                 Ok(Value::Bool(s.contains(sub)))
             }
+            // `contains(a) && contains(b) && …` and its `||` twin, which is
+            // what a filter over a list of hints spells out by hand.
+            // Vacuously true / false on an empty list, matching `all` / `any`.
+            "contains_all" => {
+                let needles = substring_args(args, "contains_all")?;
+                Ok(Value::Bool(needles.iter().all(|n| s.contains(n.as_str()))))
+            }
+            "contains_any" => {
+                let needles = substring_args(args, "contains_any")?;
+                Ok(Value::Bool(needles.iter().any(|n| s.contains(n.as_str()))))
+            }
             "replace" => {
                 let from = arg_str(args, 0, "replace")?;
                 let to = arg_str(args, 1, "replace")?;
@@ -2460,8 +2471,22 @@ impl Interpreter {
                 }
             }
             "mkdir" => {
-                if self.dry_run_skip(format!("mkdir {}", p)) {
+                // `clean` is "make this directory be exactly what I am about
+                // to put in it": the `if exists { delete } / mkdir` pair that
+                // every idempotent setup task writes out by hand.
+                let clean = bool_opt(_args.first(), "clean", "mkdir")?;
+                let action = if clean {
+                    format!("mkdir {} (clean)", p)
+                } else {
+                    format!("mkdir {}", p)
+                };
+                if self.dry_run_skip(action) {
                     return Ok(Value::Ok(Box::new(Value::Null)));
+                }
+                if clean {
+                    if let Err(e) = remove_path(p, true) {
+                        return Ok(Value::Err(Box::new(Value::String(e.to_string()))));
+                    }
                 }
                 match std::fs::create_dir_all(p) {
                     Ok(_) => Ok(Value::Ok(Box::new(Value::Null))),
@@ -2469,16 +2494,14 @@ impl Interpreter {
                 }
             }
             "delete" => {
-                let path = std::path::Path::new(p);
+                // Without `missing_ok` an absent path is still an error: a
+                // delete that quietly does nothing is how a script deletes the
+                // wrong thing for a week before anyone notices.
+                let missing_ok = bool_opt(_args.first(), "missing_ok", "delete")?;
                 if self.dry_run_skip(format!("remove {}", p)) {
                     return Ok(Value::Ok(Box::new(Value::Null)));
                 }
-                let result = if path.is_dir() {
-                    std::fs::remove_dir_all(p)
-                } else {
-                    std::fs::remove_file(p)
-                };
-                match result {
+                match remove_path(p, missing_ok) {
                     Ok(_) => Ok(Value::Ok(Box::new(Value::Null))),
                     Err(e) => Ok(Value::Err(Box::new(Value::String(e.to_string())))),
                 }
@@ -3599,6 +3622,83 @@ fn cmd_part_for(val: &Value) -> CmdPart {
         Value::Secret(s) => CmdPart::Secret(s.clone()),
         other => CmdPart::Interpolated(other.display_string()),
     }
+}
+
+/// Read one boolean out of an optional `{ key: bool }` options map.
+///
+/// A non-map argument is refused rather than coerced: `mkdir(true)` is a
+/// typo for `mkdir({ clean: true })`, and silently accepting it would make
+/// the two spellings drift apart.
+fn bool_opt(arg: Option<&Value>, key: &str, method: &str) -> Result<bool, Signal> {
+    match arg {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Map(m)) => match m.get(key) {
+            None | Some(Value::Null) => Ok(false),
+            Some(Value::Bool(b)) => Ok(*b),
+            Some(other) => Err(Signal::Error(QueError::new(
+                ErrorKind::TypeMismatch,
+                format!(
+                    "{}(): option '{}' must be a Bool, got {}",
+                    method,
+                    key,
+                    other.type_name()
+                ),
+            ))),
+        },
+        Some(other) => Err(Signal::Error(QueError::new(
+            ErrorKind::TypeMismatch,
+            format!(
+                "{}() takes an options map like {{ {}: true }}, got {}",
+                method,
+                key,
+                other.type_name()
+            ),
+        ))),
+    }
+}
+
+/// Remove a file, directory or symlink.
+///
+/// `symlink_metadata` rather than `is_dir` so a symlink pointing at a
+/// directory is unlinked instead of being handed to `remove_dir_all`, which
+/// fails on it. `missing_ok` decides whether an absent path is success or
+/// the `NotFound` the caller would otherwise see.
+fn remove_path(p: &str, missing_ok: bool) -> std::io::Result<()> {
+    match std::fs::symlink_metadata(p) {
+        Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(p),
+        Ok(_) => std::fs::remove_file(p),
+        Err(e) if missing_ok && e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+/// Collect the needles for `contains_all` / `contains_any`.
+///
+/// Both spellings are accepted because both read naturally at the call site:
+/// `name.contains_all(hints)` when the needles already are a collection, and
+/// `name.contains_all("x86", "gcc")` when they are written out. A single
+/// collection argument is unwrapped rather than stringified, so the common
+/// case never has to be spread.
+fn substring_args(args: &[Value], method: &str) -> Result<Vec<String>, Signal> {
+    let items: &[Value] = match args {
+        [Value::List(items)] | [Value::Set(items)] | [Value::Tuple(items)] => items,
+        rest => rest,
+    };
+    items
+        .iter()
+        .map(|v| match v {
+            Value::String(s) => Ok(s.clone()),
+            Value::Path(p) => Ok(p.clone()),
+            other => Err(Signal::Error(QueError::new(
+                ErrorKind::TypeMismatch,
+                format!(
+                    "{}() needles must be strings, got {}",
+                    method,
+                    other.type_name()
+                ),
+            ))),
+        })
+        .collect()
 }
 
 /// Options for `.sudo()`.

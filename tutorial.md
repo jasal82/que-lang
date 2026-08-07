@@ -395,6 +395,8 @@ println(upper_names.join(" | "))
 | `.starts_with(s)` | Check prefix |
 | `.ends_with(s)` | Check suffix |
 | `.contains(s)` | Check substring |
+| `.contains_all(needles)` | Check every needle is a substring (`true` if empty) |
+| `.contains_any(needles)` | Check at least one needle is a substring (`false` if empty) |
 | `.replace(from, to)` | Replace occurrences |
 | `.split(sep)` | Split into a list of strings |
 | `.chars()` | Split into individual characters |
@@ -2386,6 +2388,10 @@ p"./config.json".copy_to(p"./backup/config.json")?
 p"./build/output".move_to(p"/mnt/deploy/output")?
 p"./old".delete()?
 
+// Idempotent variants, for setup steps that may run twice
+p"./build".mkdir({ clean: true })?      // empty afterwards, existed or not
+p"./old".delete({ missing_ok: true })?  // an absent path is not an error
+
 // List directory contents — paths are directly iterable
 for f in p"./src" {
     println(f.name())
@@ -2509,8 +2515,8 @@ println(data)   // processed (tmp is already cleaned up)
 | `.read()` | `Result<String>` | Read file contents |
 | `.write_text(s)` | `Result` | Write string to file |
 | `.append_text(s)` | `Result` | Append string to file |
-| `.mkdir()` | `Result` | Create directory recursively |
-| `.delete()` | `Result` | Remove file or directory |
+| `.mkdir(opts?)` | `Result` | Create directory recursively. `{ clean: true }` removes an existing path first |
+| `.delete(opts?)` | `Result` | Remove file, directory or symlink. `{ missing_ok: true }` treats an absent path as success |
 | `.copy_to(dest)` | `Result` | Copy to destination |
 | `.move_to(dest)` | `Result` | Move / rename |
 | `.symlink(target)` | `Result` | Create *this* path as a symlink pointing at `target` (Unix) |
@@ -4423,6 +4429,23 @@ let origin = git.remote_url()       // "https://github.com/org/repo"
 ```
 
 All functions accept an optional repository path (default: `"."`).
+
+**Cloning.** `git.clone` returns the destination as a `Path`:
+
+```que
+let src = git.clone("https://github.com/org/repo.git")?          // ./repo
+let vendored = git.clone(url, p"./vendor/repo")?
+git.clone(url, dest, { branch: "main", depth: 1, recursive: true })?
+```
+
+Options are `branch`, `depth`, `recursive` and `quiet`. Progress goes to
+stderr unless `quiet: true`.
+
+This is the one function in the module that runs the `git` binary rather
+than libgit2. Cloning is the only operation here that talks to a remote, and
+remotes live behind credential helpers, SSH agents, proxies and per-host
+`~/.gitconfig` settings that libgit2 does not read — so it defers to the
+program that already handles them.
 
 **Common CI/CD pattern:**
 

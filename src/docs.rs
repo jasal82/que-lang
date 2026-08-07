@@ -818,6 +818,12 @@ pub fn builtin_functions() -> Vec<BuiltinInfo> {
             documentation: "Get the URL of a remote (default: origin).\n\nRequires: `import std.git`\n\n```que\nimport std.git\nlet origin = git.remote_url()\n```",
             kind: BuiltinKind::Function,
         },
+        BuiltinInfo {
+            name: "git.clone",
+            signature: "git.clone(url: String, dest?: Path, opts?: { branch: String, depth: Int, recursive: Bool, quiet: Bool }) -> Result<Path, String>",
+            documentation: "Clone a repository and return the destination path.\n\nThe destination defaults to the last segment of the url, as `git clone` does. Unlike the rest of this module it runs the `git` binary, so credential helpers, SSH agents and `~/.gitconfig` apply — which is what private remotes need.\n\nRequires: `import std.git`\n\n```que\nimport std.git\nlet src = git.clone(\"https://github.com/o/r.git\", p\"./vendor/r\")?\ngit.clone(url, dest, { branch: \"main\", depth: 1 })?\n```",
+            kind: BuiltinKind::Function,
+        },
 
         // ── Time / DateTime (requires `import std.time`) ──
         BuiltinInfo {
@@ -1166,6 +1172,8 @@ pub fn methods_for_type(type_hint: &str) -> Vec<(&'static str, &'static str)> {
             ("starts_with", "(prefix: String) -> Bool"),
             ("ends_with", "(suffix: String) -> Bool"),
             ("contains", "(substr: String) -> Bool"),
+            ("contains_all", "(needles: List<String> | ...String) -> Bool"),
+            ("contains_any", "(needles: List<String> | ...String) -> Bool"),
             ("replace", "(old: String, new: String) -> String"),
             ("split", "(delimiter: String) -> List<String>"),
             ("chars", "() -> List<String>"),
@@ -1282,11 +1290,11 @@ pub fn methods_for_type(type_hint: &str) -> Vec<(&'static str, &'static str)> {
             ("read", "() -> Result<String, String>"),
             ("write_text", "(content: String) -> Result"),
             ("append_text", "(content: String) -> Result"),
-            ("delete", "() -> Result"),
+            ("delete", "(opts?: { missing_ok: Bool }) -> Result"),
             ("copy_to", "(dest: Path) -> Result"),
             ("move_to", "(dest: Path) -> Result"),
             ("symlink", "(target: Path) -> Result"),
-            ("mkdir", "() -> Result"),
+            ("mkdir", "(opts?: { clean: Bool }) -> Result"),
             ("ls", "(pattern?: String) -> List<Path>"),
             ("walk", "() -> List<Path>"),
             ("files", "() -> List<Path>"),
@@ -1521,6 +1529,8 @@ pub fn method_doc(name: &str) -> Option<String> {
         "trim" => "```que\n.trim() -> String | Stream\n```\n\nRemove leading and trailing whitespace.\n\n**Available on:** String, Stream, ProcessResult",
         "is_empty" => "```que\n.is_empty() -> Bool\n```\n\nCheck if the value is empty.\n\n**Available on:** String, List, Map, Set, Stream",
         "contains" => "```que\n.contains(value) -> Bool\n```\n\nCheck if a collection contains a value, or a string contains a substring.\n\n**Available on:** String, List, Map, Set, Stream, Tuple",
+        "contains_all" => "```que\n.contains_all(needles: List<String>) -> Bool\n.contains_all(a: String, b: String, ...) -> Bool\n```\n\nTrue when every needle is a substring. True for an empty list, like `all`.\n\n```que\nname.contains_all(hints)\nname.contains_all(\"x86\", \"gcc\")\n```\n\n**Available on:** String",
+        "contains_any" => "```que\n.contains_any(needles: List<String>) -> Bool\n.contains_any(a: String, b: String, ...) -> Bool\n```\n\nTrue when at least one needle is a substring. False for an empty list, like `any`.\n\n**Available on:** String",
         "to_string" => "```que\n.to_string() -> String\n```\n\nConvert to a string representation.\n\n**Available on:** Int, Float, Bool, Path, Cmd, Semver, Glob, Regex, DateTime",
 
         // ── Numeric/Bool conversion methods ──
@@ -1617,10 +1627,10 @@ pub fn method_doc(name: &str) -> Option<String> {
         "name" => "```que\n.name() -> String?\n```\n\nReturn the file name component.\n\n**Available on:** Path",
         "read" => "```que\n.read() -> Result<String, String>\n```\n\nRead the file contents as a UTF-8 string.\n\n**Available on:** Path",
         "write_text" => "```que\n.write_text(content: String) -> Result\n```\n\nWrite content to the file. On a Stream, use `.write_to(path)`.\n\n**Available on:** Path",
-        "delete" => "```que\n.delete() -> Result\n```\n\nDelete the file or directory.\n\n**Available on:** Path",
+        "delete" => "```que\n.delete(opts?: { missing_ok: Bool }) -> Result\n```\n\nDelete the file, directory or symlink.\nAn absent path is an error unless `missing_ok: true` is passed.\n\n**Available on:** Path",
         "copy_to" => "```que\n.copy_to(dest: Path) -> Result\n```\n\nCopy the file or directory to a destination.\n\nAs with `cp`, an existing directory means *into* it under this path's own name; anything else is the new name.\n\n```que\np\"/opt/app\".copy_to(p\"/tmp\")        // -> /tmp/app\np\"/opt/app\".copy_to(p\"/tmp/app2\")   // -> /tmp/app2\n```\n\nOn a `Glob` it copies every match, keeping each one's position below the pattern's fixed base, and returns the new paths.\n\n```que\nglob(\"src/**/*.txt\").copy_to(p\"/tmp/out\")?  // src/a/b.txt -> /tmp/out/a/b.txt\n```\n\n**Available on:** Path, Glob",
         "move_to" => "```que\n.move_to(dest: Path) -> Result\n```\n\nMove/rename the file or directory.\n\nAs with `mv`, an existing directory means *into* it under this path's own name; anything else is the new name.\n\nOn a `Glob` it moves every match, keeping each one's position below the pattern's fixed base, and returns the new paths.\n\n**Available on:** Path, Glob",
-        "mkdir" => "```que\n.mkdir() -> Result\n```\n\nCreate the directory (and parents).\n\n**Available on:** Path",
+        "mkdir" => "```que\n.mkdir(opts?: { clean: Bool }) -> Result\n```\n\nCreate the directory (and parents).\nWith `clean: true` an existing path is removed first, so the\ndirectory ends up empty whether or not it was there before.\n\n**Available on:** Path",
         "ls" => "```que\n.ls(pattern?: String) -> List<Path>\n```\n\nList directory contents. Optional `pattern` (glob, e.g. `\"*.rs\"`) filters by filename. Errors if not a directory.\n\n**Available on:** Path",
         "resolve" => "```que\n.resolve() -> Path\n```\n\nResolve to an absolute path. Prepends the current working directory for relative paths and normalizes `.` and `..` segments. Does not require the path to exist.\n\n**Available on:** Path",
         "normalize" => "```que\n.normalize() -> Path\n```\n\nNormalize the path (remove `.` and `..`).\n\n**Available on:** Path",
