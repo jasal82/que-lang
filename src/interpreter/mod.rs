@@ -872,6 +872,9 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             }
             Item::TaskDecl(decl) => {
                 // Tasks are stored as first-class Task values with metadata.
+                // Every `@deps` entry is an `Expr::Ident`; the parser refuses
+                // anything else, since the name is what gets looked up when
+                // the task runs.
                 let dep_names: Vec<String> = decl.depends_on.iter().filter_map(|e| {
                     if let Expr::Ident(name) = e { Some(name.clone()) } else { None }
                 }).collect();

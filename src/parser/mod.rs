@@ -727,7 +727,7 @@ impl Parser {
                 }
                 "inputs" => attrs.inputs = self.parse_attr_expr_list()?,
                 "outputs" => attrs.outputs = self.parse_attr_expr_list()?,
-                "deps" => attrs.depends_on = self.parse_attr_expr_list()?,
+                "deps" => attrs.depends_on = self.parse_attr_dep_list()?,
                 "aliases" => attrs.aliases = self.parse_attr_name_list("alias")?,
                 "env" => attrs.env_keys = self.parse_attr_name_list("env var")?,
                 other => {
@@ -755,6 +755,24 @@ impl Parser {
         let items = self.parse_expr_list(&TokenKind::RBracket)?;
         self.expect(&TokenKind::RBracket)?;
         Ok(items)
+    }
+
+    /// `[NAME, "NAME"]` for `@deps` — names, like `@aliases` and `@env`.
+    ///
+    /// A dependency is resolved by *name* when the task runs, not by the value
+    /// written here, so anything that is not a name cannot work. It used to be
+    /// dropped without a word: `@deps(["setup"])` — a natural thing to write,
+    /// since the two neighbouring attributes do take quoted names — produced a
+    /// task with no dependencies at all, and the missing dependency showed up
+    /// as whatever the task did wrong for want of it. Accept the quoted form
+    /// the neighbours accept, and refuse the rest here, where there is a line
+    /// number to point at.
+    fn parse_attr_dep_list(&mut self) -> Result<Vec<Expr>, QueError> {
+        Ok(self
+            .parse_attr_name_list("dependency")?
+            .into_iter()
+            .map(Expr::Ident)
+            .collect())
     }
 
     /// `[NAME, "NAME"]` inside an attribute's parentheses — names, not values.

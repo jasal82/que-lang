@@ -3845,6 +3845,53 @@ println(build.outputs())
 }
 
 #[test]
+fn a_quoted_dependency_name_is_a_dependency() {
+    // `@aliases` and `@env` both take quoted names, so quoting one here is a
+    // natural thing to write. It used to be dropped on the floor: the task
+    // ended up with no dependencies and nothing said so.
+    let source = r#"
+task setup {
+    println("setup ran")
+}
+
+@deps(["setup"])
+task build {
+    println("build ran")
+}
+build.run()
+println(build.deps())
+"#;
+    assert_output(
+        source,
+        &[
+            "[RUN]  setup",
+            "setup ran",
+            "[DONE] setup",
+            "[RUN]  build",
+            "build ran",
+            "[DONE] build",
+            "[\"setup\"]",
+        ],
+    );
+}
+
+#[test]
+fn a_dependency_that_is_not_a_name_is_refused_rather_than_ignored() {
+    // A dependency is looked up by name when the task runs, so anything else
+    // can never resolve. Saying so at the declaration beats a task that
+    // quietly runs without the thing it depends on.
+    for deps in [
+        r#"[make_dep("setup")]"#,
+        r#"[1]"#,
+        r#"[tasks()["setup"]]"#,
+    ] {
+        let source = format!("@deps({})\ntask build {{\n    null\n}}\n", deps);
+        let msg = assert_error_contains(&source, "expected dependency name");
+        assert!(msg.contains("line"), "no location in message: {}", msg);
+    }
+}
+
+#[test]
 fn task_param_hash_invalidation() {
     // Changing a param should cause a task to re-run even if outputs exist.
     // Task defined at top level, temp dir created inside with block.

@@ -5043,6 +5043,15 @@ task package {
 Diamond dependencies are deduplicated — if multiple tasks depend on the same
 prerequisite, it runs exactly once.
 
+`@deps` takes task *names*, bare or quoted — `@deps([link])` and
+`@deps(["link"])` mean the same thing, as with `@aliases` and `@env`. The name
+is looked up when the task runs, so anything that is not a name is refused
+where it is written:
+
+```que
+@deps([make_dep("link")])   // parse error: expected dependency name
+```
+
 ### Parameterized Tasks
 
 ```que
