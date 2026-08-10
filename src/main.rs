@@ -195,6 +195,7 @@ fn print_usage() {
     eprintln!();
     eprintln!("Install options:");
     eprintln!("  --locked                    Fail instead of resolving anything not in que.lock");
+    eprintln!("  -g, --global                Install into the global Quefile's directory");
     eprintln!();
     eprintln!("Format options:");
     eprintln!("  --check                     Check formatting without writing (exit 1 if unformatted)");
@@ -306,6 +307,24 @@ fn find_global_quefile() -> Option<QuefileSource> {
         }
     }
     None
+}
+
+/// The package root the global Quefile imports against.
+///
+/// A Quefile is a script like any other, so its own directory is its package
+/// root and `que_packages/` has to sit beside it. The directory holding the
+/// Quefile wins even if another global directory has a manifest, because that
+/// is the one imports will resolve against; a manifest elsewhere would install
+/// dependencies nothing can reach.
+fn global_package_root() -> Option<std::path::PathBuf> {
+    if let Some(src) = find_global_quefile() {
+        if let Some(dir) = Path::new(&src.path).parent() {
+            return Some(dir.to_path_buf());
+        }
+    }
+    global_quefile_dirs()
+        .into_iter()
+        .find(|d| d.join("que.toml").is_file())
 }
 
 /// Report that there is nothing to run and exit.
@@ -876,28 +895,48 @@ fn cmd_fmt(args: &[String]) {
     }
 }
 
-/// `que install [--locked]`
+/// `que install [--locked] [-g]`
 ///
 /// Resolution is anchored at the package root — the nearest ancestor with a
 /// que.toml — so the command works from anywhere inside a project, the way
 /// every other tool in a repository does.
+///
+/// `-g` anchors at the global Quefile's directory instead. That directory is
+/// the package root for the global Quefile, so its dependencies have to be
+/// installed there; without this flag the only way to do that is to `cd`
+/// into a directory the user never otherwise visits.
 fn cmd_install(args: &[String]) {
     use colored::Colorize;
 
     let mut locked = false;
+    let mut global = false;
     for arg in args {
         match arg.as_str() {
             "--locked" => locked = true,
+            "-g" | "--global" => global = true,
             other => {
                 eprintln!("error: unknown option: {}", other);
-                eprintln!("Usage: que install [--locked]");
+                eprintln!("Usage: que install [--locked] [-g]");
                 process::exit(EXIT_USAGE);
             }
         }
     }
 
-    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let root = que_lang::module_loader::find_package_root(&cwd);
+    let root = if global {
+        global_package_root().unwrap_or_else(|| {
+            eprintln!("error: no global Quefile and no global que.toml to install for");
+            let dirs: Vec<String> = global_quefile_dirs()
+                .iter()
+                .map(|d| d.display().to_string())
+                .collect();
+            eprintln!("Looked in: {}", dirs.join(", "));
+            eprintln!("Put a Quefile and a que.toml in one of them, then run `que install -g`.");
+            process::exit(EXIT_USAGE);
+        })
+    } else {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        que_lang::module_loader::find_package_root(&cwd)
+    };
 
     match que_lang::install::install(&root, locked) {
         Ok(report) => {

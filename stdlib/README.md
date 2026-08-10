@@ -27,6 +27,28 @@ imports see a normal package.
 The hyphen in `que-std` becomes an underscore on disk and in imports, as for
 every package name.
 
+## Install for your global Quefile
+
+A Quefile's own directory is its package root, so a global Quefile at
+`~/.que/Quefile` wants the package beside it rather than inside some project.
+Put the same `[dependencies]` block in `~/.que/que.toml` and install with
+`-g`, which anchors there from wherever you are standing:
+
+```sh
+que install -g
+```
+
+```que
+// ~/.que/Quefile
+import que_std.colors { colored }
+import que_std.select { select }
+
+task deploy {
+    let target = select("Deploy to:", ["dev", "staging", "prod"])
+    println(colored("deploying to ${target}").green())
+}
+```
+
 ## Modules
 
 | Module | Import | What it does |

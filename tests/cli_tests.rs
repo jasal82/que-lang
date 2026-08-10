@@ -200,6 +200,42 @@ task boom {
     assert!(out.contains(&format!("unwind={}", project.display())), "{out}");
 }
 
+#[test]
+fn a_global_quefile_can_import_packages_installed_with_install_g() {
+    // The global Quefile's own directory is its package root, so its
+    // dependencies live beside it rather than in whatever project the user
+    // happens to be standing in. `-g` is what makes that reachable without
+    // knowing where the global directory is.
+    let fixture = Fixture::new(
+        "global-install",
+        Some("task local { println(\"project\") }\n"),
+        Some("import shared { greet }\n\ntask hello {\n    println(greet(\"global\"))\n}\n"),
+    );
+
+    let pkg = fixture.root.join("home/.que/shared");
+    fs::create_dir_all(&pkg).unwrap();
+    fs::write(pkg.join("mod.que"), "pub fn greet(who) { \"hi \" + who }").unwrap();
+    fs::write(
+        fixture.root.join("home/.que/que.toml"),
+        "[dependencies]\nshared = { path = \"shared\" }\n",
+    )
+    .unwrap();
+
+    // Installed from the project directory: the point of the flag.
+    let installed = fixture.que("project/sub", &["install", "-g"]);
+    assert!(installed.status.success(), "{:?}", installed);
+    assert!(fixture
+        .root
+        .join("home/.que/que_packages/shared")
+        .exists());
+
+    // The task is not in the project Quefile, so it falls through to the
+    // global one — whose import has to resolve against the global directory.
+    let output = fixture.que("project/sub", &["run", "hello"]);
+    assert!(output.status.success(), "{:?}", output);
+    assert!(stdout(&output).contains("hi global"), "{}", stdout(&output));
+}
+
 // ── Task parameters: the rest parameter ──────────────────────────────
 
 #[test]

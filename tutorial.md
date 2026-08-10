@@ -121,6 +121,7 @@ println("hi")   // inline comment
 | `que lint` | Lint source files |
 | `que test` | Run the test suite |
 | `que install` | Fetch dependencies declared in `que.toml` |
+| `que install -g` | Fetch the global Quefile's dependencies |
 
 ---
 
@@ -2318,6 +2319,10 @@ repository, installed with the `subdir` dependency above:
 
 The package's `mod.que` re-exports both, so `import que_std` and
 `import que_std.colors` are equally good ways in.
+
+To use it from your global Quefile, install it beside that file rather than
+inside a project — see [Dependencies for the global
+Quefile](#dependencies-for-the-global-quefile).
 
 ---
 
@@ -5431,6 +5436,52 @@ Global tasks are the ones you want everywhere — `backup`, `sync-dotfiles`,
 home directory. A project task shadows a global task of the same name; `-g`
 ignores the project Quefile and goes straight to the global one. `que tasks`
 lists both, marking shadowed global names.
+
+#### Dependencies for the global Quefile
+
+A Quefile is a script like any other, so its **own directory** is its package
+root: a global Quefile imports against the `que_packages/` beside it, not
+against whatever project you are standing in. Put a `que.toml` next to it and
+install with `-g`, from anywhere:
+
+```
+~/.que/
+  Quefile
+  que.toml
+  que.lock
+  que_packages/
+    que_std/
+```
+
+```toml
+# ~/.que/que.toml
+[dependencies]
+que-std = { git = "https://github.com/jasal82/que-lang", tag = "1.1.0", subdir = "stdlib" }
+```
+
+```sh
+que install -g          # installs into the global Quefile's directory
+```
+
+```que
+// ~/.que/Quefile
+import que_std.colors { colored }
+import que_std.select { select }
+
+task deploy {
+    let target = select("Deploy to:", ["dev", "staging", "prod"])
+    println(colored("deploying to ${target}").green())
+}
+```
+
+This holds however the global task was reached — `que run -g deploy`, or
+`que run deploy` falling through from a project that does not define it. The
+task still runs in the directory you invoked `que` from; only import
+resolution follows the file.
+
+A project never resolves imports against the global directory. That would
+make a checkout depend on what the machine happens to have installed, which
+is the thing `que.toml` and `que.lock` exist to prevent.
 
 #### Rooting paths at the project or at the caller
 

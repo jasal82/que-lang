@@ -78,7 +78,7 @@ println(&quot;Hello,&quot;, name)</code></pre></div>
 <div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">// This is a comment
 println(&quot;hi&quot;)   // inline comment</code></pre></div>
 <h3 id="running-que">Running Que<a class="anchor-link" href="#running-que" aria-label="Permalink">#</a></h3>
-<table><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody><tr><td><code>que</code></td><td>Start the interactive REPL</td></tr><tr><td><code>que script.que</code></td><td>Run a script file</td></tr><tr><td><code>que run &lt;task&gt;</code></td><td>Run a task from a Quefile</td></tr><tr><td><code>que run &lt;task&gt; --help</code></td><td>Show task usage and argument table</td></tr><tr><td><code>que run &lt;task&gt; -- arg1 arg2</code></td><td>Run task with positional arguments</td></tr><tr><td><code>que run &lt;task&gt; -- key=val</code></td><td>Run task with named arguments</td></tr><tr><td><code>que run -g &lt;task&gt;</code></td><td>Run a task from the global Quefile</td></tr><tr><td><code>que tasks</code></td><td>List available tasks</td></tr><tr><td><code>que fmt</code></td><td>Format source files</td></tr><tr><td><code>que lint</code></td><td>Lint source files</td></tr><tr><td><code>que test</code></td><td>Run the test suite</td></tr><tr><td><code>que install</code></td><td>Fetch dependencies declared in <code>que.toml</code></td></tr></tbody></table>
+<table><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody><tr><td><code>que</code></td><td>Start the interactive REPL</td></tr><tr><td><code>que script.que</code></td><td>Run a script file</td></tr><tr><td><code>que run &lt;task&gt;</code></td><td>Run a task from a Quefile</td></tr><tr><td><code>que run &lt;task&gt; --help</code></td><td>Show task usage and argument table</td></tr><tr><td><code>que run &lt;task&gt; -- arg1 arg2</code></td><td>Run task with positional arguments</td></tr><tr><td><code>que run &lt;task&gt; -- key=val</code></td><td>Run task with named arguments</td></tr><tr><td><code>que run -g &lt;task&gt;</code></td><td>Run a task from the global Quefile</td></tr><tr><td><code>que tasks</code></td><td>List available tasks</td></tr><tr><td><code>que fmt</code></td><td>Format source files</td></tr><tr><td><code>que lint</code></td><td>Lint source files</td></tr><tr><td><code>que test</code></td><td>Run the test suite</td></tr><tr><td><code>que install</code></td><td>Fetch dependencies declared in <code>que.toml</code></td></tr><tr><td><code>que install -g</code></td><td>Fetch the global Quefile's dependencies</td></tr></tbody></table>
 <div class="docs-pager"><span></span><a href="#2-variables-types-and-operators" class="pager-next"><span class="pager-dir">Next &rarr;</span><span class="docs-pager-title">2. Variables, Types, and Operators</span></a></div><h2 id="2-variables-types-and-operators"><span class="chapter-no">2.</span>Variables, Types, and Operators<a class="anchor-link" href="#2-variables-types-and-operators" aria-label="Permalink">#</a></h2>
 <h3 id="variables-and-mutability">Variables and Mutability<a class="anchor-link" href="#variables-and-mutability" aria-label="Permalink">#</a></h3>
 <p>Que has <strong>immutable-by-default</strong> variables. Use <code>let</code> for values that never change and <code>mut</code> for values that do.</p>
@@ -1301,6 +1301,7 @@ import que_std.select { select }</code></pre></div>
 <p>Most of the standard library is built into the interpreter and needs no installing (<code>import std.fs</code>). The parts written in Que rather than Rust ship as the <code>que-std</code> package in the <a href="stdlib"><code>stdlib/</code></a> directory of the Que repository, installed with the <code>subdir</code> dependency above:</p>
 <table><thead><tr><th>Module</th><th>What it does</th></tr></thead><tbody><tr><td><code>que_std.colors</code></td><td>ANSI colors and text styles, honouring <code>NO_COLOR</code> and non-ANSI terminals</td></tr><tr><td><code>que_std.select</code></td><td>An interactive single-choice menu, with a plain numbered fallback when there is no terminal</td></tr></tbody></table>
 <p>The package's <code>mod.que</code> re-exports both, so <code>import que_std</code> and <code>import que_std.colors</code> are equally good ways in.</p>
+<p>To use it from your global Quefile, install it beside that file rather than inside a project — see <a href="#dependencies-for-the-global-quefile">Dependencies for the global Quefile</a>.</p>
 <div class="docs-part-heading">Part II — DevOps-Native Types</div>
 <p>Everything so far would be at home in any modern scripting language. What makes Que specifically good for build automation and DevOps starts here: typed paths that know the difference between a file and a glob pattern, durations you can do arithmetic on, commands that fail loudly by default, and secrets the runtime actively hides from you.</p>
 <div class="docs-pager"><a href="#11-error-handling" class="pager-prev"><span class="pager-dir">&larr; Previous</span><span class="docs-pager-title">11. Error Handling</span></a><a href="#13-paths" class="pager-next"><span class="pager-dir">Next &rarr;</span><span class="docs-pager-title">13. Paths</span></a></div><h2 id="13-paths"><span class="chapter-no">13.</span>Paths<a class="anchor-link" href="#13-paths" aria-label="Permalink">#</a></h2>
@@ -2776,6 +2777,28 @@ $XDG_CONFIG_HOME/que/Quefile
 ~/.config/que/Quefile
 ~/.que/Quefile</code></pre></div>
 <p>Global tasks are the ones you want everywhere — <code>backup</code>, <code>sync-dotfiles</code>, <code>scaffold</code> — so they run in the directory you invoked <code>que</code> from, not in your home directory. A project task shadows a global task of the same name; <code>-g</code> ignores the project Quefile and goes straight to the global one. <code>que tasks</code> lists both, marking shadowed global names.</p>
+<h4 id="dependencies-for-the-global-quefile">Dependencies for the global Quefile<a class="anchor-link" href="#dependencies-for-the-global-quefile" aria-label="Permalink">#</a></h4>
+<p>A Quefile is a script like any other, so its <strong>own directory</strong> is its package root: a global Quefile imports against the <code>que_packages/</code> beside it, not against whatever project you are standing in. Put a <code>que.toml</code> next to it and install with <code>-g</code>, from anywhere:</p>
+<div class="code-block"><span class="code-lang">text</span><pre><code>~/.que/
+  Quefile
+  que.toml
+  que.lock
+  que_packages/
+    que_std/</code></pre></div>
+<div class="code-block"><span class="code-lang">toml</span><pre class="language-toml"><code class="language-toml"># ~/.que/que.toml
+[dependencies]
+que-std = { git = &quot;https://github.com/jasal82/que-lang&quot;, tag = &quot;1.1.0&quot;, subdir = &quot;stdlib&quot; }</code></pre></div>
+<div class="code-block"><span class="code-lang">sh</span><pre class="language-bash"><code class="language-bash">que install -g          # installs into the global Quefile&#x27;s directory</code></pre></div>
+<div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">// ~/.que/Quefile
+import que_std.colors { colored }
+import que_std.select { select }
+
+task deploy {
+    let target = select(&quot;Deploy to:&quot;, [&quot;dev&quot;, &quot;staging&quot;, &quot;prod&quot;])
+    println(colored(&quot;deploying to ${target}&quot;).green())
+}</code></pre></div>
+<p>This holds however the global task was reached — <code>que run -g deploy</code>, or <code>que run deploy</code> falling through from a project that does not define it. The task still runs in the directory you invoked <code>que</code> from; only import resolution follows the file.</p>
+<p>A project never resolves imports against the global directory. That would make a checkout depend on what the machine happens to have installed, which is the thing <code>que.toml</code> and <code>que.lock</code> exist to prevent.</p>
 <h4 id="rooting-paths-at-the-project-or-at-the-caller">Rooting paths at the project or at the caller<a class="anchor-link" href="#rooting-paths-at-the-project-or-at-the-caller" aria-label="Permalink">#</a></h4>
 <p>Since every relative path resolves against the caller's directory, a Quefile usually wants both roots. A <code>fmt</code> task that formats what you are standing in wants the caller's directory; a <code>build</code> task wants the project's <code>build/</code> wherever you ran it from. Name them both at the top of the Quefile and neither is in doubt:</p>
 <div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">import std.fs { write }
