@@ -5648,6 +5648,17 @@ The formatter enforces:
 - Trailing commas in multi-line collections
 - Opening brace on same line
 
+**Comments.** Comments are not part of the syntax tree, so the formatter puts
+them back by source position: a comment goes to the last item or statement
+boundary before it, and a comment written after code on the same line stays
+there. That is exactly where you wrote it in every ordinary case. The exception
+is a comment buried inside a multi-line expression — between the arms of a
+`match`, or between the elements of a collection that fits on one line. Such a
+comment moves down to the next statement boundary. It is never dropped.
+
+Blank lines inside a function body are not preserved, except the one before a
+comment.
+
 ### Linting (`que lint`)
 
 ```sh

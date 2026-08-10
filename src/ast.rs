@@ -221,6 +221,19 @@ pub enum MapEntry {
 pub struct Block {
     pub stmts: Vec<(Span, Stmt)>,
     pub expr: Option<Box<Expr>>,
+    /// Extra source positions only the formatter needs. Boxed because
+    /// `Value::Function` carries a `Block` by value, so every byte here is a
+    /// byte on every interpreter stack frame.
+    pub source: Option<Box<BlockSource>>,
+}
+
+/// Where a block sat in the source text.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockSource {
+    /// Span of the trailing expression's first token, when there is one.
+    pub expr_span: Option<Span>,
+    /// Byte offset just past the closing `}`.
+    pub end: usize,
 }
 
 // ── Statements ──

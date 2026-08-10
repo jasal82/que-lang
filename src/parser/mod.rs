@@ -1282,6 +1282,7 @@ impl Parser {
 
         let mut stmts = Vec::new();
         let mut final_expr: Option<Box<Expr>> = None;
+        let mut final_expr_span: Option<Span> = None;
 
         while !matches!(self.peek(), TokenKind::RBrace | TokenKind::Eof) {
             // Record position before parsing each statement for error reporting.
@@ -1295,6 +1296,7 @@ impl Parser {
                 // Last item in block — if it's just an expression, it's the block value.
                 if let Stmt::Expr(expr) = stmt {
                     final_expr = Some(Box::new(expr));
+                    final_expr_span = Some(span);
                 } else {
                     stmts.push((span, stmt));
                 }
@@ -1303,10 +1305,15 @@ impl Parser {
             }
         }
 
+        let close = self.current_span();
         self.expect(&TokenKind::RBrace)?;
         Ok(Block {
             stmts,
             expr: final_expr,
+            source: Some(Box::new(BlockSource {
+                expr_span: final_expr_span,
+                end: close.end,
+            })),
         })
     }
 

@@ -2877,6 +2877,8 @@ que fmt --check            # check without writing (exit 1 if unformatted)
 que fmt --diff             # show diff without writing</code></pre></div>
 <p>The formatter enforces:</p>
 <ul><li>4-space indentation</li><li>Spaces around operators</li><li>One blank line between top-level declarations</li><li>Newlines as statement terminators</li><li>Trailing commas in multi-line collections</li><li>Opening brace on same line</li></ul>
+<p><strong>Comments.</strong> Comments are not part of the syntax tree, so the formatter puts them back by source position: a comment goes to the last item or statement boundary before it, and a comment written after code on the same line stays there. That is exactly where you wrote it in every ordinary case. The exception is a comment buried inside a multi-line expression — between the arms of a <code>match</code>, or between the elements of a collection that fits on one line. Such a comment moves down to the next statement boundary. It is never dropped.</p>
+<p>Blank lines inside a function body are not preserved, except the one before a comment.</p>
 <h3 id="linting-que-lint">Linting (<code>que lint</code>)<a class="anchor-link" href="#linting-que-lint" aria-label="Permalink">#</a></h3>
 <div class="code-block"><span class="code-lang">sh</span><pre class="language-bash"><code class="language-bash">que lint                   # lint all .que files
 que lint script.que       # lint a specific file</code></pre></div>

@@ -6,13 +6,27 @@
 /// - One blank line between top-level declarations
 /// - Newlines as statement terminators (no semicolons)
 /// - Trailing commas in multi-line collections
+///
+/// Comments are not part of the AST, so the lexer hands them over separately
+/// and the formatter re-inserts them by byte offset. A comment is emitted at
+/// the last item or statement boundary before its position, which puts it
+/// back where it was written in every ordinary case. A comment buried inside
+/// a multi-line expression (say, between the arms of a `match`) moves to the
+/// nearest following boundary — it is never dropped, but it may shift.
 
 use crate::ast::*;
 use crate::ast::AstStringPart;
+use crate::lexer::Comment;
 
 pub struct Formatter {
     output: String,
     indent: usize,
+    /// Comments in source order, plus a cursor into them.
+    comments: Vec<Comment>,
+    next_comment: usize,
+    /// A comment asked for a blank line after it; emit it before the next
+    /// piece of content.
+    pending_blank: bool,
 }
 
 const INDENT: &str = "    ";
@@ -22,6 +36,17 @@ impl Formatter {
         Self {
             output: String::new(),
             indent: 0,
+            comments: Vec::new(),
+            next_comment: 0,
+            pending_blank: false,
+        }
+    }
+
+    /// Formatter that re-emits the comments collected by the lexer.
+    pub fn with_comments(comments: Vec<Comment>) -> Self {
+        Self {
+            comments,
+            ..Self::new()
         }
     }
 
@@ -41,7 +66,7 @@ impl Formatter {
             self.newline();
         }
 
-        for (_, item) in &module.items {
+        for (span, item) in &module.items {
 
             let is_decl = matches!(
                 item,
@@ -55,17 +80,24 @@ impl Formatter {
                     | Item::TraitImplDecl(_)
             );
 
-            // Blank line between top-level declarations
+            // Blank line between top-level declarations. It belongs before
+            // any comment attached to the declaration, so it goes first.
             if !first && (is_decl || prev_was_decl) {
                 self.newline();
             }
             first = false;
 
+            self.flush_comments_before(span.start);
+            self.ensure_line_start();
             self.format_item(item);
+            self.attach_trailing_comments(span.line);
             self.newline();
 
             prev_was_decl = is_decl;
         }
+
+        // Comments after the last item.
+        self.flush_comments_before(usize::MAX);
 
         // Ensure trailing newline
         if !self.output.ends_with('\n') {
@@ -1018,23 +1050,41 @@ impl Formatter {
     // ── Helpers ──
 
     fn format_block(&mut self, block: &Block) {
+        // Without source positions (a block the interpreter synthesised) there
+        // is nothing to interleave comments against.
+        let block_end = block.source.as_ref().map_or(0, |s| s.end);
+        let expr_span = block.source.as_ref().and_then(|s| s.expr_span);
+
         self.push_str("{");
-        if block.stmts.is_empty() && block.expr.is_none() {
+        if block.stmts.is_empty() && block.expr.is_none() && !self.has_comment_before(block_end) {
             self.push_str("}");
             return;
         }
         self.indent += 1;
-        for (_, stmt) in &block.stmts {
+        for (span, stmt) in &block.stmts {
             self.newline();
+            self.flush_comments_before(span.start);
+            self.ensure_line_start();
             self.format_stmt(stmt);
+            self.attach_trailing_comments(span.line);
         }
         if let Some(ref expr) = block.expr {
             self.newline();
+            if let Some(span) = expr_span {
+                self.flush_comments_before(span.start);
+            }
+            self.ensure_line_start();
             self.write_indent();
             self.format_expr(expr);
+            if let Some(span) = expr_span {
+                self.attach_trailing_comments(span.line);
+            }
         }
+        // Comments between the last statement and the closing brace.
+        self.flush_comments_before(block_end);
         self.indent -= 1;
-        self.newline();
+        self.pending_blank = false;
+        self.ensure_line_start();
         self.write_indent();
         self.push_str("}");
     }
@@ -1223,6 +1273,63 @@ impl Formatter {
         }
     }
 
+    // ── Comments ──
+
+    /// True if a comment is still pending that starts before `limit`.
+    fn has_comment_before(&self, limit: usize) -> bool {
+        self.comments
+            .get(self.next_comment)
+            .is_some_and(|c| c.start < limit)
+    }
+
+    /// Emit every pending comment that starts before `limit`, each on its own
+    /// line at the current indent.
+    fn flush_comments_before(&mut self, limit: usize) {
+        while self.has_comment_before(limit) {
+            let comment = self.comments[self.next_comment].clone();
+            self.next_comment += 1;
+            self.emit_comment_line(&comment);
+        }
+    }
+
+    /// Append the comments that were written on `line` of the source to the
+    /// line just emitted, so `let x = 1  // why` keeps its note.
+    fn attach_trailing_comments(&mut self, line: usize) {
+        while self
+            .comments
+            .get(self.next_comment)
+            .is_some_and(|c| !c.own_line && c.line == line)
+        {
+            let comment = self.comments[self.next_comment].clone();
+            self.next_comment += 1;
+            self.push_str("  ");
+            self.push_str(comment.text.trim_end());
+        }
+    }
+
+    fn emit_comment_line(&mut self, comment: &Comment) {
+        self.ensure_line_start();
+        if comment.blank_before && !self.output.is_empty() && !self.output.ends_with("\n\n") {
+            self.newline();
+        }
+        self.write_indent();
+        self.push_str(comment.text.trim_end());
+        self.pending_blank = comment.blank_after;
+    }
+
+    /// Start a fresh line, honouring a blank line requested by a comment.
+    fn ensure_line_start(&mut self) {
+        if !self.output.is_empty() && !self.output.ends_with('\n') {
+            self.newline();
+        }
+        if self.pending_blank {
+            self.pending_blank = false;
+            if !self.output.is_empty() && !self.output.ends_with("\n\n") {
+                self.newline();
+            }
+        }
+    }
+
     // ── Low-level output ──
 
     fn push_str(&mut self, s: &str) {
@@ -1242,15 +1349,26 @@ impl Formatter {
 
 // ── Free helper functions ──
 
+/// Re-emit a string literal's contents as Que source. Every character that
+/// the lexer would read back differently has to be escaped, otherwise the
+/// formatter silently rewrites the program: a raw ESC byte breaks the file,
+/// and a bare `${` turns a literal into an interpolation.
 fn escape_string(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
-    for ch in s.chars() {
+    let mut chars = s.chars().peekable();
+    while let Some(ch) = chars.next() {
         match ch {
             '"' => result.push_str("\\\""),
             '\\' => result.push_str("\\\\"),
             '\n' => result.push_str("\\n"),
             '\t' => result.push_str("\\t"),
             '\r' => result.push_str("\\r"),
+            '\0' => result.push_str("\\0"),
+            // Only `${` starts an interpolation, so a lone `$` is literal.
+            '$' if chars.peek() == Some(&'{') => result.push_str("\\$"),
+            c if c.is_control() => {
+                result.push_str(&format!("\\x{:02x}", c as u32));
+            }
             c => result.push(c),
         }
     }

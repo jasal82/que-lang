@@ -251,6 +251,7 @@ impl Interpreter {
                         body: Block {
                             stmts: vec![],
                             expr: Some(Box::new(body_expr)),
+                            source: None,
                         },
                         closure_env,
                     });
@@ -327,6 +328,7 @@ impl Interpreter {
                 body: Block {
                     stmts: vec![],
                     expr: Some(body.clone()),
+                    source: None,
                 },
                 closure_env: self.env.clone(),
             }),
@@ -511,6 +513,7 @@ impl Interpreter {
                     body: Block {
                         stmts: vec![],
                         expr: Some(body.clone()),
+                        source: None,
                     },
                     closure_env: self.env.clone(),
                 };

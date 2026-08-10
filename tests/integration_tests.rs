@@ -10719,7 +10719,7 @@ fn format_source(source: &str) -> String {
     let tokens = lexer.tokenize().expect("lex error");
     let mut parser = Parser::new(tokens);
     let module = parser.parse_module().expect("parse error");
-    Formatter::new().format_module(&module)
+    Formatter::with_comments(lexer.take_comments()).format_module(&module)
 }
 
 #[test]
@@ -10985,6 +10985,57 @@ fn fmt_index_on_binary_expr_keeps_parens() {
     let src = "(a + b)[0]";
     let out = format_source(src);
     assert!(out.contains("(a + b)[0]"), "got: {out}");
+}
+
+#[test]
+fn fmt_escapes_control_characters_in_strings() {
+    // Emitting the raw byte produced a file the lexer read back as a
+    // different string — the formatter was rewriting the program.
+    let out = format_source("let e = \"\\x1b[0m\"");
+    assert!(out.contains(r#"let e = "\x1b[0m""#), "got: {out}");
+    assert!(!out.contains('\u{1b}'), "raw ESC byte in output: {out:?}");
+}
+
+#[test]
+fn fmt_escapes_an_interpolation_opener_in_a_literal() {
+    let out = format_source(r#"let s = "\${not interpolated}""#);
+    assert!(out.contains(r#""\${not interpolated}""#), "got: {out}");
+}
+
+#[test]
+fn fmt_leaves_a_lone_dollar_alone() {
+    let out = format_source(r#"let s = "costs $5""#);
+    assert!(out.contains(r#""costs $5""#), "got: {out}");
+}
+
+#[test]
+fn fmt_keeps_comments() {
+    let src = "// header\n\nfn f(x) {\n    // leading\n    let a = 1  // trailing\n    a\n}\n";
+    let out = format_source(src);
+    assert!(out.contains("// header"), "got: {out}");
+    assert!(out.contains("    // leading"), "got: {out}");
+    assert!(out.contains("let a = 1  // trailing"), "got: {out}");
+}
+
+#[test]
+fn fmt_keeps_a_comment_in_an_otherwise_empty_block() {
+    let out = format_source("fn f() {\n    // nothing yet\n}\n");
+    assert!(out.contains("// nothing yet"), "got: {out}");
+}
+
+#[test]
+fn fmt_keeps_a_block_comment_and_a_trailing_one() {
+    let out = format_source("/* doc */\nfn f() {\n    1\n}\n// the end\n");
+    assert!(out.contains("/* doc */"), "got: {out}");
+    assert!(out.contains("// the end"), "got: {out}");
+}
+
+#[test]
+fn fmt_is_idempotent_with_comments() {
+    let src = "// header\n\nimport std.fs\n\n// about f\nfn f(x) {\n    // step one\n    let a = 1  // why\n\n    // step two\n    a + 1\n}\n";
+    let once = format_source(src);
+    let twice = format_source(&once);
+    assert_eq!(once, twice, "formatting is not stable:\n{once}\n---\n{twice}");
 }
 
 // ═════════════════════════════════════════════════════════════════════

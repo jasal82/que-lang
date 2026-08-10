@@ -17,6 +17,26 @@ struct LexStart {
     col: usize,
 }
 
+/// A comment skipped by the lexer, kept so tools that rewrite source (the
+/// formatter) can put it back. The parser never sees these.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Comment {
+    /// Byte offset of the leading `/`.
+    pub start: usize,
+    /// Byte offset just past the comment.
+    pub end: usize,
+    /// 1-based line the comment starts on.
+    pub line: usize,
+    /// Full text, including the `//` or `/* */` delimiters.
+    pub text: String,
+    /// Only whitespace precedes the comment on its line.
+    pub own_line: bool,
+    /// A blank line separates the comment from whatever precedes it.
+    pub blank_before: bool,
+    /// A blank line separates the comment from whatever follows it.
+    pub blank_after: bool,
+}
+
 pub struct Lexer<'src> {
     source: &'src [u8],
     pos: usize,
@@ -26,6 +46,8 @@ pub struct Lexer<'src> {
     /// only means "shebang or pragma" in that prologue; anywhere else it is
     /// the same error it has always been.
     prologue: bool,
+    /// Comments in source order, collected as they are skipped.
+    comments: Vec<Comment>,
 }
 
 impl<'src> Lexer<'src> {
@@ -36,7 +58,14 @@ impl<'src> Lexer<'src> {
             line: 1,
             col: 1,
             prologue: true,
+            comments: Vec::new(),
         }
+    }
+
+    /// Take ownership of the collected comments, leaving the lexer empty.
+    /// The parser has no use for them; `que fmt` re-inserts them.
+    pub fn take_comments(&mut self) -> Vec<Comment> {
+        std::mem::take(&mut self.comments)
     }
 
     /// Tokenize the entire source, returning all tokens (including Eof).
@@ -173,6 +202,8 @@ impl<'src> Lexer<'src> {
                     self.advance();
                 }
                 Some(b'/') => {
+                    let start = self.pos;
+                    let line = self.line;
                     if self.peek_at(1) == Some(b'/') {
                         // Line comment — consume until newline
                         while let Some(c) = self.peek() {
@@ -203,10 +234,61 @@ impl<'src> Lexer<'src> {
                     } else {
                         break;
                     }
+                    self.record_comment(start, line);
                 }
                 _ => break,
             }
         }
+    }
+
+    /// Record the comment spanning `start..self.pos` along with the layout
+    /// facts a formatter needs to put it back: whether it sat on its own line
+    /// and whether blank lines surrounded it.
+    fn record_comment(&mut self, start: usize, line: usize) {
+        let text = String::from_utf8_lossy(&self.source[start..self.pos]).into_owned();
+
+        // Walk back to the previous non-blank content to classify the comment.
+        let mut own_line = true;
+        let mut newlines_before = 0;
+        for &b in self.source[..start].iter().rev() {
+            match b {
+                b' ' | b'\t' | b'\r' => {}
+                b'\n' => {
+                    newlines_before += 1;
+                    if newlines_before >= 2 {
+                        break;
+                    }
+                }
+                _ => {
+                    own_line = newlines_before > 0;
+                    break;
+                }
+            }
+        }
+
+        let mut newlines_after = 0;
+        for &b in &self.source[self.pos..] {
+            match b {
+                b' ' | b'\t' | b'\r' => {}
+                b'\n' => {
+                    newlines_after += 1;
+                    if newlines_after >= 2 {
+                        break;
+                    }
+                }
+                _ => break,
+            }
+        }
+
+        self.comments.push(Comment {
+            start,
+            end: self.pos,
+            line,
+            text,
+            own_line,
+            blank_before: newlines_before >= 2,
+            blank_after: newlines_after >= 2,
+        });
     }
 
     pub fn next_token(&mut self) -> Result<Token, QueError> {
@@ -2214,5 +2296,33 @@ mod tests {
     fn test_error_unexpected_char() {
         let mut lexer = Lexer::new("§");
         assert!(lexer.tokenize().is_err());
+    }
+
+    #[test]
+    fn comments_are_collected_with_their_layout() {
+        let mut lexer = Lexer::new("// header\n\nlet x = 1 // why\n");
+        lexer.tokenize().unwrap();
+        let comments = lexer.take_comments();
+        assert_eq!(comments.len(), 2);
+
+        assert_eq!(comments[0].text, "// header");
+        assert_eq!(comments[0].line, 1);
+        assert!(comments[0].own_line);
+        assert!(!comments[0].blank_before);
+        assert!(comments[0].blank_after);
+
+        assert_eq!(comments[1].text, "// why");
+        assert_eq!(comments[1].line, 3);
+        assert!(!comments[1].own_line, "a comment after code is not own-line");
+    }
+
+    #[test]
+    fn a_block_comment_is_collected_whole() {
+        let mut lexer = Lexer::new("let x = /* a /* nested */ b */ 1");
+        lexer.tokenize().unwrap();
+        let comments = lexer.take_comments();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].text, "/* a /* nested */ b */");
+        assert!(!comments[0].own_line);
     }
 }

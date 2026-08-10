@@ -853,7 +853,7 @@ fn cmd_fmt(args: &[String]) {
             }
         };
 
-        let formatted = Formatter::new().format_module(&module);
+        let formatted = Formatter::with_comments(lexer.take_comments()).format_module(&module);
 
         if source == formatted {
             continue;
