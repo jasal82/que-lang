@@ -651,6 +651,315 @@ pub fn to_yaml_ordered(value: &Value, original: &str) -> Result<String, String> 
         .map_err(|e| format!("YAML serialize error: {}", e))
 }
 
+// ── Lossless YAML editing ────────────────────────────────────────────
+//
+// `to_yaml_ordered` round-trips the whole document through `serde_yaml`,
+// which throws away every comment, blank line and quoting choice in the
+// file.  The functions below edit the original text through a concrete
+// syntax tree instead: only the scalars, keys and list entries that
+// actually changed are rewritten, so everything else keeps its original
+// bytes.  This mirrors what `to_toml_ordered` gets from `toml_edit`.
+
+/// Expand a Que `Value` into the `yaml_edit` node that represents it, and run
+/// `$body` with that node bound to `$v`.
+///
+/// `Mapping::set`, `Sequence::set` and `Sequence::push` are generic over
+/// `AsYaml`, and the three node types are unrelated, so the match has to
+/// happen at every call site. The macro keeps that from being written out
+/// three times.
+macro_rules! with_fresh_yaml {
+    ($value:expr, $v:ident => $body:expr) => {
+        match que_value_to_yaml_node($value)? {
+            FreshYaml::Scalar($v) => $body,
+            FreshYaml::Mapping($v) => $body,
+            FreshYaml::Sequence($v) => $body,
+        }
+    };
+}
+
+/// A freshly built node for a key or list slot that has no counterpart in the
+/// original document, so has no formatting worth preserving.
+enum FreshYaml {
+    Scalar(yaml_edit::Scalar),
+    Mapping(yaml_edit::Mapping),
+    Sequence(yaml_edit::Sequence),
+}
+
+/// Render `value` as a single-line YAML node.
+///
+/// Collections come out in flow style (`{a: 1}`, `[1, 2]`) on purpose:
+/// `yaml_edit` splices a new node's text in verbatim without re-indenting it,
+/// so a block collection would land at the wrong depth. Flow style carries no
+/// indentation and is valid wherever it is spliced.
+fn yaml_flow_text(value: &Value) -> String {
+    match value {
+        Value::Bool(b) => b.to_string(),
+        Value::Int(n) => n.to_string(),
+        Value::Float(f) => {
+            let mut rendered = f.to_string();
+            if !rendered.contains(['.', 'e', 'E']) {
+                rendered.push_str(".0");
+            }
+            rendered
+        }
+        Value::Null => "null".to_string(),
+        Value::String(s) | Value::Path(s) | Value::Glob(s)
+        | Value::Regex(s) | Value::Semver(s) => yaml_flow_scalar(s),
+        // A secret written into a config file is a secret written to disk;
+        // callers who mean it write `.expose()` first.
+        Value::Secret(_) => yaml_flow_scalar(crate::value::REDACTED),
+        Value::Stream(s) => yaml_flow_scalar(&s.materialize_eager().unwrap_or_default()),
+        Value::List(items) | Value::Tuple(items) | Value::Set(items) => {
+            let rendered: Vec<String> = items.iter().map(yaml_flow_text).collect();
+            format!("[{}]", rendered.join(", "))
+        }
+        Value::Map(map) => {
+            let rendered: Vec<String> = map
+                .iter()
+                .map(|(k, v)| format!("{}: {}", yaml_flow_scalar(k), yaml_flow_text(v)))
+                .collect();
+            format!("{{{}}}", rendered.join(", "))
+        }
+        Value::Ok(inner) | Value::Err(inner) => yaml_flow_text(inner),
+        other => yaml_flow_scalar(&other.display_string()),
+    }
+}
+
+fn yaml_flow_scalar(s: &str) -> String {
+    let rendered = yaml_edit::ScalarValue::string(s).to_yaml_string();
+    let quoted = rendered.starts_with('"') || rendered.starts_with('\'');
+    // Flow context adds indicators a plain scalar may not contain.
+    if !quoted && (rendered.is_empty() || rendered.contains([',', '[', ']', '{', '}', ':', '#'])) {
+        return yaml_edit::ScalarValue::double_quoted(s).to_yaml_string();
+    }
+    rendered
+}
+
+fn que_value_to_yaml_node(value: &Value) -> Result<FreshYaml, String> {
+    use std::str::FromStr;
+
+    let text = yaml_flow_text(value);
+    let doc = yaml_edit::Document::from_str(&text)
+        .map_err(|e| format!("YAML serialize error: {}", e))?;
+    if let Some(mapping) = doc.as_mapping() {
+        return Ok(FreshYaml::Mapping(mapping));
+    }
+    if let Some(seq) = doc.as_sequence() {
+        return Ok(FreshYaml::Sequence(seq));
+    }
+    if let Some(scalar) = doc.as_scalar() {
+        return Ok(FreshYaml::Scalar(scalar));
+    }
+    Err(format!("cannot represent {} as YAML", value.type_name()))
+}
+
+/// Serialize to YAML by editing `original` in place: comments, blank lines,
+/// indentation and quoting style survive for everything that did not change.
+///
+/// Returns `Err` for documents and edits this cannot safely make — see the
+/// guards below.  Callers should fall back to [`to_yaml_ordered`], which
+/// always produces a semantically correct file even though it loses the
+/// formatting.
+pub fn to_yaml_lossless(value: &Value, original: &str) -> Result<String, String> {
+    use std::str::FromStr;
+
+    // Parse as a file rather than a document: a comment above the first key
+    // belongs to the file, and `Document` alone would drop it.
+    let file = yaml_edit::YamlFile::from_str(original)
+        .map_err(|e| format!("YAML parse error: {}", e))?;
+    let doc = file
+        .document()
+        .ok_or_else(|| "YAML document is empty".to_string())?;
+
+    match value {
+        Value::Map(map) => {
+            let mapping = doc
+                .as_mapping()
+                .ok_or_else(|| "YAML root is not a mapping".to_string())?;
+            if yaml_mapping_has_alias(&mapping) {
+                return Err("YAML document uses anchors or aliases".to_string());
+            }
+            apply_map_to_yaml_mapping(&mapping, map)?;
+        }
+        Value::List(items) | Value::Tuple(items) => {
+            let seq = doc
+                .as_sequence()
+                .ok_or_else(|| "YAML root is not a sequence".to_string())?;
+            if yaml_sequence_has_alias(&seq) {
+                return Err("YAML document uses anchors or aliases".to_string());
+            }
+            apply_list_to_yaml_sequence(&seq, items)?;
+        }
+        _ => return Err("YAML root must be a map or a list".to_string()),
+    }
+
+    let mut out = file.to_string();
+    // Removing the last key takes its newline with it.
+    if original.ends_with('\n') && !out.ends_with('\n') {
+        out.push('\n');
+    }
+    Ok(out)
+}
+
+/// Aliases (including `<<:` merge keys) are flattened by `parse_yaml`, so
+/// writing the flattened result back would silently expand them.  Documents
+/// that use them take the lossy path instead.
+fn yaml_node_has_alias(node: &yaml_edit::YamlNode) -> bool {
+    if node.is_alias() {
+        return true;
+    }
+    if let Some(mapping) = node.as_mapping() {
+        return yaml_mapping_has_alias(mapping);
+    }
+    if let Some(seq) = node.as_sequence() {
+        return yaml_sequence_has_alias(seq);
+    }
+    false
+}
+
+fn yaml_mapping_has_alias(mapping: &yaml_edit::Mapping) -> bool {
+    mapping.values().any(|v| yaml_node_has_alias(&v))
+}
+
+fn yaml_sequence_has_alias(seq: &yaml_edit::Sequence) -> bool {
+    seq.values().any(|v| yaml_node_has_alias(&v))
+}
+
+/// What `parse_yaml` would have made of this scalar's source text.
+///
+/// Comparing against that — rather than reimplementing YAML's plain-scalar
+/// resolution — is what lets us leave a scalar's original bytes alone when
+/// the value did not change.
+fn yaml_scalar_as_value(scalar: &yaml_edit::Scalar) -> Option<Value> {
+    parse_yaml(&scalar.value()).ok()
+}
+
+fn apply_map_to_yaml_mapping(
+    mapping: &yaml_edit::Mapping,
+    map: &BTreeMap<String, Value>,
+) -> Result<(), String> {
+    // `Value::Map` is keyed by `String`, and `yaml_to_value` mangles every
+    // non-string key into a debug rendering that would never match the
+    // original.  Rather than delete and re-add those keys, bail out.
+    let mut existing = Vec::with_capacity(mapping.len());
+    for key in mapping.keys() {
+        let text = key
+            .as_scalar()
+            .and_then(yaml_scalar_as_value)
+            .and_then(|v| match v {
+                Value::String(s) => Some(s),
+                _ => None,
+            })
+            .ok_or_else(|| "YAML mapping has a non-string key".to_string())?;
+        existing.push(text);
+    }
+
+    for key in &existing {
+        if !map.contains_key(key) {
+            mapping.remove(key.as_str());
+        }
+    }
+
+    for (key, value) in map {
+        let handled = match mapping.get(key.as_str()) {
+            Some(node) => apply_value_to_yaml_node(&node, value)?,
+            None => false,
+        };
+        if !handled {
+            with_fresh_yaml!(value, v => mapping.set(key.as_str(), v));
+        }
+    }
+    Ok(())
+}
+
+fn apply_list_to_yaml_sequence(
+    seq: &yaml_edit::Sequence,
+    items: &[Value],
+) -> Result<(), String> {
+    // `Sequence::remove` leaves the removed entry's indentation behind and
+    // corrupts the document, so a shortened list takes the lossy path.
+    if seq.len() > items.len() {
+        return Err("cannot remove YAML list items in place".to_string());
+    }
+    for (index, value) in items.iter().enumerate() {
+        let handled = match seq.get(index) {
+            Some(node) => apply_value_to_yaml_node(&node, value)?,
+            None => {
+                with_fresh_yaml!(value, v => seq.push(v));
+                true
+            }
+        };
+        if !handled {
+            with_fresh_yaml!(value, v => { seq.set(index, v); });
+        }
+    }
+    Ok(())
+}
+
+/// Update `node` in place to hold `value`.
+///
+/// Returns `false` when the shapes do not match (a scalar becoming a list,
+/// say) and the caller has to replace the node wholesale.
+fn apply_value_to_yaml_node(
+    node: &yaml_edit::YamlNode,
+    value: &Value,
+) -> Result<bool, String> {
+    match value {
+        Value::Map(map) if !map.is_empty() => match node.as_mapping() {
+            Some(child) => {
+                apply_map_to_yaml_mapping(child, map)?;
+                Ok(true)
+            }
+            None => Ok(false),
+        },
+        Value::List(items) | Value::Tuple(items) if !items.is_empty() => {
+            match node.as_sequence() {
+                Some(child) => {
+                    apply_list_to_yaml_sequence(child, items)?;
+                    Ok(true)
+                }
+                None => Ok(false),
+            }
+        }
+        Value::Map(_) | Value::List(_) | Value::Tuple(_) | Value::Set(_) => Ok(false),
+        _ => match node.as_scalar() {
+            Some(scalar) => {
+                if yaml_scalar_as_value(scalar).as_ref() != Some(value) {
+                    scalar.set_value(&yaml_scalar_replacement(scalar, value));
+                }
+                Ok(true)
+            }
+            None => Ok(false),
+        },
+    }
+}
+
+/// The source text to give a scalar that changed, keeping the quoting style
+/// the original used where that still makes sense.
+fn yaml_scalar_replacement(scalar: &yaml_edit::Scalar, value: &Value) -> String {
+    use yaml_edit::{ScalarStyle, ScalarValue};
+
+    let text = match value {
+        Value::String(s) | Value::Path(s) | Value::Glob(s)
+        | Value::Regex(s) | Value::Semver(s) => s.clone(),
+        Value::Secret(_) => crate::value::REDACTED.to_string(),
+        Value::Stream(s) => s.materialize_eager().unwrap_or_default(),
+        // Numbers, bools and null are never quoted, so there is no style to
+        // carry over.
+        other => return yaml_flow_text(other),
+    };
+
+    let raw = scalar.value();
+    let style = if raw.starts_with('"') {
+        ScalarStyle::DoubleQuoted
+    } else if raw.starts_with('\'') {
+        ScalarStyle::SingleQuoted
+    } else {
+        return ScalarValue::string(text).to_yaml_string();
+    };
+    ScalarValue::with_style(text, style).to_yaml_string()
+}
+
 // ── Config path syntax ───────────────────────────────────────────────
 
 /// A parsed segment of a config path.

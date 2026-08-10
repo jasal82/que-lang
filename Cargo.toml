@@ -37,6 +37,7 @@ zip = "2"
 chrono = "0.4"
 chrono-tz = "0.10"
 git2 = { version = "0.20", default-features = false }
+yaml-edit = { version = "0.2.3", registry = "artifactory" }
 
 # Only used to record which signal arrived; the actual interrupt handling is
 # cooperative (see src/interrupt.rs) so `defer` blocks still run.

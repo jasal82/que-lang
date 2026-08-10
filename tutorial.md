@@ -4111,6 +4111,37 @@ yaml.edit("config.yaml", |doc| {
 > **Tip:** The callback's parameter is mutable, so you can modify nested fields
 > directly with `doc.a.b = val` — no need for `set_path`.
 
+#### What survives an edit
+
+`toml.edit` and `yaml.edit` edit the original text rather than re-serializing
+the whole document, so comments, blank lines, indentation and quoting style
+survive everywhere the value did not change:
+
+```que
+// west.yml before:
+//   # our fork of zephyr
+//   - name: zephyr
+//     revision: "v4.3.0"   # pinned
+yaml.edit("west.yml", |doc| {
+    doc.manifest.projects[0].revision = "v4.4.0"
+    doc
+})
+// west.yml after — only the version moved:
+//   # our fork of zephyr
+//   - name: zephyr
+//     revision: "v4.4.0"   # pinned
+```
+
+A new key is appended in flow style (`nested: {x: 1}`), because a freshly
+built block collection has no indentation of its own to reuse.
+
+Two YAML cases fall back to re-serializing the whole file, which is still
+correct but drops the comments: **shortening a list**, and documents that use
+**anchors or aliases** (including `<<:` merge keys), which are flattened on
+parse and so cannot be written back unchanged.
+
+`json.edit` preserves key order but not comments — JSON has none.
+
 ### Deep Merge
 
 ```que
@@ -4143,9 +4174,9 @@ let manifest = stream.file(path("./Cargo.toml")).parse_toml()?
 | `json.stringify(val, indent?)` | Serialize to JSON |
 | `yaml.stringify(val)` | Serialize to YAML |
 | `toml.stringify(val)` | Serialize to TOML |
-| `json.edit(path, fn)` | Read-parse-modify-write JSON file atomically |
-| `toml.edit(path, fn)` | Read-parse-modify-write TOML file atomically |
-| `yaml.edit(path, fn)` | Read-parse-modify-write YAML file atomically |
+| `json.edit(path, fn)` | Read-parse-modify-write JSON file atomically (keeps key order) |
+| `toml.edit(path, fn)` | Read-parse-modify-write TOML file atomically (keeps comments and layout) |
+| `yaml.edit(path, fn)` | Read-parse-modify-write YAML file atomically (keeps comments and layout) |
 | `config.read(path)` | Read and parse (auto-detect format) |
 | `config.write(path, val)` | Serialize and write (auto-detect format) |
 | `.get_path(path)` | Get nested value by path |

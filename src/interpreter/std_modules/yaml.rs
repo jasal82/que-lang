@@ -49,9 +49,14 @@ impl Interpreter {
                     Signal::Error(QueError::new(ErrorKind::Runtime, e))
                 })?;
                 let result = self.call_value(func_val, vec![doc])?;
-                let serialized = crate::config::to_yaml_ordered(&result, &content).map_err(|e| {
-                    Signal::Error(QueError::new(ErrorKind::Runtime, e))
-                })?;
+                // Edit the original text so comments and layout survive; fall
+                // back to a full re-serialisation for the documents the
+                // in-place editor refuses (anchors, non-string keys, ...).
+                let serialized = crate::config::to_yaml_lossless(&result, &content)
+                    .or_else(|_| crate::config::to_yaml_ordered(&result, &content))
+                    .map_err(|e| {
+                        Signal::Error(QueError::new(ErrorKind::Runtime, e))
+                    })?;
                 atomic_write_str(&p, &serialized)?;
                 Ok(Value::Null)
             }

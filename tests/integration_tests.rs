@@ -12530,6 +12530,176 @@ println(lines[0].starts_with("zebra"))
     assert_output(source, &["true"]);
 }
 
+#[test]
+fn yaml_edit_keeps_comments_and_layout() {
+    let source = r##"
+import std.fs
+import std.yaml
+let tmp = fs.temp_file("que_test_yaml_keep_", ".yaml").unwrap()
+fs.write(tmp, "# top of file\nname: que   # inline\n\nnested:\n    # about port\n    port: 8080\n")
+yaml.edit(tmp, |doc| {
+    doc.nested.port = 9090
+    doc
+})
+print(fs.read(tmp).unwrap())
+"##;
+    assert_output(
+        source,
+        &[
+            "# top of file",
+            "name: que   # inline",
+            "",
+            "nested:",
+            "    # about port",
+            "    port: 9090",
+        ],
+    );
+}
+
+#[test]
+fn yaml_edit_keeps_quoting_style_of_changed_scalars() {
+    let source = r#"
+import std.fs
+import std.yaml
+let tmp = fs.temp_file("que_test_yaml_quote_", ".yaml").unwrap()
+fs.write(tmp, "a: \"one\"\nb: 'two'\nc: three\n")
+yaml.edit(tmp, |doc| {
+    doc.a = "ONE"
+    doc.b = "TWO"
+    doc.c = "THREE"
+    doc
+})
+print(fs.read(tmp).unwrap())
+"#;
+    assert_output(source, &["a: \"ONE\"", "b: 'TWO'", "c: THREE"]);
+}
+
+#[test]
+fn yaml_edit_leaves_untouched_values_byte_identical() {
+    // `yes` is a string under YAML 1.2, and a plain scalar that could be
+    // mistaken for a bool must not get quoted on the way back out.
+    let source = r#"
+import std.fs
+import std.yaml
+let tmp = fs.temp_file("que_test_yaml_plain_", ".yaml").unwrap()
+fs.write(tmp, "flag: yes\nver: 1.10\nempty:\nchanged: 1\n")
+yaml.edit(tmp, |doc| {
+    doc.changed = 2
+    doc
+})
+print(fs.read(tmp).unwrap())
+"#;
+    assert_output(source, &["flag: yes", "ver: 1.10", "empty:", "changed: 2"]);
+}
+
+#[test]
+fn yaml_edit_keeps_comments_when_adding_and_removing_keys() {
+    let source = r##"
+import std.fs
+import std.yaml
+let tmp = fs.temp_file("que_test_yaml_addrm_", ".yaml").unwrap()
+fs.write(tmp, "# head\na: 1\nb: 2   # keep me\nc: 3\n")
+yaml.edit(tmp, |doc| {
+    mut d = doc.remove("c")
+    d.added = "hello"
+    d.nested = { "x": 1 }
+    d
+})
+print(fs.read(tmp).unwrap())
+"##;
+    assert_output(
+        source,
+        &[
+            "# head",
+            "a: 1",
+            "b: 2   # keep me",
+            "added: hello",
+            "nested: {x: 1}",
+        ],
+    );
+}
+
+#[test]
+fn yaml_edit_keeps_comments_when_appending_to_a_list() {
+    let source = r#"
+import std.fs
+import std.yaml
+let tmp = fs.temp_file("que_test_yaml_push_", ".yaml").unwrap()
+fs.write(tmp, "items:\n  # the list\n  - one\n  - two\n")
+yaml.edit(tmp, |doc| {
+    doc.items = ["one", "TWO", "three"]
+    doc
+})
+print(fs.read(tmp).unwrap())
+"#;
+    assert_output(
+        source,
+        &["items:", "  # the list", "  - one", "  - TWO", "  - three"],
+    );
+}
+
+#[test]
+fn yaml_edit_falls_back_to_a_full_rewrite_when_a_list_shrinks() {
+    // Removing list entries in place corrupts the document, so a shortened
+    // list is re-serialised: correct, but without the comments.
+    let source = r#"
+import std.fs
+import std.yaml
+let tmp = fs.temp_file("que_test_yaml_shrink_", ".yaml").unwrap()
+fs.write(tmp, "items:\n  # the list\n  - one\n  - two\n")
+yaml.edit(tmp, |doc| {
+    doc.items = ["one"]
+    doc
+})
+let doc = yaml.parse(fs.read(tmp).unwrap()).unwrap()
+println(doc.items.len())
+println(doc.items[0])
+"#;
+    assert_output(source, &["1", "one"]);
+}
+
+#[test]
+fn yaml_edit_falls_back_to_a_full_rewrite_for_anchors() {
+    let source = r#"
+import std.fs
+import std.yaml
+let tmp = fs.temp_file("que_test_yaml_anchor_", ".yaml").unwrap()
+fs.write(tmp, "base: &b\n  a: 1\nchild:\n  <<: *b\n  b: 2\n")
+yaml.edit(tmp, |doc| {
+    doc.base.a = 7
+    doc
+})
+let doc = yaml.parse(fs.read(tmp).unwrap()).unwrap()
+println(doc.base.a)
+"#;
+    assert_output(source, &["7"]);
+}
+
+#[test]
+fn yaml_edit_keeps_comments_in_a_root_level_list() {
+    let source = r##"
+import std.fs
+import std.yaml
+let tmp = fs.temp_file("que_test_yaml_rootseq_", ".yaml").unwrap()
+fs.write(tmp, "# a list file\n- name: one   # inline\n  v: 1\n- name: two\n  v: 2\n")
+yaml.edit(tmp, |doc| {
+    doc[1].v = 22
+    doc
+})
+print(fs.read(tmp).unwrap())
+"##;
+    assert_output(
+        source,
+        &[
+            "# a list file",
+            "- name: one   # inline",
+            "  v: 1",
+            "- name: two",
+            "  v: 22",
+        ],
+    );
+}
+
 // ── Gap improvements (GAPS.md) ────────────────────────────────────────────
 
 #[test]
