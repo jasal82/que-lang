@@ -54,7 +54,7 @@ task deploy {
 | Module | Import | What it does |
 | --- | --- | --- |
 | `colors` | `import que_std.colors { colored, Color, TextStyle }` | ANSI colors and text styles, honouring `NO_COLOR` and non-ANSI terminals |
-| `select` | `import que_std.select { select }` | Interactive single-choice menu, with a plain numbered fallback when there is no terminal |
+| `select` | `import que_std.select { select }` | Interactive single-choice menu, with a plain numbered fallback when there is no terminal. Styles itself with `colors` |
 
 ```que
 import que_std.colors { colored, Color }

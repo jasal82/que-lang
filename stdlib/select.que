@@ -1,7 +1,8 @@
 // ── stdlib/select.que ───────────────────────────────────────────────────────
 //
 // An interactive single-choice select prompt, written in pure Que on top of
-// the `std.prompt.read_key` primitive and ANSI escape sequences.
+// the `std.prompt.read_key` primitive, the sibling `colors` module, and the
+// ANSI escapes for moving the cursor.
 //
 // Usage:
 //   import que_std.select { select }
@@ -31,33 +32,24 @@
 // legacy Windows console that does not interpret ANSI escapes — the prompt
 // degrades to a plain numbered list read with `prompt.read_line()`.
 //
+// `NO_COLOR` is a color policy only: it takes the colors out of the menu but
+// must not disable the cursor movement the menu is built on, which is why
+// only the styling goes through `colors`.
+//
 // Options map (third argument, all optional):
 //   "page_size" — max rows shown at once, the list scrolls beyond it (10)
 //   "start"     — index the cursor starts on (0)
 
 import std.prompt
 import std.tty
+import .colors { colored }
 
+// Only the cursor control the menu needs. Colors come from `colors`, which
+// also decides when to leave them out — `NO_COLOR`, and a Windows console
+// that would print the escapes literally.
 let _ESC = "\x1b"
-
-let _RESET       = "${_ESC}[0m"
-let _BOLD        = "${_ESC}[1m"
-let _DIM         = "${_ESC}[2m"
-let _CYAN        = "${_ESC}[36m"
 let _HIDE_CURSOR = "${_ESC}[?25l"
 let _SHOW_CURSOR = "${_ESC}[?25h"
-
-/// The menu steers the cursor with escape codes, not just colors, so where
-/// `tty.supports_ansi()` is false the whole interactive rendering has to be
-/// skipped. `NO_COLOR` is a color policy only — it must not disable the cursor
-/// movement the menu depends on, hence the two separate checks.
-fn _colors_on() {
-    tty.supports_ansi() && env.get("NO_COLOR") == null
-}
-
-fn _paint(code, text) {
-    if _colors_on() { code + text + _RESET } else { text }
-}
 
 fn _label_of(opt) {
     if typeof(opt) == "Map" && opt.contains("label") { str(opt["label"]) }
@@ -86,13 +78,13 @@ fn _render(title, labels, cursor, top, visible) {
     mut lines = 0
 
     if title != null && title != "" {
-        println(_paint(_BOLD, str(title)))
+        println(colored(str(title)).bold())
         lines = lines + 1
     }
 
     for i in range(top, top + visible) {
         if i == cursor {
-            println(_paint(_CYAN + _BOLD, "> " + labels[i]))
+            println(colored("> " + labels[i]).cyan().bold())
         } else {
             println("  " + labels[i])
         }
@@ -100,7 +92,7 @@ fn _render(title, labels, cursor, top, visible) {
     }
 
     let pos = "(" + str(cursor + 1) + "/" + str(n) + ")"
-    println(_paint(_DIM, "  " + pos + " up/down: move  enter: select  esc: cancel"))
+    println(colored("  " + pos + " up/down: move  enter: select  esc: cancel").dim())
     lines = lines + 1
 
     lines
@@ -109,8 +101,8 @@ fn _render(title, labels, cursor, top, visible) {
 /// Erase the last frame and print a one-line summary in its place.
 fn _finish(drawn, title, summary) {
     print("${_ESC}[${str(drawn)}A${_ESC}[J" + _SHOW_CURSOR)
-    let prefix = if title != null && title != "" { _paint(_BOLD, str(title)) + " " } else { "" }
-    println(prefix + summary)
+    let prefix = if title != null && title != "" { "${colored(str(title)).bold()} " } else { "" }
+    println("${prefix}${summary}")
 }
 
 /// Non-interactive fallback: print a numbered list and read one line.
@@ -164,11 +156,11 @@ pub fn select(title, options, opts = {}) {
 
         match prompt.read_key() {
             "enter" => {
-                _finish(drawn, title, _paint(_CYAN, labels[cursor]))
+                _finish(drawn, title, colored(labels[cursor]).cyan())
                 return _value_of(options[cursor])
             }
             "escape" | "q" | "ctrl+c" => {
-                _finish(drawn, title, _paint(_DIM, "(cancelled)"))
+                _finish(drawn, title, colored("(cancelled)").dim())
                 return null
             }
             "up" | "k"      => { cursor = (cursor - 1 + n) % n }
