@@ -53,12 +53,8 @@ modules:
 import que_std
 
 println(que_std.version())
+println(que_std.colors.colored("ok").green())
 ```
-
-Import the sub-modules directly, though, as in the example above. A
-re-export carries a module's functions but not the `impl` blocks of the
-types it defines, so `que_std.colors.colored(...)` would hand back a
-`ColoredString` without its methods.
 
 ## Working on it locally
 

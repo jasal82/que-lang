@@ -7917,6 +7917,89 @@ pub fn greet(name) { "Hello, " + name }
     );
 }
 
+#[test]
+fn module_pub_import_reexports_a_type_with_its_methods() {
+    // A type's fields and methods live in the interpreter's tables, not in
+    // the value that names it. A re-export therefore has to carry them on,
+    // or the importer receives a type it cannot construct or call.
+    assert_module_output(
+        &[
+            ("main.que", r#"
+import .facade
+let b = facade.shapes.Box.new(3)
+println(b.area())
+println(facade.shapes.Kind.Round.label())
+"#),
+            ("facade.que", r#"
+pub import .shapes
+"#),
+            ("shapes.que", r#"
+pub struct Box { side: Int }
+pub enum Kind { Round, Square }
+pub impl Box {
+    fn new(side) -> Box { Box { side: side } }
+    fn area(self) { self.side * self.side }
+}
+pub impl Kind {
+    fn label(self) { match self { Round => "round", Square => "square" } }
+}
+"#),
+        ],
+        &["9", "round"],
+    );
+}
+
+#[test]
+fn module_pub_import_reexports_a_type_through_two_levels() {
+    // The same has to hold for a facade over a facade, or the property is
+    // only true for the depth someone happened to test.
+    assert_module_output(
+        &[
+            ("main.que", r#"
+import .outer { Box }
+println(Box.new(4).area())
+"#),
+            ("outer.que", r#"
+pub import .inner { Box }
+"#),
+            ("inner.que", r#"
+pub import .shapes { Box }
+"#),
+            ("shapes.que", r#"
+pub struct Box { side: Int }
+pub impl Box {
+    fn new(side) -> Box { Box { side: side } }
+    fn area(self) { self.side * self.side }
+}
+"#),
+        ],
+        &["16"],
+    );
+}
+
+#[test]
+fn a_plain_import_does_not_leak_the_types_it_pulled_in() {
+    // Only `pub import` passes a type on. A private import is an
+    // implementation detail, and a type it brought in must not become
+    // constructible in whoever imports the module that used it.
+    assert_module_error(&[
+        ("main.que", r#"
+import .facade
+println(Box { side: 1 }.side)
+"#),
+        ("facade.que", r#"
+import .shapes
+pub fn make() { shapes.Box.new(2) }
+"#),
+        ("shapes.que", r#"
+pub struct Box { side: Int }
+pub impl Box {
+    fn new(side) -> Box { Box { side: side } }
+}
+"#),
+    ]);
+}
+
 // ── std imports ──────────────────────────────────────────────────────
 
 #[test]

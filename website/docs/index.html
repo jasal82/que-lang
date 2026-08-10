@@ -1205,6 +1205,7 @@ pub fn version() { v&quot;1.0.0&quot; }</code></pre></div>
 <div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">import .lib
 println(lib.version())
 println(lib.math.add(2, 3))</code></pre></div>
+<p>A re-exported <code>struct</code> or <code>enum</code> keeps its <code>impl</code> blocks, however many modules it travels through, so a facade module can pass a type on without its methods going missing.</p>
 <h3 id="standard-library-imports">Standard Library Imports<a class="anchor-link" href="#standard-library-imports" aria-label="Permalink">#</a></h3>
 <p>Domain-specific functions are available via <code>std.*</code> module imports. Core utilities like <code>println</code>, <code>len</code>, <code>typeof</code>, <code>path</code>, <code>env</code> remain globals.</p>
 <div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">import std.fs { read, write, exists }
@@ -1299,7 +1300,7 @@ import que_std.select { select }</code></pre></div>
 <h3 id="the-que-std-package">The <code>que-std</code> Package<a class="anchor-link" href="#the-que-std-package" aria-label="Permalink">#</a></h3>
 <p>Most of the standard library is built into the interpreter and needs no installing (<code>import std.fs</code>). The parts written in Que rather than Rust ship as the <code>que-std</code> package in the <a href="stdlib"><code>stdlib/</code></a> directory of the Que repository, installed with the <code>subdir</code> dependency above:</p>
 <table><thead><tr><th>Module</th><th>What it does</th></tr></thead><tbody><tr><td><code>que_std.colors</code></td><td>ANSI colors and text styles, honouring <code>NO_COLOR</code> and non-ANSI terminals</td></tr><tr><td><code>que_std.select</code></td><td>An interactive single-choice menu, with a plain numbered fallback when there is no terminal</td></tr></tbody></table>
-<p>Import the sub-modules directly (<code>import que_std.colors</code>) rather than through the package root: a <code>pub import</code> re-export carries a module's functions but not the <code>impl</code> blocks of the types it defines.</p>
+<p>The package's <code>mod.que</code> re-exports both, so <code>import que_std</code> and <code>import que_std.colors</code> are equally good ways in.</p>
 <div class="docs-part-heading">Part II — DevOps-Native Types</div>
 <p>Everything so far would be at home in any modern scripting language. What makes Que specifically good for build automation and DevOps starts here: typed paths that know the difference between a file and a glob pattern, durations you can do arithmetic on, commands that fail loudly by default, and secrets the runtime actively hides from you.</p>
 <div class="docs-pager"><a href="#11-error-handling" class="pager-prev"><span class="pager-dir">&larr; Previous</span><span class="docs-pager-title">11. Error Handling</span></a><a href="#13-paths" class="pager-next"><span class="pager-dir">Next &rarr;</span><span class="docs-pager-title">13. Paths</span></a></div><h2 id="13-paths"><span class="chapter-no">13.</span>Paths<a class="anchor-link" href="#13-paths" aria-label="Permalink">#</a></h2>

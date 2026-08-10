@@ -2105,6 +2105,10 @@ println(lib.version())
 println(lib.math.add(2, 3))
 ```
 
+A re-exported `struct` or `enum` keeps its `impl` blocks, however many
+modules it travels through, so a facade module can pass a type on without
+its methods going missing.
+
 ### Standard Library Imports
 
 Domain-specific functions are available via `std.*` module imports. Core
@@ -2312,9 +2316,8 @@ repository, installed with the `subdir` dependency above:
 | `que_std.colors` | ANSI colors and text styles, honouring `NO_COLOR` and non-ANSI terminals |
 | `que_std.select` | An interactive single-choice menu, with a plain numbered fallback when there is no terminal |
 
-Import the sub-modules directly (`import que_std.colors`) rather than through
-the package root: a `pub import` re-export carries a module's functions but
-not the `impl` blocks of the types it defines.
+The package's `mod.que` re-exports both, so `import que_std` and
+`import que_std.colors` are equally good ways in.
 
 ---
 

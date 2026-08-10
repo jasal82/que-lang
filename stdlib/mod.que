@@ -13,15 +13,10 @@
 //      import que_std.colors { colored, Color }
 //      import que_std.select { select }
 //
-//  or as a namespace:
+//  or as a namespace, which is what the re-exports below are for:
 //
-//      import que_std.colors
-//      colors.colored("ok").green()
-//
-//  Note: import the sub-modules directly, as above, rather than going
-//  through this file (`import que_std { colors }`). A re-export carries a
-//  module's functions but not the `impl` blocks of the types it defines, so
-//  `ColoredString` would arrive without its methods.
+//      import que_std
+//      que_std.colors.colored("ok").green()
 
 pub import .colors
 pub import .select

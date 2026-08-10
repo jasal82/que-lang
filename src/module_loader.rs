@@ -438,40 +438,35 @@ impl ModuleLoader {
             }
         }
 
-        // Propagate struct metadata for exported types into pending fields.
-        // This allows the parent interpreter to construct instances of imported structs.
-        for type_name in &exported_type_names {
+        // Propagate the metadata of every type this module hands on, so the
+        // importer can construct instances and call methods. A type's fields
+        // and methods live in the interpreter's tables, not in the value that
+        // names it, so exporting the name alone is not enough.
+        //
+        // `reexported_type_names` covers the types that arrived through a
+        // `pub import` and are passed straight on; without it a facade module
+        // would export a type stripped of its `impl` blocks.
+        let passed_on = interp.reexported_type_names.clone();
+        let names = exported_type_names
+            .iter()
+            .chain(exported_enum_names.iter())
+            .chain(passed_on.iter());
+        for type_name in names {
             if let Some(fields) = interp.struct_defs.get(type_name) {
                 self.pending_struct_defs.insert(type_name.clone(), fields.clone());
+            }
+            if let Some(variants) = interp.enum_defs.get(type_name) {
+                self.pending_enum_defs.insert(type_name.clone(), variants.clone());
+                for (variant_name, _) in variants {
+                    self.pending_enum_variant_to_enum
+                        .insert(variant_name.clone(), type_name.clone());
+                }
             }
             if let Some(methods) = interp.impl_methods.get(type_name) {
                 self.pending_impl_methods.insert(type_name.clone(), methods.clone());
             }
-            // Copy all trait impls for this type
             for ((tname, trait_name), methods) in &interp.trait_impls {
                 if tname == type_name {
-                    self.pending_trait_impls
-                        .entry((tname.clone(), trait_name.clone()))
-                        .or_default()
-                        .extend(methods.clone());
-                }
-            }
-        }
-
-        // Propagate enum metadata and methods for exported enum types.
-        for enum_name in &exported_enum_names {
-            if let Some(variants) = interp.enum_defs.get(enum_name) {
-                self.pending_enum_defs.insert(enum_name.clone(), variants.clone());
-                for (variant_name, _) in variants {
-                    self.pending_enum_variant_to_enum
-                        .insert(variant_name.clone(), enum_name.clone());
-                }
-            }
-            if let Some(methods) = interp.impl_methods.get(enum_name) {
-                self.pending_impl_methods.insert(enum_name.clone(), methods.clone());
-            }
-            for ((tname, trait_name), methods) in &interp.trait_impls {
-                if tname == enum_name {
                     self.pending_trait_impls
                         .entry((tname.clone(), trait_name.clone()))
                         .or_default()
