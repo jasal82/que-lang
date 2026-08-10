@@ -1,9 +1,9 @@
-// ── examples/colors.que ─────────────────────────────────────────────────────
+// ── stdlib/colors.que ───────────────────────────────────────────────────────
 //
 // Terminal color and style helpers built around enums.
 //
 // Usage:
-//   import .colors { Color, TextStyle, ColoredString }
+//   import que_std.colors { Color, TextStyle, ColoredString }
 //
 //   println(ColoredString.new("Error").fg(Color.Red).style(TextStyle.Bold))
 //   println(ColoredString.new("Custom").fg(Color.Rgb(r: 120, g: 80, b: 255)))

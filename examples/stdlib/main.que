@@ -1,0 +1,29 @@
+// ── examples/stdlib/main.que ───────────────────────────────────────────────
+//
+//  Using the `que-std` package.
+//
+//      que install       # links que_packages/que_std -> ../../stdlib
+//      que run main.que
+
+import que_std.colors { colored, Color, TextStyle, strip }
+import que_std.select { select }
+
+println(colored("que-std").fg(Color.Cyan).style(TextStyle.Bold))
+println("${colored("  ok").green()}     a green line")
+println("${colored("  warn").yellow()}   NO_COLOR=1 removes the escapes")
+println(colored("  error").red().bold())
+println("  plain: ${strip(str(colored("still readable").magenta()))}")
+
+// `select` falls back to a numbered list when stdin is not a terminal, so
+// this stays runnable in a pipeline or in CI.
+let target = select("Deploy to:", [
+    { "label": "Development", "value": "dev" },
+    { "label": "Staging",     "value": "staging" },
+    { "label": "Production",  "value": "prod" },
+])
+
+if target == null {
+    println(colored("cancelled").dim())
+} else {
+    println(colored("deploying to ${target}").green())
+}

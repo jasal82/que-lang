@@ -2233,6 +2233,7 @@ deploy-tools = { git = "git@github.com:acme/deploy-tools", rev = "9f2c1ab" }
 nightly      = { git = "https://github.com/acme/nightly", branch = "main" }
 shared       = { path = "../shared" }
 helpers      = "https://github.com/acme/helpers#v2"   # shorthand: url#ref
+que-std      = { git = "https://github.com/jasal82/que-lang", tag = "1.1.0", subdir = "stdlib" }
 ```
 
 ```sh
@@ -2271,6 +2272,49 @@ whatever else your organisation uses already work.
 Add `que_packages/` to `.gitignore`. It is a cache that `que install`
 rebuilds from `que.lock`; committing it means reviewing other people's
 diffs forever.
+
+### Packages That Are Not at a Repository Root (`subdir`)
+
+A repository does not have to *be* a package. `subdir` names the directory
+inside it that is one, which is how a single repository ships several
+packages, or ships one next to unrelated code:
+
+```toml
+[dependencies]
+que-std = { git = "https://github.com/jasal82/que-lang", tag = "1.1.0", subdir = "stdlib" }
+```
+
+```que
+import que_std.colors { colored, Color }
+import que_std.select { select }
+```
+
+The repository is cloned once into `que_packages/.sources/<name>/`, and
+`que_packages/<name>/` points at the sub-directory inside it — so the import
+side sees a normal package and never the code around it. `.sources` starts
+with a dot, which no import path can spell, so nothing there is importable by
+accident.
+
+`subdir` must stay inside the checkout: an absolute path or one containing
+`..` is rejected rather than allowed to reach outside `que_packages/`. It
+applies to `git` dependencies only — a `path` dependency can simply point at
+the sub-directory itself.
+
+### The `que-std` Package
+
+Most of the standard library is built into the interpreter and needs no
+installing (`import std.fs`). The parts written in Que rather than Rust ship
+as the `que-std` package in the [`stdlib/`](stdlib) directory of the Que
+repository, installed with the `subdir` dependency above:
+
+| Module | What it does |
+| --- | --- |
+| `que_std.colors` | ANSI colors and text styles, honouring `NO_COLOR` and non-ANSI terminals |
+| `que_std.select` | An interactive single-choice menu, with a plain numbered fallback when there is no terminal |
+
+Import the sub-modules directly (`import que_std.colors`) rather than through
+the package root: a `pub import` re-export carries a module's functions but
+not the `impl` blocks of the types it defines.
 
 ---
 

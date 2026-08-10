@@ -1427,6 +1427,9 @@ impl Interpreter {
                     .filter_map(|e| e.ok())
                     .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
                     .map(|e| e.file_name().to_string_lossy().into_owned())
+                    // `.sources/` holds git checkouts of `subdir`
+                    // dependencies; it is not importable.
+                    .filter(|n| !n.starts_with('.'))
                     .collect();
                 names.sort();
                 if !names.is_empty() {

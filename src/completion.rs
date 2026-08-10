@@ -215,7 +215,12 @@ impl QueHelper {
             if let Ok(rd) = std::fs::read_dir(&pkg_dir) {
                 for e in rd.flatten() {
                     if e.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                        names.push(e.file_name().to_string_lossy().into_owned());
+                        let name = e.file_name().to_string_lossy().into_owned();
+                        // `.sources/` holds git checkouts of `subdir`
+                        // dependencies; it is not importable.
+                        if !name.starts_with('.') {
+                            names.push(name);
+                        }
                     }
                 }
             }

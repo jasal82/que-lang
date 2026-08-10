@@ -1,0 +1,31 @@
+// ── stdlib/mod.que ─────────────────────────────────────────────────────────
+//
+//  Entry point of the `que-std` package: the parts of the standard library
+//  that are written in Que rather than built into the interpreter.
+//
+//  Install it by adding this to your que.toml and running `que install`:
+//
+//      [dependencies]
+//      que-std = { git = "https://github.com/jasal82/que-lang", tag = "1.1.0", subdir = "stdlib" }
+//
+//  Then import the sub-module you need:
+//
+//      import que_std.colors { colored, Color }
+//      import que_std.select { select }
+//
+//  or as a namespace:
+//
+//      import que_std.colors
+//      colors.colored("ok").green()
+//
+//  Note: import the sub-modules directly, as above, rather than going
+//  through this file (`import que_std { colors }`). A re-export carries a
+//  module's functions but not the `impl` blocks of the types it defines, so
+//  `ColoredString` would arrive without its methods.
+
+pub import .colors
+pub import .select
+
+/// The version of this package. Bump it together with the git tag that
+/// dependants pin, so a script can tell what it is running against.
+pub fn version() { v"1.0.0" }

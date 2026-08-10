@@ -1,1 +1,4 @@
 /target/
+
+# Dependency cache: `que install` rebuilds it from que.lock.
+que_packages/

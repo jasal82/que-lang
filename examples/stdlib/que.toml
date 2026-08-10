@@ -1,0 +1,17 @@
+# que.toml — depends on the que-std package in this repository.
+#
+# A path dependency, because this example lives next door to the package:
+# `que install` symlinks it into que_packages/, so edits to stdlib/ take
+# effect immediately.
+#
+# Outside this repository you would fetch the same package from git, naming
+# the directory it lives in with `subdir`:
+#
+#   que-std = { git = "https://github.com/jasal82/que-lang", tag = "1.1.0", subdir = "stdlib" }
+
+[package]
+name = "stdlib-example"
+version = "0.1.0"
+
+[dependencies]
+que-std = { path = "../../stdlib" }

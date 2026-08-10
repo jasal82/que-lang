@@ -70,10 +70,37 @@ fn install_manifest(root: &Path, manifest: &Manifest, locked: bool) -> Result<Re
                     }
                     None => resolve_revision(url, dep.requirement.as_deref())?,
                 };
-                let action = fetch_git(url, &revision, &dest, &dep.name)?;
+
+                // Without a subdir the checkout *is* the package directory.
+                // With one, the checkout holds more than the package, so it
+                // is kept aside and only the sub-directory is exposed.
+                let checkout = match dep.subdir {
+                    None => dest.clone(),
+                    Some(_) => manifest::sources_dir(root).join(&dep.dir_name),
+                };
+                let action = fetch_git(url, &revision, &checkout, &dep.name)?;
+
+                if let Some(subdir) = &dep.subdir {
+                    let src = checkout.join(subdir);
+                    if !src.is_dir() {
+                        return Err(format!(
+                            "dependency '{}': {} has no directory '{}' at {}",
+                            dep.name,
+                            url,
+                            subdir,
+                            dep.requirement.as_deref().unwrap_or(&revision)
+                        ));
+                    }
+                    link_dir(&src, &dest)?;
+                }
+
                 report.lines.push(format!(
-                    "{} {} @ {} ({})",
+                    "{}{} {} @ {} ({})",
                     dep.name,
+                    dep.subdir
+                        .as_ref()
+                        .map(|s| format!(" [{}]", s))
+                        .unwrap_or_default(),
                     dep.requirement.as_deref().unwrap_or("default branch"),
                     &revision[..revision.len().min(12)],
                     action
@@ -105,10 +132,6 @@ fn sorted_by_name(entries: &[LockEntry]) -> Vec<LockEntry> {
 }
 
 /// Make a path dependency reachable under `que_packages/`.
-///
-/// A symlink rather than a copy: a path dependency exists so that edits in
-/// the other directory are picked up immediately, and a copy would silently
-/// go stale.
 fn link_path_dependency(src: &Path, dest: &Path, dep: &Dependency) -> Result<(), String> {
     if !src.is_dir() {
         return Err(format!(
@@ -117,7 +140,21 @@ fn link_path_dependency(src: &Path, dest: &Path, dep: &Dependency) -> Result<(),
             src.display()
         ));
     }
+    link_dir(src, dest)
+}
+
+/// Point `dest` at the directory `src`.
+///
+/// A symlink rather than a copy: a path dependency exists so that edits in
+/// the other directory are picked up immediately, and a copy would silently
+/// go stale. A `subdir` dependency links for a different reason — the git
+/// checkout it points into is shared and must not be duplicated per package.
+fn link_dir(src: &Path, dest: &Path) -> Result<(), String> {
     remove_existing(dest)?;
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("cannot create {}: {}", parent.display(), e))?;
+    }
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(src, dest)
@@ -338,6 +375,84 @@ mod tests {
         .unwrap();
         let err = install(&dir, false).unwrap_err();
         assert!(err.contains("not a directory"), "{}", err);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Build a one-commit git repository with `mod.que` inside `stdlib/`,
+    /// the layout a repository uses when it ships a package alongside other
+    /// code. Returns `None` when git is unusable, so the suite still runs on
+    /// a machine without it.
+    fn repo_with_a_package_in_a_subdir(dir: &Path) -> Option<PathBuf> {
+        let repo = dir.join("repo");
+        std::fs::create_dir_all(repo.join("stdlib")).unwrap();
+        std::fs::write(repo.join("README.md"), "not que code").unwrap();
+        std::fs::write(repo.join("stdlib/mod.que"), "pub fn hi() { 1 }").unwrap();
+
+        for args in [
+            vec!["init", "-q", "."],
+            vec!["add", "-A"],
+            vec![
+                "-c",
+                "user.email=t@example.com",
+                "-c",
+                "user.name=t",
+                "commit",
+                "-qm",
+                "init",
+            ],
+        ] {
+            let mut cmd = Command::new("git");
+            cmd.current_dir(&repo).args(args);
+            run(cmd, "git").ok()?;
+        }
+        Some(repo)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_subdir_dependency_exposes_only_that_directory() {
+        let dir = tmp("subdir");
+        let Some(repo) = repo_with_a_package_in_a_subdir(&dir) else {
+            return;
+        };
+        std::fs::write(
+            dir.join("que.toml"),
+            format!(
+                "[dependencies]\nque-std = {{ git = \"{}\", subdir = \"stdlib\" }}\n",
+                repo.display()
+            ),
+        )
+        .unwrap();
+
+        install(&dir, false).unwrap();
+
+        // The import path sees a package, not the repository around it.
+        let installed = manifest::packages_dir(&dir).join("que_std");
+        assert!(installed.join("mod.que").is_file());
+        assert!(!installed.join("README.md").exists());
+        // The checkout itself is kept out of the way, under a name no import
+        // can spell.
+        assert!(manifest::sources_dir(&dir).join("que_std").join(".git").is_dir());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_subdir_that_is_not_in_the_repository_is_an_error() {
+        let dir = tmp("subdir_missing");
+        let Some(repo) = repo_with_a_package_in_a_subdir(&dir) else {
+            return;
+        };
+        std::fs::write(
+            dir.join("que.toml"),
+            format!(
+                "[dependencies]\nx = {{ git = \"{}\", subdir = \"nowhere\" }}\n",
+                repo.display()
+            ),
+        )
+        .unwrap();
+        let err = install(&dir, false).unwrap_err();
+        assert!(err.contains("has no directory 'nowhere'"), "{}", err);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

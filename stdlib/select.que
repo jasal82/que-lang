@@ -1,10 +1,10 @@
-// ── examples/select.que ─────────────────────────────────────────────────────
+// ── stdlib/select.que ───────────────────────────────────────────────────────
 //
 // An interactive single-choice select prompt, written in pure Que on top of
 // the `std.prompt.read_key` primitive and ANSI escape sequences.
 //
 // Usage:
-//   import .select { select }
+//   import que_std.select { select }
 //
 //   let target = select("Deploy to:", ["dev", "staging", "prod"])
 //   if target == null {

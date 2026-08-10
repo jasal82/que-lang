@@ -114,6 +114,7 @@ que install --locked   # CI: fail rather than resolve anything unpinned
 - HTTP client for API calls
 - Regex support
 - Module system with imports, selective imports, and re-exports
+- `que-std`: a [stdlib](stdlib) package written in Que (terminal colors, interactive select), installable with `que install`
 - `retry` and `timeout` for resilient operations
 
 ### Tooling

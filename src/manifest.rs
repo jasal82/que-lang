@@ -38,6 +38,10 @@ pub struct Dependency {
     /// Tag, branch or revision for a git source. `None` means the remote's
     /// default branch.
     pub requirement: Option<String>,
+    /// A directory inside the git checkout that holds the package, for a
+    /// repository that ships several packages (or ships one alongside
+    /// unrelated code). `None` means the repository root is the package.
+    pub subdir: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -68,6 +72,16 @@ pub fn lock_path(root: &Path) -> PathBuf {
 
 pub fn packages_dir(root: &Path) -> PathBuf {
     root.join("que_packages")
+}
+
+/// Where git checkouts of `subdir` dependencies are kept.
+///
+/// A `subdir` package is only part of its repository, so the checkout cannot
+/// be the package directory itself. It lives here instead, and
+/// `que_packages/<name>` points into it. The leading dot keeps it out of
+/// import resolution: import paths are identifiers, so no import can name it.
+pub fn sources_dir(root: &Path) -> PathBuf {
+    packages_dir(root).join(".sources")
 }
 
 /// Read and parse `<root>/que.toml`.
@@ -124,6 +138,7 @@ fn parse_dependency(name: &str, spec: &toml::Value) -> Result<Dependency, String
             dir_name,
             source: Source::Git(url),
             requirement: req,
+            subdir: None,
         });
     }
 
@@ -168,12 +183,50 @@ fn parse_dependency(name: &str, spec: &toml::Value) -> Result<Dependency, String
         ));
     }
 
+    let subdir = match table.get("subdir") {
+        None => None,
+        Some(v) => {
+            let s = v.as_str().ok_or_else(|| {
+                format!("dependency '{}': `subdir` must be a string", name)
+            })?;
+            if matches!(source, Source::Path(_)) {
+                return Err(format!(
+                    "dependency '{}' is a path dependency, so `subdir` cannot apply to it; \
+                     point `path` at the sub-directory instead",
+                    name
+                ));
+            }
+            Some(normalize_subdir(name, s)?)
+        }
+    };
+
     Ok(Dependency {
         name: name.to_string(),
         dir_name,
         source,
         requirement,
+        subdir,
     })
+}
+
+/// Check that a `subdir` stays inside the checkout.
+///
+/// The value comes from a manifest that may itself have been fetched, so an
+/// absolute path or a `..` component would let it name a directory outside
+/// `que_packages/` — and `que install` would then link that into the build.
+fn normalize_subdir(name: &str, raw: &str) -> Result<String, String> {
+    let cleaned = raw.trim_matches('/').replace('\\', "/");
+    let bad = cleaned.is_empty()
+        || raw.starts_with('/')
+        || Path::new(raw).is_absolute()
+        || cleaned.split('/').any(|c| c == ".." || c == "." || c.is_empty());
+    if bad {
+        return Err(format!(
+            "dependency '{}': `subdir` must be a relative path inside the repository, not '{}'",
+            name, raw
+        ));
+    }
+    Ok(cleaned)
 }
 
 /// Read `<root>/que.lock`. A missing or unreadable lockfile is not an error:
@@ -316,6 +369,33 @@ deploy-tools = { git = "https://example.com/deploy", tag = "v1.2.0" }
     }
 
     #[test]
+    fn parses_a_subdir_so_one_repository_can_ship_several_packages() {
+        let m = parse(
+            "[dependencies]\nque-std = { git = \"https://example.com/que\", tag = \"v1\", subdir = \"stdlib/\" }\n",
+        )
+        .unwrap();
+        assert_eq!(m.dependencies[0].subdir.as_deref(), Some("stdlib"));
+    }
+
+    #[test]
+    fn rejects_a_subdir_that_escapes_the_checkout() {
+        for bad in ["../..", "/etc", "lib/../../secrets"] {
+            let err = parse(&format!(
+                "[dependencies]\nx = {{ git = \"u\", subdir = \"{}\" }}\n",
+                bad
+            ))
+            .unwrap_err();
+            assert!(err.contains("inside the repository"), "{}: {}", bad, err);
+        }
+    }
+
+    #[test]
+    fn rejects_a_subdir_on_a_path_dependency() {
+        let err = parse("[dependencies]\nx = { path = \"p\", subdir = \"lib\" }\n").unwrap_err();
+        assert!(err.contains("point `path` at the sub-directory"), "{}", err);
+    }
+
+    #[test]
     fn a_manifest_without_dependencies_is_fine() {
         assert!(parse("[package]\nname = \"app\"\n").unwrap().dependencies.is_empty());
     }
@@ -355,6 +435,7 @@ deploy-tools = { git = "https://example.com/deploy", tag = "v1.2.0" }
             dir_name: "x".into(),
             source: Source::Git("u".into()),
             requirement: Some("v1".into()),
+            subdir: None,
         };
         assert!(locked_revision(&lock, &dep).is_some());
         dep.requirement = Some("v2".into());
