@@ -1091,6 +1091,9 @@ impl Parser {
                     let expr = Self::parse_interp_source(&src, span)?;
                     result.push(AstStringPart::RawExpr(Box::new(expr)));
                 }
+                crate::token::StringPart::Continuation => {
+                    result.push(AstStringPart::Continuation);
+                }
             }
         }
         Ok(result)

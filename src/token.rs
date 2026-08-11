@@ -45,6 +45,12 @@ pub enum StringPart {
     Expr(String),
     /// A raw (unescaped) expression inside `!{...}` (commands only).
     RawExpr(String),
+    /// A `\`-at-end-of-line continuation (command literals only).
+    ///
+    /// It means a single space, but it is kept as its own part rather than
+    /// folded into the surrounding text so that `que fmt` can put the line
+    /// break back where the author wrote it.
+    Continuation,
 }
 
 /// Duration units for duration literals.

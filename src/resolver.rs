@@ -496,7 +496,7 @@ impl Resolver {
                 for part in parts {
                     match part {
                         AstStringPart::Expr(e) | AstStringPart::RawExpr(e) => self.walk_expr(e),
-                        AstStringPart::Literal(_) => {}
+                        AstStringPart::Literal(_) | AstStringPart::Continuation => {}
                     }
                 }
             }

@@ -202,6 +202,10 @@ pub enum AstStringPart {
     Expr(Box<Expr>),
     /// A raw (unescaped) `!{...}` expression (command literals only).
     RawExpr(Box<Expr>),
+    /// A `\`-at-end-of-line continuation (command literals only). Evaluates
+    /// to a single space; kept separate so the formatter can restore the
+    /// line break.
+    Continuation,
 }
 
 // ── Map entries ──

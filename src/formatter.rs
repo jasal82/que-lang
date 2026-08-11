@@ -567,6 +567,8 @@ impl Formatter {
                             self.format_expr(e);
                             self.push_str("}");
                         }
+                        // Only command literals can carry one.
+                        AstStringPart::Continuation => self.push_str(" "),
                     }
                 }
                 self.push_str("\"");
@@ -689,6 +691,17 @@ impl Formatter {
                             self.push_str("!{");
                             self.format_expr(e);
                             self.push_str("}");
+                        }
+                        // Put the author's line break back rather than
+                        // collapsing a deliberately wrapped command into one
+                        // very long line. Continuation lines all sit one
+                        // level in from the statement.
+                        AstStringPart::Continuation => {
+                            self.push_str(" \\");
+                            self.newline();
+                            self.indent += 1;
+                            self.write_indent();
+                            self.indent -= 1;
                         }
                     }
                 }
@@ -1021,6 +1034,7 @@ impl Formatter {
                             self.format_expr(e);
                             self.push_str("}");
                         }
+                        AstStringPart::Continuation => self.push_str(" "),
                     }
                 }
                 self.push_str("\"");
@@ -1040,6 +1054,7 @@ impl Formatter {
                             self.format_expr(e);
                             self.push_str("}");
                         }
+                        AstStringPart::Continuation => self.push_str(" "),
                     }
                 }
                 self.push_str("\"");

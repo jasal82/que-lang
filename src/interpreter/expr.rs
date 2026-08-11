@@ -111,6 +111,12 @@ impl Interpreter {
                                 other => cmd_parts.push(CmdPart::Raw(other.display_string())),
                             }
                         }
+                        // A wrapped line is the same command as the one-line
+                        // form, so the shell -- and every rendering of the
+                        // command -- sees a plain space.
+                        AstStringPart::Continuation => {
+                            cmd_parts.push(CmdPart::Literal(" ".to_string()))
+                        }
                     }
                 }
                 Ok(Value::Cmd(cmd_parts, Box::new(CmdModifiers::default())))
@@ -1708,6 +1714,8 @@ impl Interpreter {
                     let val = self.eval_expr(expr)?;
                     result.push_str(&val.display_string());
                 }
+                // Only command literals can carry one.
+                AstStringPart::Continuation => result.push(' '),
             }
         }
         // `~` means the home directory here exactly as it does in `path("~/…")`
@@ -1742,6 +1750,7 @@ impl Interpreter {
                     let val = self.eval_expr(expr)?;
                     result.push_str(&val.display_string());
                 }
+                AstStringPart::Continuation => result.push(' '),
             }
         }
         Ok(Value::Glob(result))
@@ -1762,6 +1771,7 @@ impl Interpreter {
                     let val = self.eval_expr(expr)?;
                     result.push_str(&self.display_value(val)?);
                 }
+                AstStringPart::Continuation => result.push(' '),
             }
         }
         Ok(Value::String(result))

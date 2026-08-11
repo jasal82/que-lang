@@ -977,6 +977,38 @@ impl<'src> Lexer<'src> {
                     let expr = self.read_interpolation_expr()?;
                     parts.push(StringPart::RawExpr(expr));
                 }
+                // A backslash at end of line continues the command on the
+                // next one. The break and the following indentation mean a
+                // single space, so a wrapped command is exactly the command
+                // written on one line -- including in `to_string()`,
+                // `--dry-run` output and failure messages. Folding it here
+                // rather than passing it to the shell is also what makes it
+                // work under `cmd.exe`, which has no backslash continuation
+                // of its own.
+                Some(b'\\') if matches!(self.peek_at(1), Some(b'\n') | Some(b'\r')) => {
+                    self.advance(); // backslash
+                    if self.peek() == Some(b'\r') {
+                        self.advance();
+                    }
+                    if self.peek() == Some(b'\n') {
+                        self.advance();
+                    }
+                    while matches!(self.peek(), Some(b' ') | Some(b'\t')) {
+                        self.advance();
+                    }
+                    // The continuation supplies the separator, so any spaces
+                    // written before the backslash would only be doubled.
+                    let end = buf.trim_end_matches([' ', '\t']).len();
+                    buf.truncate(end);
+                    if !buf.is_empty() {
+                        parts.push(StringPart::Literal(std::mem::take(&mut buf)));
+                    }
+                    // A continuation on the very first line has nothing to
+                    // separate, so it contributes nothing.
+                    if !parts.is_empty() {
+                        parts.push(StringPart::Continuation);
+                    }
+                }
                 Some(b'\\') => {
                     self.advance();
                     match self.advance() {
@@ -1883,6 +1915,112 @@ mod tests {
                     StringPart::Literal("cargo build ".into()),
                     StringPart::RawExpr("flags".into()),
                 ]),
+                TokenKind::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn a_trailing_backslash_continues_the_command_on_the_next_line() {
+        let tokens = tokenize("`docker run \\\n    --rm \\\n    alpine`");
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::CmdLit(vec![
+                    StringPart::Literal("docker run".into()),
+                    StringPart::Continuation,
+                    StringPart::Literal("--rm".into()),
+                    StringPart::Continuation,
+                    StringPart::Literal("alpine".into()),
+                ]),
+                TokenKind::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn a_continuation_absorbs_the_whitespace_around_it() {
+        // No space before the backslash, and deep indentation after it.
+        let tokens = tokenize("`echo one\\\n\t\t  two`");
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::CmdLit(vec![
+                    StringPart::Literal("echo one".into()),
+                    StringPart::Continuation,
+                    StringPart::Literal("two".into()),
+                ]),
+                TokenKind::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn a_continuation_survives_crlf_line_endings() {
+        let tokens = tokenize("`echo one \\\r\n  two`");
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::CmdLit(vec![
+                    StringPart::Literal("echo one".into()),
+                    StringPart::Continuation,
+                    StringPart::Literal("two".into()),
+                ]),
+                TokenKind::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn a_continuation_after_an_interpolation_still_separates_the_arguments() {
+        let tokens = tokenize("`echo ${a}\\\n  ${b}`");
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::CmdLit(vec![
+                    StringPart::Literal("echo ".into()),
+                    StringPart::Expr("a".into()),
+                    StringPart::Continuation,
+                    StringPart::Expr("b".into()),
+                ]),
+                TokenKind::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn a_continuation_on_the_first_line_has_nothing_to_separate() {
+        let tokens = tokenize("`\\\n  git status`");
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::CmdLit(vec![StringPart::Literal("git status".into())]),
+                TokenKind::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn a_bare_newline_is_still_a_command_separator() {
+        // Continuation is opt-in: without the backslash the shell sees two
+        // commands, which is how a literal spanning lines behaves today.
+        let tokens = tokenize("`echo one\necho two`");
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::CmdLit(vec![StringPart::Literal("echo one\necho two".into())]),
+                TokenKind::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn an_escaped_backslash_before_a_newline_is_not_a_continuation() {
+        let tokens = tokenize("`echo a\\\\\nb`");
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::CmdLit(vec![StringPart::Literal("echo a\\\nb".into())]),
                 TokenKind::Eof
             ]
         );

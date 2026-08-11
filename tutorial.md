@@ -3024,6 +3024,33 @@ let cmd = `echo hello`
 println(typeof(cmd))   // Cmd
 ```
 
+### Splitting a Command Across Lines
+
+A backslash at the end of a line continues the command on the next one. The
+line break and the indentation that follows it mean a single space, so a
+wrapped command is exactly the command written on one line:
+
+```que
+`docker run \
+    --rm \
+    --volume ${cache}:/cache \
+    ${image} build`
+```
+
+The wrapping is source layout, not part of the command. `--dry-run`,
+`.to_string()` and failure messages all show the single-line form, and
+`que fmt` puts the line breaks back where you wrote them.
+
+A **bare** newline is not a continuation — it stays in the command, and the
+shell reads it as a separator. That is how you write a short script in one
+literal:
+
+```que
+`echo building
+make all
+echo done`
+```
+
 ### The Three Execution Forms
 
 | Form | Output | On failure |

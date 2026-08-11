@@ -2434,6 +2434,37 @@ result.exit_code
     assert_result(source, Value::Int(0));
 }
 
+#[test]
+fn a_command_wrapped_with_trailing_backslashes_runs_as_one_command() {
+    let source = "`echo -n one \\\n    two \\\n    three`.out()";
+    assert_result(source, Value::String("one two three".into()));
+}
+
+#[test]
+fn a_wrapped_command_renders_as_the_single_line_it_means() {
+    // The wrapping is source layout, not part of the command, so nothing
+    // that shows the command to a human -- `to_string()`, `--dry-run`,
+    // failure messages -- should show the backslashes or the indentation.
+    let source = "`git commit \\\n    --message hi`.to_string()";
+    assert_result(source, Value::String("git commit --message hi".into()));
+}
+
+#[test]
+fn a_wrapped_command_separates_adjacent_interpolations() {
+    let source = "let a = \"one\"\nlet b = \"two\"\n`echo -n ${a}\\\n    ${b}`.out()";
+    assert_result(source, Value::String("one two".into()));
+}
+
+#[test]
+fn a_bare_newline_in_a_command_still_separates_two_commands() {
+    // Continuation is opt-in. Without the backslash the shell sees a script
+    // of two commands, which is what a multi-line literal has always meant.
+    assert_result(
+        "`echo one\necho two`.out()",
+        Value::String("one\ntwo".into()),
+    );
+}
+
 // ═════════════════════════════════════════════════════════════════════
 // NEW FEATURES: Lazy command literals
 // ═════════════════════════════════════════════════════════════════════
@@ -10857,6 +10888,33 @@ fn fmt_try_catch() {
     let out = format_source("try  {  1  }  catch  e  {  2  }");
     assert!(out.contains("try {"));
     assert!(out.contains("} catch e {"));
+}
+
+#[test]
+fn fmt_keeps_a_wrapped_command_wrapped() {
+    // Joining a deliberately wrapped command back into one long line would
+    // make the continuation syntax useless, so the break survives the round
+    // trip -- normalised to one space before the backslash and one indent
+    // level after it.
+    let out = format_source("`docker run    \\\n        --rm \\\n  alpine`");
+    assert_eq!(out.trim_end(), "`docker run \\\n    --rm \\\n    alpine`");
+}
+
+#[test]
+fn fmt_indents_continuation_lines_relative_to_the_statement() {
+    let out = format_source("fn f() {\n`echo one \\\ntwo`\n}");
+    assert!(
+        out.contains("    `echo one \\\n        two`"),
+        "{}",
+        out
+    );
+}
+
+#[test]
+fn fmt_is_idempotent_for_wrapped_commands() {
+    let first = format_source("`echo one \\\n  two \\\n  three`");
+    let second = format_source(&first);
+    assert_eq!(first, second, "formatter is not idempotent");
 }
 
 #[test]
