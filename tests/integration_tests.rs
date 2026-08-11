@@ -7844,6 +7844,45 @@ import .nonexistent
     ]);
 }
 
+// ── Error locations across files ─────────────────────────────────────
+
+#[test]
+fn an_error_in_an_imported_function_names_the_file_it_lives_in() {
+    // The span points into helper.que; reporting it against main.que gave a
+    // line number main.que does not have.
+    let err = run_module_project(&[
+        (
+            "main.que",
+            "import .helper\nhelper.go()\n",
+        ),
+        (
+            "helper.que",
+            "// pad\n// pad\n// pad\n// pad\n// pad\npub fn go() {\n    let a = 1\n    undefined_thing()\n}\n",
+        ),
+    ])
+    .expect_err("expected a runtime error");
+    assert_eq!(err.file.as_deref(), Some("helper.que"));
+    assert_eq!(err.span.map(|s| s.line), Some(8));
+}
+
+#[test]
+fn an_error_after_an_imported_call_returns_to_the_calling_file() {
+    // The callee's file must not leak past the call that used it.
+    let err = run_module_project(&[
+        (
+            "main.que",
+            "import .helper\nhelper.go()\nundefined_thing()\n",
+        ),
+        (
+            "helper.que",
+            "pub fn go() {\n    let a = 1\n    a\n}\n",
+        ),
+    ])
+    .expect_err("expected a runtime error");
+    assert_eq!(err.file.as_deref(), Some("main.que"));
+    assert_eq!(err.span.map(|s| s.line), Some(3));
+}
+
 // ── Module as Map (runtime representation) ──────────────────────────
 
 #[test]
@@ -8582,6 +8621,32 @@ check()"#;
     assert!(err.span.is_some(), "expected span in error, got: {}", err);
     let span = err.span.unwrap();
     assert_eq!(span.line, 3, "expected error on line 3, got line {}", span.line);
+}
+
+#[test]
+fn a_blocks_trailing_expression_reports_its_own_line() {
+    // The trailing expression used to inherit the previous statement's span,
+    // so every error in one was reported a statement too early.
+    let src = r#"fn check() {
+    let a = 1
+    no_such_variable
+}
+check()"#;
+    let err = que_lang::interpreter::run(src).unwrap_err();
+    let span = err.span.expect("expected span in error");
+    assert_eq!(span.line, 3, "expected line 3, got {}", span.line);
+}
+
+#[test]
+fn a_trailing_expression_in_a_task_reports_its_own_line() {
+    let src = r#"task boom {
+    println("running")
+    no_such_variable
+}
+boom()"#;
+    let err = que_lang::interpreter::run(src).unwrap_err();
+    let span = err.span.expect("expected span in error");
+    assert_eq!(span.line, 3, "expected line 3, got {}", span.line);
 }
 
 // ── Quick-win #5: which() ─────────────────────────────────────────────

@@ -212,7 +212,7 @@ impl Interpreter {
         let saved_file = self.current_file.clone();
         self.call_stack.push(crate::error::CallFrame {
             name: name.clone(),
-            call_file: self.current_file.clone(),
+            call_file: self.current_file.as_deref().cloned(),
             call_span: self.current_span,
         });
 

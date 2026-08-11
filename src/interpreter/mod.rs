@@ -110,7 +110,9 @@ pub struct Interpreter {
     /// during execution). Used to attach file/line info to runtime errors.
     current_span: Option<crate::token::Span>,
     /// Filename of the current script (short name only, for error messages).
-    current_file: Option<String>,
+    /// Shared so a function value can hold on to the file it was defined in
+    /// without copying the name into every closure.
+    current_file: Option<std::sync::Arc<String>>,
     /// Struct field definitions: type_name → ordered list of field defs.
     pub(crate) struct_defs: std::collections::HashMap<String, Vec<crate::value::FieldDef>>,
     /// Enum definitions: enum_name → [(variant_name, [field_names])].
@@ -273,7 +275,7 @@ impl Interpreter {
     pub fn set_script_path(&mut self, path: std::path::PathBuf) {
         self.current_file = path
             .file_name()
-            .map(|n| n.to_string_lossy().into_owned());
+            .map(|n| std::sync::Arc::new(n.to_string_lossy().into_owned()));
         self.script_path = Some(path);
     }
 
@@ -625,6 +627,8 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                     params: decl.params,
                     body: decl.body,
                     closure_env: crate::environment::Environment::new(),
+                    // Synthesised from a string, so there is no file to blame.
+                    def_file: None,
                 });
             }
         }
@@ -662,6 +666,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 params: d.params.clone(),
                 body: d.body.clone(),
                 closure_env: self.env.clone(),
+                def_file: self.current_file.clone(),
             }
         }).collect()
     }
@@ -827,7 +832,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                         }
                     }
                     if e.file.is_none() {
-                        e.file = self.current_file.clone();
+                        e.file = self.current_file.as_deref().cloned();
                     }
                     if e.backtrace.is_empty() && !self.call_stack.is_empty() {
                         e.backtrace = self.call_stack.clone();
@@ -862,6 +867,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                     return_type: decl.return_type.clone().map(Box::new),
                     body: decl.body.clone(),
                     closure_env: self.env.clone(),
+                    def_file: self.current_file.clone(),
                 };
                 self.env.define(&decl.name, func.clone(), false);
 
@@ -873,6 +879,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                     return_type: decl.return_type.clone().map(Box::new),
                     body: decl.body.clone(),
                     closure_env: self.env.clone(),
+                    def_file: self.current_file.clone(),
                 };
                 self.env.set(&decl.name, func_v2).ok();
                 Ok(Value::Null)
@@ -1008,6 +1015,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                                     params: default_method.params.clone(),
                                     body: body.clone(),
                                     closure_env: self.env.clone(),
+                                    def_file: self.current_file.clone(),
                                 });
                             }
                         }
@@ -1559,7 +1567,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                         }
                     }
                     if e.file.is_none() {
-                        e.file = self.current_file.clone();
+                        e.file = self.current_file.as_deref().cloned();
                     }
                     if e.backtrace.is_empty() && !self.call_stack.is_empty() {
                         e.backtrace = self.call_stack.clone();
@@ -1573,9 +1581,15 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 }
             }
         }
-        // Update span for the trailing expression so errors point to the right location.
-        // current_span was already set by the last statement in stmts (if any).
+        // Point errors at the trailing expression rather than at whatever ran
+        // last. Without this the expression inherits the previous statement's
+        // span -- and when the block has no statements, a span left behind by
+        // an entirely different file, which is how a line number larger than
+        // the file could be reported.
         let result = if let Some(expr) = &block.expr {
+            if let Some(span) = block.source.as_ref().and_then(|s| s.expr_span) {
+                self.current_span = Some(span);
+            }
             let evaluated = self.eval_expr(expr);
             // The parser turns a block's last statement into its trailing
             // expression, but a backtick literal written on its own is still a
@@ -1597,7 +1611,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                         }
                     }
                     if e.file.is_none() {
-                        e.file = self.current_file.clone();
+                        e.file = self.current_file.as_deref().cloned();
                     }
                     if e.backtrace.is_empty() && !self.call_stack.is_empty() {
                         e.backtrace = self.call_stack.clone();

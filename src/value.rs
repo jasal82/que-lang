@@ -26,6 +26,9 @@ pub struct MethodDef {
     pub params: Vec<Param>,
     pub body: Block,
     pub closure_env: crate::environment::Environment,
+    /// The file the method was written in, for the same reason a function
+    /// value carries one.
+    pub def_file: Option<Arc<String>>,
 }
 
 impl PartialEq for MethodDef {
@@ -93,6 +96,13 @@ pub enum Value {
         return_type: Option<Box<TypeExpr>>,
         body: Block,
         closure_env: crate::environment::Environment,
+        /// The file the function was written in. A function exported by an
+        /// imported module is called from a file it does not live in, and
+        /// its errors carry spans into its own source -- without this they
+        /// would be reported against the caller's file, at a line that file
+        /// may not even have. `Arc` so the pointer, not the name, is what
+        /// every function value carries.
+        def_file: Option<Arc<String>>,
     },
     BuiltinFn(String),
 

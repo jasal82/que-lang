@@ -260,6 +260,7 @@ impl Interpreter {
                             source: None,
                         },
                         closure_env,
+                        def_file: self.current_file.clone(),
                     });
                 }
 
@@ -337,6 +338,7 @@ impl Interpreter {
                     source: None,
                 },
                 closure_env: self.env.clone(),
+                def_file: self.current_file.clone(),
             }),
 
             // ── Control flow expressions ──
@@ -522,6 +524,7 @@ impl Interpreter {
                         source: None,
                     },
                     closure_env: self.env.clone(),
+                    def_file: self.current_file.clone(),
                 };
                 self.call_value(func, vec![left])
             }
@@ -1139,6 +1142,7 @@ impl Interpreter {
                 return_type,
                 body,
                 closure_env,
+                def_file,
             } => {
                 // Save call-site span so that after the function returns, current_span
                 // reflects where the call was made (not a stale line inside the callee).
@@ -1146,9 +1150,14 @@ impl Interpreter {
                 let saved_file = self.current_file.clone();
                 self.call_stack.push(crate::error::CallFrame {
                     name: name.clone().unwrap_or_else(|| "<anonymous>".to_string()),
-                    call_file: self.current_file.clone(),
+                    call_file: self.current_file.as_deref().cloned(),
                     call_span: self.current_span,
                 });
+                // The body's spans point into the file the function was
+                // written in, which is not necessarily the caller's.
+                if def_file.is_some() {
+                    self.current_file = def_file;
+                }
                 let saved = std::mem::replace(&mut self.env, closure_env);
                 // For recursion: if function has a name, define it in its own scope
                 // so it can call itself. This works because we capture the environment
@@ -1513,9 +1522,12 @@ impl Interpreter {
         let saved_file = self.current_file.clone();
         self.call_stack.push(crate::error::CallFrame {
             name: method.name.clone(),
-            call_file: self.current_file.clone(),
+            call_file: self.current_file.as_deref().cloned(),
             call_span: self.current_span,
         });
+        if method.def_file.is_some() {
+            self.current_file = method.def_file.clone();
+        }
         // Build a child environment from the method's closure env.
         let saved_env = self.env.clone();
         self.env = method.closure_env.clone();
