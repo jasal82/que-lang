@@ -6264,6 +6264,19 @@ println(saved_path.to_path().exists())
 }
 
 #[test]
+fn temp_dir_can_be_built_through_its_constructor() {
+    // `TempDir {}` is the spelling every other test uses, which left the
+    // static constructor -- whose body is a struct literal parsed from a
+    // string at startup rather than from a module -- with no coverage.
+    let source = r#"
+with TempDir.new("que_ctor_", null) as d {
+    println(d.to_string().contains("que_ctor_"))
+}
+"#;
+    assert_output(source, &["true"]);
+}
+
+#[test]
 fn with_temp_file_keep_preserves() {
     // The new OOP-based TempFile always cleans up — verify that behavior
     let source = r#"
@@ -8044,6 +8057,33 @@ pub impl Box {
 "#),
         ],
         &["16"],
+    );
+}
+
+#[test]
+fn an_exported_function_can_still_build_a_privately_imported_type() {
+    // The function runs in the caller's interpreter, so the fields and
+    // methods of the types it was written against have to be reachable
+    // there -- even though the caller imported none of them and cannot
+    // name them itself.
+    assert_module_output(
+        &[
+            ("main.que", r#"
+import .facade
+println(facade.make().side)
+"#),
+            ("facade.que", r#"
+import .shapes
+pub fn make() { shapes.Box.new(2) }
+"#),
+            ("shapes.que", r#"
+pub struct Box { side: Int }
+pub impl Box {
+    fn new(side) -> Box { Box { side: side } }
+}
+"#),
+        ],
+        &["2"],
     );
 }
 

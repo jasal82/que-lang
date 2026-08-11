@@ -1863,6 +1863,19 @@ impl Interpreter {
     /// Separated from eval_expr to keep its stack frame small enough for deep recursion.
     #[inline(never)]
     fn eval_struct_lit(&mut self, name: &str, fields: &[(String, Expr)]) -> IResult {
+        // A type's fields travel to every module that imports -- directly or
+        // indirectly -- the module declaring it, because a function it exports
+        // has to be able to construct its own types wherever it is called
+        // from. What does *not* travel is the name: only a `pub` type, or one
+        // passed on by a `pub import`, is bound in the importer. So the
+        // binding, not the metadata, is what decides whether a literal here is
+        // allowed to name this type.
+        if !matches!(self.env.get(name), Some(Value::TypeRef(_))) {
+            return Err(Signal::Error(QueError::new(
+                ErrorKind::UndefinedVariable,
+                format!("unknown struct type '{}'", name),
+            )));
+        }
         let field_defs = self.struct_defs.get(name).cloned().ok_or_else(|| {
             Signal::Error(QueError::new(
                 ErrorKind::UndefinedVariable,

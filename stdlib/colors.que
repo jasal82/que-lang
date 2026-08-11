@@ -195,5 +195,5 @@ pub impl Display for ColoredString {
 }
 
 pub fn colored(text) -> ColoredString {
-    ColoredString.new(text)
+    ColoredString(text)
 }

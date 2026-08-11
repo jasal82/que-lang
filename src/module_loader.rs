@@ -365,8 +365,6 @@ impl ModuleLoader {
 
         // Collect pub exports from the module's items
         let mut exports = BTreeMap::new();
-        let mut exported_type_names: Vec<String> = Vec::new();
-        let mut exported_enum_names: Vec<String> = Vec::new();
         for (_, item) in &module.items {
             match item {
                 Item::FnDecl(decl) if decl.is_pub => {
@@ -379,7 +377,6 @@ impl ModuleLoader {
                     if let Some(val) = interp.env.get(&decl.name) {
                         exports.insert(decl.name.clone(), val);
                     }
-                    exported_type_names.push(decl.name.clone());
                 }
                 Item::PubLet { pattern, .. } => {
                     // Extract all names bound by the pattern and export them
@@ -399,7 +396,6 @@ impl ModuleLoader {
                     if let Some(val) = interp.env.get(&decl.name) {
                         exports.insert(decl.name.clone(), val);
                     }
-                    exported_enum_names.push(decl.name.clone());
                     // Export unit variants as direct values
                     for variant in &decl.variants {
                         if variant.fields.is_empty() {
@@ -438,20 +434,17 @@ impl ModuleLoader {
             }
         }
 
-        // Propagate the metadata of every type this module hands on, so the
+        // Propagate the metadata of every type this module can reach, so the
         // importer can construct instances and call methods. A type's fields
         // and methods live in the interpreter's tables, not in the value that
         // names it, so exporting the name alone is not enough.
         //
-        // `reexported_type_names` covers the types that arrived through a
-        // `pub import` and are passed straight on; without it a facade module
-        // would export a type stripped of its `impl` blocks.
-        let passed_on = interp.reexported_type_names.clone();
-        let names = exported_type_names
-            .iter()
-            .chain(exported_enum_names.iter())
-            .chain(passed_on.iter());
-        for type_name in names {
+        // The set deliberately reaches past the module's own `pub` types: a
+        // function it exports may well construct a type it imported privately,
+        // and that call runs in the importer's interpreter. The type stays
+        // unreachable by name there, because only the metadata travels — the
+        // binding that names it does not.
+        for type_name in &interp.known_type_names {
             if let Some(fields) = interp.struct_defs.get(type_name) {
                 self.pending_struct_defs.insert(type_name.clone(), fields.clone());
             }
