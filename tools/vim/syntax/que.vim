@@ -36,9 +36,26 @@ syntax keyword queModifier
 syntax keyword queConcurrency
       \ spawn parallel
 
-" Task attributes, written above the declaration
-syntax match   queTaskProp
-      \ "^\s*@\(deps\|description\|inputs\|outputs\|aliases\|env\)\ze("
+" ─── Task attributes ─────────────────────────────────────────────────────────
+"
+" `@deps(…)` and friends are written above the `task` they describe. The
+" argument list is a region of its own so the bare names in `@deps([build,
+" test])` are highlighted too; strings, numbers and comments inside it keep
+" their usual look.
+
+syntax match   queAttribute
+      \ "^\s*@\(description\|deps\|inputs\|outputs\|aliases\|env\)\>"
+      \ nextgroup=queAttributeArgs skipwhite
+
+syntax region  queAttributeArgs
+      \ matchgroup=queAttributeDelim
+      \ start="(" end=")"
+      \ end="^\s*\%(@\w\|\%(task\|fn\|pub\|import\|type\|enum\|struct\)\>\)"me=s-1
+      \ contained
+      \ contains=queAttributeName,queString,queRawString,queRawHashStr,
+      \queTripleString,queInt,queFloat,queLineComment,queBlockComment
+
+syntax match   queAttributeName "\<[a-zA-Z_][a-zA-Z0-9_]*\>"  contained
 
 " ─── Task and function names ─────────────────────────────────────────────────
 
@@ -188,7 +205,9 @@ highlight default link queDeclaration    Keyword
 highlight default link queBinding        StorageClass
 highlight default link queModifier       PreProc
 highlight default link queConcurrency    Keyword
-highlight default link queTaskProp       Identifier
+highlight default link queAttribute      PreProc
+highlight default link queAttributeDelim Delimiter
+highlight default link queAttributeName  Identifier
 
 highlight default link queTaskKeyword    Keyword
 highlight default link queTaskName       Function
