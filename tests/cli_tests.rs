@@ -28,9 +28,53 @@ fn help_includes_the_version_and_version_flags() {
     let output = que(&["--help"]);
     assert!(output.status.success());
 
-    let help = String::from_utf8_lossy(&output.stderr);
-    assert!(help.starts_with(&format!("Que v{VERSION}\n\nUsage:")));
-    assert!(help.contains("--version, -V"));
+    // Requested help is output, not an error report, so it goes to stdout.
+    let help = String::from_utf8_lossy(&output.stdout);
+    assert!(help.starts_with(&format!("Que v{VERSION}\n")));
+    assert!(help.contains("Usage"));
+    assert!(help.contains("-V, --version"));
+}
+
+#[test]
+fn every_command_has_a_help_page_listing_its_options() {
+    // Each command's own flags must appear on its page: a flag that exists
+    // but is undocumented is one nobody will ever use.
+    let expected = [
+        ("run", vec!["-f <file>", "-g, --global", "-B, --force", "--dry-run", "--allow"]),
+        ("tasks", vec!["-f <file>", "-g, --global"]),
+        ("test", vec!["--filter <text>"]),
+        ("install", vec!["--locked", "-g, --global"]),
+        ("fmt", vec!["--check", "--diff"]),
+        ("lint", vec!["[files...]"]),
+    ];
+
+    for (command, flags) in expected {
+        // Both spellings reach the same page.
+        for args in [vec!["help", command], vec![command, "--help"]] {
+            let output = que(&args);
+            assert!(output.status.success(), "que {args:?} failed");
+            let page = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                page.starts_with(&format!("que {command}\n")),
+                "que {args:?} did not print the {command} page: {page}"
+            );
+            for flag in &flags {
+                assert!(page.contains(flag), "que {args:?} does not document {flag}");
+            }
+        }
+        // And the command is listed on the top-level page.
+        let root = String::from_utf8_lossy(&que(&["help"]).stdout).to_string();
+        assert!(root.contains(command), "`que help` does not list {command}");
+    }
+}
+
+#[test]
+fn an_unknown_command_points_at_the_help_command() {
+    let output = que(&["--nonsense"]);
+    assert!(!output.status.success());
+    let err = String::from_utf8_lossy(&output.stderr);
+    assert!(err.contains("unknown command or option: --nonsense"), "{err}");
+    assert!(err.contains("que help"), "{err}");
 }
 
 #[test]

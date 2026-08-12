@@ -78,7 +78,7 @@ println(&quot;Hello,&quot;, name)</code></pre></div>
 <div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">// This is a comment
 println(&quot;hi&quot;)   // inline comment</code></pre></div>
 <h3 id="running-que">Running Que<a class="anchor-link" href="#running-que" aria-label="Permalink">#</a></h3>
-<table><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody><tr><td><code>que</code></td><td>Start the interactive REPL</td></tr><tr><td><code>que script.que</code></td><td>Run a script file</td></tr><tr><td><code>que run &lt;task&gt;</code></td><td>Run a task from a Quefile</td></tr><tr><td><code>que run &lt;task&gt; --help</code></td><td>Show task usage and argument table</td></tr><tr><td><code>que run &lt;task&gt; -- arg1 arg2</code></td><td>Run task with positional arguments</td></tr><tr><td><code>que run &lt;task&gt; -- key=val</code></td><td>Run task with named arguments</td></tr><tr><td><code>que run -g &lt;task&gt;</code></td><td>Run a task from the global Quefile</td></tr><tr><td><code>que tasks</code></td><td>List available tasks</td></tr><tr><td><code>que fmt</code></td><td>Format source files</td></tr><tr><td><code>que lint</code></td><td>Lint source files</td></tr><tr><td><code>que test</code></td><td>Run the test suite</td></tr><tr><td><code>que install</code></td><td>Fetch dependencies declared in <code>que.toml</code></td></tr><tr><td><code>que install -g</code></td><td>Fetch the global Quefile's dependencies</td></tr></tbody></table>
+<table><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody><tr><td><code>que</code></td><td>Start the interactive REPL</td></tr><tr><td><code>que script.que</code></td><td>Run a script file</td></tr><tr><td><code>que run &lt;task&gt;</code></td><td>Run a task from a Quefile</td></tr><tr><td><code>que run &lt;task&gt; --help</code></td><td>Show task usage and argument table</td></tr><tr><td><code>que run &lt;task&gt; -- arg1 arg2</code></td><td>Run task with positional arguments</td></tr><tr><td><code>que run &lt;task&gt; -- key=val</code></td><td>Run task with named arguments</td></tr><tr><td><code>que run -g &lt;task&gt;</code></td><td>Run a task from the global Quefile</td></tr><tr><td><code>que tasks</code></td><td>List available tasks</td></tr><tr><td><code>que fmt</code></td><td>Format source files</td></tr><tr><td><code>que lint</code></td><td>Lint source files</td></tr><tr><td><code>que test</code></td><td>Run the test suite</td></tr><tr><td><code>que install</code></td><td>Fetch dependencies declared in <code>que.toml</code></td></tr><tr><td><code>que install -g</code></td><td>Fetch the global Quefile's dependencies</td></tr><tr><td><code>que help [command]</code></td><td>Show help, or the options of one command</td></tr></tbody></table>
 <div class="docs-pager"><span></span><a href="#2-variables-types-and-operators" class="pager-next"><span class="pager-dir">Next &rarr;</span><span class="docs-pager-title">2. Variables, Types, and Operators</span></a></div><h2 id="2-variables-types-and-operators"><span class="chapter-no">2.</span>Variables, Types, and Operators<a class="anchor-link" href="#2-variables-types-and-operators" aria-label="Permalink">#</a></h2>
 <h3 id="variables-and-mutability">Variables and Mutability<a class="anchor-link" href="#variables-and-mutability" aria-label="Permalink">#</a></h3>
 <p>Que has <strong>immutable-by-default</strong> variables. Use <code>let</code> for values that never change and <code>mut</code> for values that do.</p>
@@ -1619,6 +1619,17 @@ println(&quot;build succeeded&quot;)  // only reached if the build worked</code>
 <p>Binding a command to a name keeps it lazy, so you can build it up before running it:</p>
 <div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">let cmd = `echo hello`
 println(typeof(cmd))   // Cmd</code></pre></div>
+<h3 id="splitting-a-command-across-lines">Splitting a Command Across Lines<a class="anchor-link" href="#splitting-a-command-across-lines" aria-label="Permalink">#</a></h3>
+<p>A backslash at the end of a line continues the command on the next one. The line break and the indentation that follows it mean a single space, so a wrapped command is exactly the command written on one line:</p>
+<div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">`docker run \
+    --rm \
+    --volume ${cache}:/cache \
+    ${image} build`</code></pre></div>
+<p>The wrapping is source layout, not part of the command. <code>--dry-run</code>, <code>.to_string()</code> and failure messages all show the single-line form, and <code>que fmt</code> puts the line breaks back where you wrote them.</p>
+<p>A <strong>bare</strong> newline is not a continuation — it stays in the command, and the shell reads it as a separator. That is how you write a short script in one literal:</p>
+<div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">`echo building
+make all
+echo done`</code></pre></div>
 <h3 id="the-three-execution-forms">The Three Execution Forms<a class="anchor-link" href="#the-three-execution-forms" aria-label="Permalink">#</a></h3>
 <table><thead><tr><th>Form</th><th>Output</th><th>On failure</th></tr></thead><tbody><tr><td><code>`cmd`</code> or <code>`cmd`.run()</code></td><td>streamed to the terminal</td><td><strong>raises</strong></td></tr><tr><td><code>`cmd`.out()</code></td><td>returned as a trimmed <code>String</code></td><td><strong>raises</strong></td></tr><tr><td><code>`cmd`.try()</code></td><td>captured in a <code>ProcessResult</code></td><td>returns normally</td></tr></tbody></table>
 <div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">// Streamed, checked — the everyday case
@@ -2672,13 +2683,16 @@ que run build -- target=darwin-arm64  # named
 que run build -- target=win mode=release</code></pre></div>
 <p>Use <code>--help</code> to see the full argument table for a task:</p>
 <div class="code-block"><span class="code-lang">sh</span><pre class="language-bash"><code class="language-bash">que run build --help
-# Usage: build [target] [mode]
-#
+# que run build
 # Build for a specific target
 #
-# Arguments:
-#   target  (required)
-#   mode    default: &quot;debug&quot;</code></pre></div>
+# Usage
+#   que run [-f Quefile] build -- target=&lt;target&gt; [mode=&lt;mode&gt;]
+#   que run [-f Quefile] build -- &lt;target&gt; [mode]  (positional)
+#
+# Arguments
+#   target  any  required
+#   mode    any  optional (default: &quot;debug&quot;)</code></pre></div>
 <p>An argument no parameter can claim is an error, not something quietly dropped:</p>
 <div class="code-block"><span class="code-lang">sh</span><pre class="language-bash"><code class="language-bash">que run build -- linux-amd64 release oops
 # task &#x27;build&#x27; takes 2 positional arguments, but 3 were given</code></pre></div>
@@ -3394,7 +3408,7 @@ pattern if guard            // guard</code></pre></div>
 <p>Happy que-ing!</p><div class="docs-pager"><a href="#35-language-grammar-summary" class="pager-prev"><span class="pager-dir">&larr; Previous</span><span class="docs-pager-title">35. Language Grammar Summary</span></a></div>
 
         <p style="margin-top:4em; color: var(--text-faint); font-size: 12.5px; font-family: var(--font-mono);">
-            Generated 2026-08-10 from <code>tutorial2.md</code> —
+            Generated 2026-08-12 from <code>tutorial2.md</code> —
             <a href="https://github.com/jasal82/que-lang/blob/main/tutorial2.md" target="_blank" rel="noopener">edit this page on GitHub</a>.
         </p>
     </main>

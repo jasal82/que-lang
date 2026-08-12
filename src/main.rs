@@ -17,6 +17,8 @@ use rustyline::history::DefaultHistory;
 use rustyline::{Editor, CompletionType, Config};
 use que_lang::completion::QueHelper;
 
+mod help;
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
@@ -43,7 +45,10 @@ fn main() {
         "install" => cmd_install(&args[2..]),
         "fmt" => cmd_fmt(&args[2..]),
         "lint" => cmd_lint(&args[2..]),
-        "help" | "--help" | "-h" => print_usage(),
+        "help" | "--help" | "-h" => match args.get(2) {
+            Some(topic) => help::print_command_help(topic),
+            None => help::print_usage(),
+        },
         "version" | "--version" | "-V" => print_version(),
         _ => {
             // Treat the argument as a script file (backward compatible).
@@ -68,6 +73,14 @@ fn main() {
                 } else if let Some(spec) = permission_flag(tail, &mut i) {
                     apply_permission(&mut policy, &spec);
                 } else if script_pos.is_none() {
+                    // A flag before the script name is meant for que, and que
+                    // does not know it. Treating it as the script file only
+                    // postpones the error into a confusing one.
+                    if a.starts_with('-') && a.len() > 1 {
+                        eprintln!("error: unknown command or option: {}", a);
+                        eprintln!("Run `que help` to see the available commands and options.");
+                        process::exit(EXIT_USAGE);
+                    }
                     script_pos = Some(i);
                 } else {
                     // Additional non-flag tokens before `--` are also passed
@@ -80,8 +93,8 @@ fn main() {
             match script_pos {
                 Some(idx) => run_file(&tail[idx], strict, dry_run, policy, script_args),
                 None => {
-                    eprintln!("Unknown command: {}", args[1]);
-                    print_usage();
+                    eprintln!("error: no script file given");
+                    eprintln!("Run `que help` to see the available commands and options.");
                     process::exit(EXIT_USAGE);
                 }
             }
@@ -151,68 +164,38 @@ fn print_version() {
     println!("Que v{}", VERSION);
 }
 
-fn print_usage() {
-    eprintln!("Que v{}", VERSION);
-    eprintln!();
-    eprintln!("Usage: que [command] [options]");
-    eprintln!();
-    eprintln!("Commands:");
-    eprintln!("  <script.que>               Run a script file");
-    eprintln!("  run [options] <task> [-- args...]  Run a task from a Quefile");
-    eprintln!("                                     Args may be positional or named (key=value)");
-    eprintln!("  tasks [options]             List available tasks");
-    eprintln!("  test [options] [paths...]   Run tests");
-    eprintln!("  install [options]           Fetch dependencies declared in que.toml");
-    eprintln!("  fmt [options] [files...]    Format Que source files");
-    eprintln!("  lint [files...]             Lint Que source files for issues");
-    eprintln!("  help                        Show this help message");
-    eprintln!("  version                     Show version information");
-    eprintln!();
-    eprintln!("Global options:");
-    eprintln!("  --help, -h                  Show this help message");
-    eprintln!("  --version, -V               Show version information");
-    eprintln!();
-    eprintln!("Run options:");
-    eprintln!("  -f <file>                   Use a specific Quefile (default: auto-detect)");
-    eprintln!("  -g, --global                Use the global Quefile ($QUE_HOME, ~/.config/que, ~/.que)");
-    eprintln!("  --help, -h                  Show argument help for the task");
-    eprintln!("  --dry-run                   Print effects instead of performing them");
-    eprintln!("  --force, -B                 Run even if inputs and outputs say it is up to date");
-    eprintln!("  --allow <cap>[=<list>]      Grant a capability (see Sandbox options)");
-    eprintln!("  --deny <cap>                Deny a capability (see Sandbox options)");
-    eprintln!("  -- arg1 arg2 ...            Pass positional arguments to the task");
-    eprintln!("  -- key=value ...            Pass named arguments to the task");
-    eprintln!();
-    eprintln!("Quefile discovery:");
-    eprintln!("  The nearest Quefile at or above the current directory is used, and its");
-    eprintln!("  tasks run in the current directory — use quefile_dir() for paths relative");
-    eprintln!("  to the Quefile. A task it does not define is looked up in the global");
-    eprintln!("  Quefile.");
-    eprintln!();
-    eprintln!("Test options:");
-    eprintln!("  --filter <text>             Only run tests whose name contains <text>");
-    eprintln!("  [paths...]                  Files or directories (default: current directory)");
-    eprintln!();
-    eprintln!("Install options:");
-    eprintln!("  --locked                    Fail instead of resolving anything not in que.lock");
-    eprintln!("  -g, --global                Install into the global Quefile's directory");
-    eprintln!();
-    eprintln!("Format options:");
-    eprintln!("  --check                     Check formatting without writing (exit 1 if unformatted)");
-    eprintln!("  --diff                      Show diff without writing");
-    eprintln!();
-    eprintln!("Script options:");
-    eprintln!("  --strict                    Enforce type annotations at runtime");
-    eprintln!("  --dry-run                   Print effects instead of performing them");
-    eprintln!();
-    eprintln!("Sandbox options (accepted by both `que <script>` and `que run`):");
-    eprintln!("  --allow <cap>[=<list>]      Grant a capability; everything else is denied");
-    eprintln!("  --deny <cap>                Deny one capability; everything else is granted");
-    eprintln!("      capabilities: read, write, exec, net, env");
-    eprintln!("      examples: --allow read=src,. --allow net=api.example.com --deny exec");
-    eprintln!("  Without any --allow/--deny flag the script runs unrestricted.");
-    eprintln!();
-    eprintln!("With no arguments, starts an interactive REPL.");
+/// Whether `args` asks for help rather than for work.
+///
+/// Checked before a command touches the filesystem: `que run --help` has to
+/// work in a directory with no Quefile, which is exactly where a user is
+/// most likely to ask.
+fn wants_help(args: &[String]) -> bool {
+    args.iter()
+        .take_while(|a| *a != "--")
+        .any(|a| a == "-h" || a == "--help")
+}
+
+/// The first non-flag token in `args`, skipping over detached flag values.
+///
+/// Used to tell `que run --help` (help for the command) apart from
+/// `que run build --help` (help for the task).
+fn first_operand(args: &[String]) -> Option<&String> {
+    let before = match args.iter().position(|a| a == "--") {
+        Some(pos) => &args[..pos],
+        None => args,
+    };
+    let mut i = 0;
+    while i < before.len() {
+        let a = before[i].as_str();
+        if a == "-f" || a == "--allow" || a == "--deny" {
+            i += 2;
+        } else if a.starts_with('-') {
+            i += 1;
+        } else {
+            return Some(&before[i]);
+        }
+    }
+    None
 }
 
 /// Filenames accepted as a Quefile, in the order they are tried.
@@ -460,12 +443,18 @@ fn load_quefile(file: &QuefileSource) -> Interpreter {
 }
 
 /// Collect all tasks from an interpreter's environment.
+///
+/// An alias is a second binding to the same task, so listing every binding
+/// would print the task once per name it answers to. Only the declared name
+/// is kept; the aliases are reported alongside it.
 fn collect_tasks(interp: &Interpreter) -> Vec<(String, Box<que_lang::value::TaskData>)> {
     let all_vars = interp.env.list_vars();
     let mut tasks: Vec<(String, Box<que_lang::value::TaskData>)> = Vec::new();
     for (name, val, _) in all_vars {
         if let Value::Task(t) = val {
-            tasks.push((name.clone(), t.clone()));
+            if *name == t.name {
+                tasks.push((name.clone(), t.clone()));
+            }
         }
     }
     tasks.sort_by(|a, b| a.0.cmp(&b.0));
@@ -512,7 +501,7 @@ fn parse_run_args(
             task_name = Some(arg.clone());
         } else {
             eprintln!("error: unexpected argument: {}", arg);
-            eprintln!("Usage: que run [-f <file>] <task> [-- arg1 arg2 ...]");
+            help::print_usage_hint("run");
             process::exit(EXIT_USAGE);
         }
         idx += 1;
@@ -560,13 +549,20 @@ fn lookup_task(selection: &QuefileSelection, task_name: &str) -> TaskLookup {
 
 /// `que run [-f file | -g] [--help] <task> [-- arg1 arg2 ...]`
 fn cmd_run(args: &[String]) {
-    let (selection, task_name, help, dry_run, force, policy, task_args) = parse_run_args(args);
+    // `que run --help` with no task is a question about the command, and has
+    // to be answered before looking for a Quefile that may not exist.
+    if wants_help(args) && first_operand(args).is_none() {
+        help::print_command_help("run");
+        return;
+    }
+
+    let (selection, task_name, help_flag, dry_run, force, policy, task_args) = parse_run_args(args);
 
     let task_name = match task_name {
         Some(n) => n,
         None => {
             eprintln!("error: no task specified");
-            eprintln!("Usage: que run [-f <file>] <task> [-- arg1 arg2 ...]");
+            help::print_usage_hint("run");
             process::exit(EXIT_USAGE);
         }
     };
@@ -605,7 +601,7 @@ fn cmd_run(args: &[String]) {
     interp.force_run = force;
     interp.permissions = policy;
 
-    if help {
+    if help_flag {
         print_task_help(&source, &task);
         return;
     }
@@ -638,79 +634,108 @@ fn cmd_run(args: &[String]) {
 
 /// Print usage/argument help for a single task.
 fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
+    use colored::Colorize;
+
     let run = source.run_prefix();
-    // Usage line — show both positional and named forms for params
+    let width = help::wrap_width();
+
+    println!("{} {}", "que run".bold(), task.name.bold().cyan());
+    if let Some(desc) = &task.description {
+        for line in help::wrap(desc, width) {
+            println!("{}", line);
+        }
+    }
+
+    println!();
+    println!("{}", help::heading("Usage"));
     if task.params.is_empty() {
-        println!(
-            "Usage: {} {}",
-            run, task.name
-        );
+        println!("  {} {}", run, task.name);
     } else {
-        let param_usage: Vec<String> = task.params.iter().map(|p| {
-            if p.rest {
-                format!("[{}...]", p.name)
-            } else if p.default.is_some() {
-                format!("[{}=<{}>]", p.name, p.name)
-            } else {
-                format!("{}=<{}>", p.name, p.name)
-            }
-        }).collect();
+        // Both call forms are shown because both are accepted, and a user
+        // reading help for an unfamiliar task has no way to guess that.
+        let named: Vec<String> = task
+            .params
+            .iter()
+            .map(|p| {
+                if p.rest {
+                    format!("[{}...]", p.name)
+                } else if p.default.is_some() {
+                    format!("[{}=<{}>]", p.name, p.name)
+                } else {
+                    format!("{}=<{}>", p.name, p.name)
+                }
+            })
+            .collect();
+        let positional: Vec<String> = task
+            .params
+            .iter()
+            .map(|p| {
+                if p.rest {
+                    format!("[{}...]", p.name)
+                } else if p.default.is_some() {
+                    format!("[{}]", p.name)
+                } else {
+                    format!("<{}>", p.name)
+                }
+            })
+            .collect();
+        println!("  {} {} -- {}", run, task.name, named.join(" "));
         println!(
-            "Usage: {} {} -- {}",
-            run, task.name, param_usage.join(" ")
-        );
-        // Also show positional form if params exist
-        let positional_usage: Vec<String> = task.params.iter().map(|p| {
-            if p.rest {
-                format!("[{}...]", p.name)
-            } else if p.default.is_some() {
-                format!("[{}]", p.name)
-            } else {
-                format!("<{}>", p.name)
-            }
-        }).collect();
-        println!(
-            "       {} {} -- {}  (positional)",
-            run, task.name, positional_usage.join(" ")
+            "  {} {} -- {}  {}",
+            run,
+            task.name,
+            positional.join(" "),
+            "(positional)".dimmed()
         );
     }
 
-    // Description
-    if let Some(ref desc) = task.description {
+    if !task.aliases.is_empty() {
         println!();
-        println!("{}", desc);
+        println!("{}", help::heading("Aliases"));
+        println!("  {}", help::term(&task.aliases.join(", ")));
     }
 
-    // Dependencies
     if !task.depends_on.is_empty() {
         println!();
-        println!("Depends on: {}", task.depends_on.join(", "));
+        println!("{}", help::heading("Runs after"));
+        println!("  {}", task.depends_on.join(", "));
     }
 
-    // Parameters table
     if !task.params.is_empty() {
         println!();
-        println!("Arguments:");
-        let max_name = task.params.iter().map(|p| p.name.len()).max().unwrap_or(0);
-        for param in &task.params {
-            let type_str = param
-                .type_ann
-                .as_ref()
-                .map(|t| t.to_string())
-                .unwrap_or_else(|| if param.rest { "List".to_string() } else { "any".to_string() });
-            let opt_str = if param.rest {
-                " [rest]"
-            } else if param.default.is_some() {
-                " [optional]"
+        println!("{}", help::heading("Arguments"));
+        let max_name = task.params.iter().map(|p| p.name.chars().count()).max().unwrap_or(0);
+        let types: Vec<String> = task
+            .params
+            .iter()
+            .map(|p| {
+                p.type_ann
+                    .as_ref()
+                    .map(|t| t.to_string())
+                    .unwrap_or_else(|| if p.rest { "List".to_string() } else { "any".to_string() })
+            })
+            .collect();
+        let max_type = types.iter().map(|t| t.chars().count()).max().unwrap_or(0);
+        for (param, type_str) in task.params.iter().zip(&types) {
+            let note = if param.rest {
+                "rest".to_string()
+            } else if let Some(default) = &param.default {
+                format!(
+                    "optional (default: {})",
+                    Formatter::expr_to_source(default)
+                )
             } else {
-                " [required]"
+                "required".to_string()
             };
             println!(
-                "  {:<width$}  {}{}",
-                param.name,
-                type_str,
-                opt_str,
-                width = max_name
+                "  {}{:name_pad$}  {}{:type_pad$}  {}",
+                help::term(&param.name),
+                "",
+                type_str.dimmed(),
+                "",
+                note,
+                name_pad = max_name - param.name.chars().count(),
+                type_pad = max_type - type_str.chars().count(),
             );
         }
     }
@@ -718,11 +743,16 @@ fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
 
 /// `que tasks [-f file | -g]`
 fn cmd_tasks(args: &[String]) {
+    if wants_help(args) {
+        help::print_command_help("tasks");
+        return;
+    }
+
     let (selection, extra) = resolve_quefile(args);
 
     if !extra.is_empty() {
         eprintln!("error: unexpected arguments: {}", extra.join(" "));
-        eprintln!("Usage: que tasks [-f <file>] [-g]");
+        help::print_usage_hint("tasks");
         process::exit(EXIT_USAGE);
     }
 
@@ -732,7 +762,11 @@ fn cmd_tasks(args: &[String]) {
     if let Some(project) = &selection.project {
         let interp = load_quefile(project);
         let tasks = collect_tasks(&interp);
-        project_names = tasks.iter().map(|(n, _)| n.clone()).collect();
+        // Aliases shadow global names just as declared names do.
+        project_names = tasks
+            .iter()
+            .flat_map(|(n, d)| std::iter::once(n.clone()).chain(d.aliases.iter().cloned()))
+            .collect();
         if tasks.is_empty() {
             println!("No tasks defined in {}", project.path);
         } else {
@@ -774,35 +808,66 @@ fn print_task_section(
     tasks: &[(String, Box<que_lang::value::TaskData>)],
     shadowed_by: &std::collections::HashSet<String>,
 ) {
+    use colored::Colorize;
+
     // Build display strings and find the longest left column for alignment
-    let entries: Vec<(String, String)> = tasks.iter().map(|(name, data)| {
-        let mut left = if data.depends_on.is_empty() {
-            name.clone()
-        } else {
-            format!("{} [{}]", name, data.depends_on.join(", "))
-        };
-        if shadowed_by.contains(name) {
-            left.push_str(" (shadowed)");
-        }
-        let desc = data.description.as_deref().unwrap_or("").to_string();
-        (left, desc)
-    }).collect();
+    let entries: Vec<(String, String, String)> = tasks
+        .iter()
+        .map(|(name, data)| {
+            let mut suffix = String::new();
+            if !data.aliases.is_empty() {
+                suffix.push_str(&format!(" ({})", data.aliases.join(", ")));
+            }
+            if !data.depends_on.is_empty() {
+                suffix.push_str(&format!(" [{}]", data.depends_on.join(", ")));
+            }
+            if shadowed_by.contains(name) {
+                suffix.push_str(" (shadowed)");
+            }
+            let desc = data.description.as_deref().unwrap_or("").to_string();
+            (name.clone(), suffix, desc)
+        })
+        .collect();
 
-    let max_left = entries.iter().map(|(l, _)| l.len()).max().unwrap_or(0);
+    let max_left = entries
+        .iter()
+        .map(|(n, s, _)| n.chars().count() + s.chars().count())
+        .max()
+        .unwrap_or(0);
 
-    println!("{}", title);
+    println!("{}", help::heading(title));
     println!();
-    for (left, desc) in &entries {
+    let indent = 2 + max_left + 4;
+    let desc_width = help::wrap_width().saturating_sub(indent).max(20);
+    for (name, suffix, desc) in &entries {
+        let pad = max_left - name.chars().count() - suffix.chars().count();
         if desc.is_empty() {
-            println!("  {}", left);
-        } else {
-            println!("  {:<width$}  — {}", left, desc, width = max_left);
+            println!("  {}{}", help::term(name), suffix.dimmed());
+            continue;
+        }
+        let lines = help::wrap(desc, desc_width);
+        println!(
+            "  {}{}{:pad$}  {} {}",
+            help::term(name),
+            suffix.dimmed(),
+            "",
+            "—".dimmed(),
+            lines[0],
+            pad = pad
+        );
+        for line in &lines[1..] {
+            println!("{:indent$}{}", "", line, indent = indent);
         }
     }
 }
 
 /// `que fmt [--check] [--diff] [files...]`
 fn cmd_fmt(args: &[String]) {
+    if wants_help(args) {
+        help::print_command_help("fmt");
+        return;
+    }
+
     let mut check_only = false;
     let mut show_diff = false;
     let mut files: Vec<String> = Vec::new();
@@ -811,6 +876,11 @@ fn cmd_fmt(args: &[String]) {
         match arg.as_str() {
             "--check" => check_only = true,
             "--diff" => show_diff = true,
+            other if other.starts_with('-') => {
+                eprintln!("error: unknown option: {}", other);
+                help::print_usage_hint("fmt");
+                process::exit(EXIT_USAGE);
+            }
             _ => files.push(arg.clone()),
         }
     }
@@ -908,6 +978,11 @@ fn cmd_fmt(args: &[String]) {
 fn cmd_install(args: &[String]) {
     use colored::Colorize;
 
+    if wants_help(args) {
+        help::print_command_help("install");
+        return;
+    }
+
     let mut locked = false;
     let mut global = false;
     for arg in args {
@@ -916,7 +991,7 @@ fn cmd_install(args: &[String]) {
             "-g" | "--global" => global = true,
             other => {
                 eprintln!("error: unknown option: {}", other);
-                eprintln!("Usage: que install [--locked] [-g]");
+                help::print_usage_hint("install");
                 process::exit(EXIT_USAGE);
             }
         }
@@ -966,6 +1041,11 @@ fn cmd_test(args: &[String]) {
     use colored::Colorize;
     use que_lang::test_runner;
 
+    if wants_help(args) {
+        help::print_command_help("test");
+        return;
+    }
+
     let mut filter: Option<String> = None;
     let mut roots: Vec<std::path::PathBuf> = Vec::new();
     let mut i = 0;
@@ -981,7 +1061,7 @@ fn cmd_test(args: &[String]) {
             }
             other if other.starts_with('-') => {
                 eprintln!("error: unknown option: {}", other);
-                eprintln!("Usage: que test [--filter <text>] [paths...]");
+                help::print_usage_hint("test");
                 process::exit(EXIT_USAGE);
             }
             other => {
@@ -1073,8 +1153,17 @@ fn cmd_test(args: &[String]) {
 }
 
 fn cmd_lint(args: &[String]) {
-    let mut files: Vec<String> = args.to_vec();
+    if wants_help(args) {
+        help::print_command_help("lint");
+        return;
+    }
 
+    let mut files: Vec<String> = args.to_vec();
+    if let Some(flag) = files.iter().find(|f| f.starts_with('-')) {
+        eprintln!("error: unknown option: {}", flag);
+        help::print_usage_hint("lint");
+        process::exit(EXIT_USAGE);
+    }
     if files.is_empty() {
         files = find_que_files(".");
     }

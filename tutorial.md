@@ -122,6 +122,7 @@ println("hi")   // inline comment
 | `que test` | Run the test suite |
 | `que install` | Fetch dependencies declared in `que.toml` |
 | `que install -g` | Fetch the global Quefile's dependencies |
+| `que help [command]` | Show help, or the options of one command |
 
 ---
 
@@ -5256,13 +5257,16 @@ Use `--help` to see the full argument table for a task:
 
 ```sh
 que run build --help
-# Usage: build [target] [mode]
-#
+# que run build
 # Build for a specific target
 #
-# Arguments:
-#   target  (required)
-#   mode    default: "debug"
+# Usage
+#   que run [-f Quefile] build -- target=<target> [mode=<mode>]
+#   que run [-f Quefile] build -- <target> [mode]  (positional)
+#
+# Arguments
+#   target  any  required
+#   mode    any  optional (default: "debug")
 ```
 
 An argument no parameter can claim is an error, not something quietly dropped:
