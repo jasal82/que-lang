@@ -13,12 +13,6 @@ endif
 syntax match   queShebang       "\%^#!/.*$"
 syntax match   quePragma        "^#!\w\+$"
 
-" ─── Comments ────────────────────────────────────────────────────────────────
-
-syntax match   queDocComment    "///.*$"
-syntax match   queLineComment   "//.*$"
-syntax region  queBlockComment  start="/\*"  end="\*/"
-
 " ─── Keywords ────────────────────────────────────────────────────────────────
 
 " Control flow
@@ -102,11 +96,6 @@ syntax region  queRawInterp
       \ start="!{"   end="}"
       \ contained contains=TOP
 
-" Triple-quoted string
-syntax region  queTripleString
-      \ start='"""'  end='"""'
-      \ contains=queEscape,queInterp,queRawInterp
-
 " Raw strings  r"..."  and  r#"..."#
 syntax region  queRawString   start='r"'   end='"'
 syntax region  queRawHashStr  start='r#"'  end='"#'
@@ -122,6 +111,15 @@ syntax region  queString
       \ start='"'  end='"'  skip='\\"'
       \ contains=queEscape,queInterp,queRawInterp
 
+" Triple-quoted string
+"
+" Defined after queString: where two items can start at the same position Vim
+" gives the later definition priority, and `"""` must not be read as an empty
+" string followed by a stray quote that swallows the rest of the file.
+syntax region  queTripleString
+      \ start='"""'  end='"""'
+      \ contains=queEscape,queInterp,queRawInterp
+
 " Backtick command literal  `...`
 syntax region  queCommand
       \ start='`'  end='`'
@@ -130,6 +128,16 @@ syntax region  queCommand
 " ─── Operators ───────────────────────────────────────────────────────────────
 
 syntax match   queOperator "|>\|=>\|->\|\.\.\.\|\.\.=\|\.\.\|==\|!=\|<=\|>=\|&&\|||\|+=\|-=\|\*=\|/=\|%=\|\*\*\|??\|?\|[-+*/%<>!&|^~=]"
+
+" ─── Comments ────────────────────────────────────────────────────────────────
+"
+" Defined after the operators so the `/` of `//` and `/*` reads as a comment
+" rather than a division sign, and `///` after `//` so a doc comment keeps its
+" own highlight.
+
+syntax match   queLineComment   "//.*$"
+syntax match   queDocComment    "///.*$"
+syntax region  queBlockComment  start="/\*"  end="\*/"
 
 " ─── Built-in functions ──────────────────────────────────────────────────────
 
