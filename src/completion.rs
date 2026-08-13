@@ -211,15 +211,16 @@ impl QueHelper {
             .map(|m| m.name.to_string())
             .collect();
         if let Some(loader) = self.interp.borrow().module_loader.as_ref() {
-            let pkg_dir = loader.package_root().join("que_packages");
-            if let Ok(rd) = std::fs::read_dir(&pkg_dir) {
-                for e in rd.flatten() {
-                    if e.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                        let name = e.file_name().to_string_lossy().into_owned();
-                        // `.sources/` holds git checkouts of `subdir`
-                        // dependencies; it is not importable.
-                        if !name.starts_with('.') {
-                            names.push(name);
+            for pkg_dir in loader.package_dirs() {
+                if let Ok(rd) = std::fs::read_dir(pkg_dir) {
+                    for e in rd.flatten() {
+                        if e.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                            let name = e.file_name().to_string_lossy().into_owned();
+                            // `.sources/` holds git checkouts of `subdir`
+                            // dependencies; it is not importable.
+                            if !name.starts_with('.') {
+                                names.push(name);
+                            }
                         }
                     }
                 }

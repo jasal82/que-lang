@@ -1419,25 +1419,26 @@ impl Interpreter {
             hint("Import with `import std.<name>`; use `help(\"<name>\")` to list its functions.")
         ));
 
-        // List user packages from <package_root>/que_packages/ if any.
+        // List user packages from every directory imports are searched in.
         if let Some(loader) = self.module_loader.as_ref() {
-            let pkg_dir = loader.package_root().join("que_packages");
-            if let Ok(rd) = std::fs::read_dir(&pkg_dir) {
-                let mut names: Vec<String> = rd
-                    .filter_map(|e| e.ok())
-                    .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-                    .map(|e| e.file_name().to_string_lossy().into_owned())
-                    // `.sources/` holds git checkouts of `subdir`
-                    // dependencies; it is not importable.
-                    .filter(|n| !n.starts_with('.'))
-                    .collect();
-                names.sort();
-                if !names.is_empty() {
-                    s.push_str(&format!(
-                        "\n{}\n  {}\n",
-                        section(&format!("Local packages in {}:", pkg_dir.display())),
-                        ident(&names.join(", "))
-                    ));
+            for pkg_dir in loader.package_dirs() {
+                if let Ok(rd) = std::fs::read_dir(pkg_dir) {
+                    let mut names: Vec<String> = rd
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                        .map(|e| e.file_name().to_string_lossy().into_owned())
+                        // `.sources/` holds git checkouts of `subdir`
+                        // dependencies; it is not importable.
+                        .filter(|n| !n.starts_with('.'))
+                        .collect();
+                    names.sort();
+                    if !names.is_empty() {
+                        s.push_str(&format!(
+                            "\n{}\n  {}\n",
+                            section(&format!("Local packages in {}:", pkg_dir.display())),
+                            ident(&names.join(", "))
+                        ));
+                    }
                 }
             }
         }

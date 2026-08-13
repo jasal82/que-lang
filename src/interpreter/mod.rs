@@ -104,6 +104,10 @@ pub struct Interpreter {
     task_cache_dir_override: Option<std::path::PathBuf>,
     /// Module loader: resolves imports, caches loaded modules, detects cycles.
     pub(crate) module_loader: Option<ModuleLoader>,
+    /// Package directories the CLI asked for, applied when the loader is
+    /// built. `(dir, first)`: `first` searches ahead of the script's own
+    /// `que_packages/`, otherwise it is a fallback behind it.
+    package_dir_overrides: Vec<(std::path::PathBuf, bool)>,
     /// Path of the script/module being executed (for resolving local imports).
     script_path: Option<std::path::PathBuf>,
     /// Current source location (updated from each item/statement's span
@@ -252,6 +256,7 @@ impl Interpreter {
             permissions: None,
             secrets: Vec::new(),
             module_loader: None,
+            package_dir_overrides: Vec::new(),
             script_path: None,
             current_span: None,
             current_file: None,
@@ -306,8 +311,29 @@ impl Interpreter {
                 let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
                 crate::module_loader::find_package_root(&cwd)
             };
-            self.module_loader = Some(ModuleLoader::new(root));
+            let mut loader = ModuleLoader::new(root);
+            let overrides = std::mem::take(&mut self.package_dir_overrides);
+            // Reversed, because each prepend goes in front of the last: the
+            // flags stay in the order the user wrote them.
+            for (dir, _) in overrides.iter().filter(|(_, first)| *first).rev() {
+                loader.prepend_package_dir(dir.clone());
+            }
+            for (dir, _) in overrides.iter().filter(|(_, first)| !*first) {
+                loader.push_package_dir(dir.clone());
+            }
+            self.module_loader = Some(loader);
         }
+    }
+
+    /// Search `dir` for external imports ahead of the script's own
+    /// `que_packages/` (`--packages <dir>`).
+    pub fn add_package_dir(&mut self, dir: std::path::PathBuf) {
+        self.package_dir_overrides.push((dir, true));
+    }
+
+    /// Search `dir` for external imports after everything else (`-g`).
+    pub fn add_fallback_package_dir(&mut self, dir: std::path::PathBuf) {
+        self.package_dir_overrides.push((dir, false));
     }
 
     /// Set the module loader (used by module_loader to share cache).

@@ -2222,6 +2222,64 @@ If you have a single-file utility you want to reuse without packaging it,
 put it at the package root (e.g. `<root>/colors.que`) and use a local
 import: `import .colors { Color }`.
 
+### Where a Script Looks for Packages
+
+By default a bare import only sees the `que_packages/` directory beside the
+script's package root. Two flags widen that search, both on the plain
+`que <script.que>` form:
+
+```sh
+que -g script.que                    # also look in the global que_packages/
+que --packages ~/lib/que_packages script.que
+```
+
+| Flag | Where it looks |
+| --- | --- |
+| `--packages <dir>` | `<dir>`, **before** the script's own `que_packages/` |
+| `-g`, `--global` | the global `que_packages/`, **after** everything else |
+
+The first directory that has the package wins, so a project's own copy is
+never shadowed by a machine-wide one; `-g` fills the gaps rather than
+overriding. `--packages` is the other way round — you named that directory
+on purpose, so it is asked first. Both may be repeated, and the order you
+write them is the order they are searched.
+
+`--packages` takes the packages directory *itself* — the one holding
+`<pkg>/mod.que` — not a project directory containing one. A path that does
+not exist is an error rather than a quiet fall back to `./que_packages`,
+because the alternative is running against a package you did not choose.
+
+Both flags also work with no script at all, in which case they start the
+REPL — which is where you would want them most, since trying a package out
+is the reason to reach for an interactive session:
+
+```sh
+que -g                               # REPL that can import global packages
+que --packages ~/lib/que_packages    # REPL that can import those
+```
+
+The global `que_packages/` is the one `que install -g` fills, next to your
+global Quefile (see [Dependencies for the global
+Quefile](#dependencies-for-the-global-quefile)). That is how a personal
+utility script kept outside any project gets at `que_std`:
+
+```que
+// ~/bin/release.que
+import que_std.colors { colored }
+
+println(colored("releasing").green())
+```
+
+```sh
+que install -g          # once
+que -g ~/bin/release.que
+```
+
+Nothing changes for a project checked into version control: without a flag,
+imports resolve against `que.toml`, `que.lock` and `que_packages/` alone.
+That is deliberate — a build that quietly picked up whatever the machine had
+installed is the thing a lockfile exists to prevent.
+
 ### Declaring Dependencies (`que.toml` and `que install`)
 
 `que_packages/` is where packages live; `que.toml` is what says which ones
@@ -5541,9 +5599,12 @@ This holds however the global task was reached — `que run -g deploy`, or
 task still runs in the directory you invoked `que` from; only import
 resolution follows the file.
 
-A project never resolves imports against the global directory. That would
-make a checkout depend on what the machine happens to have installed, which
-is the thing `que.toml` and `que.lock` exist to prevent.
+A project never resolves imports against the global directory on its own.
+That would make a checkout depend on what the machine happens to have
+installed, which is the thing `que.toml` and `que.lock` exist to prevent. A
+loose script that is not part of any project can opt in with `que -g
+script.que` — see [Where a Script Looks for
+Packages](#where-a-script-looks-for-packages).
 
 #### Rooting paths at the project or at the caller
 
@@ -6153,6 +6214,13 @@ Functions (12):
 `help()` (no arguments) also lists any user packages found in
 `<package-root>/que_packages/`, so a fresh REPL gives you an immediate
 overview of what's importable in the current project.
+
+Started with `que -g` or `que --packages <dir>`, the session can import from
+those directories too, and `help()` and tab completion list their packages
+alongside the local ones — see [Where a Script Looks for
+Packages](#where-a-script-looks-for-packages). The directories are fixed when
+the session starts, because a module loader that changed underneath an
+already-imported name would make the same import mean two things.
 
 ### REPL Meta-Commands
 

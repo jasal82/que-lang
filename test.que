@@ -1,0 +1,3 @@
+import que_std.select { select }
+
+select("Test", ["one", "two", "three"])

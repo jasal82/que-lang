@@ -1262,6 +1262,24 @@ palette.lighten(c)
 deploy_tools.deploy(&quot;staging&quot;)</code></pre></div>
 <p>Hyphens in package names are normalized to underscores on disk: <code>import my-tool</code> looks for <code>que_packages/my_tool/</code>.</p>
 <p>If you have a single-file utility you want to reuse without packaging it, put it at the package root (e.g. <code>&lt;root&gt;/colors.que</code>) and use a local import: <code>import .colors { Color }</code>.</p>
+<h3 id="where-a-script-looks-for-packages">Where a Script Looks for Packages<a class="anchor-link" href="#where-a-script-looks-for-packages" aria-label="Permalink">#</a></h3>
+<p>By default a bare import only sees the <code>que_packages/</code> directory beside the script's package root. Two flags widen that search, both on the plain <code>que &lt;script.que&gt;</code> form:</p>
+<div class="code-block"><span class="code-lang">sh</span><pre class="language-bash"><code class="language-bash">que -g script.que                    # also look in the global que_packages/
+que --packages ~/lib/que_packages script.que</code></pre></div>
+<table><thead><tr><th>Flag</th><th>Where it looks</th></tr></thead><tbody><tr><td><code>--packages &lt;dir&gt;</code></td><td><code>&lt;dir&gt;</code>, <strong>before</strong> the script's own <code>que_packages/</code></td></tr><tr><td><code>-g</code>, <code>--global</code></td><td>the global <code>que_packages/</code>, <strong>after</strong> everything else</td></tr></tbody></table>
+<p>The first directory that has the package wins, so a project's own copy is never shadowed by a machine-wide one; <code>-g</code> fills the gaps rather than overriding. <code>--packages</code> is the other way round — you named that directory on purpose, so it is asked first. Both may be repeated, and the order you write them is the order they are searched.</p>
+<p><code>--packages</code> takes the packages directory *itself* — the one holding <code>&lt;pkg&gt;/mod.que</code> — not a project directory containing one. A path that does not exist is an error rather than a quiet fall back to <code>./que_packages</code>, because the alternative is running against a package you did not choose.</p>
+<p>Both flags also work with no script at all, in which case they start the REPL — which is where you would want them most, since trying a package out is the reason to reach for an interactive session:</p>
+<div class="code-block"><span class="code-lang">sh</span><pre class="language-bash"><code class="language-bash">que -g                               # REPL that can import global packages
+que --packages ~/lib/que_packages    # REPL that can import those</code></pre></div>
+<p>The global <code>que_packages/</code> is the one <code>que install -g</code> fills, next to your global Quefile (see <a href="#dependencies-for-the-global-quefile">Dependencies for the global Quefile</a>). That is how a personal utility script kept outside any project gets at <code>que_std</code>:</p>
+<div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">// ~/bin/release.que
+import que_std.colors { colored }
+
+println(colored(&quot;releasing&quot;).green())</code></pre></div>
+<div class="code-block"><span class="code-lang">sh</span><pre class="language-bash"><code class="language-bash">que install -g          # once
+que -g ~/bin/release.que</code></pre></div>
+<p>Nothing changes for a project checked into version control: without a flag, imports resolve against <code>que.toml</code>, <code>que.lock</code> and <code>que_packages/</code> alone. That is deliberate — a build that quietly picked up whatever the machine had installed is the thing a lockfile exists to prevent.</p>
 <h3 id="declaring-dependencies-quetoml-and-que-install">Declaring Dependencies (<code>que.toml</code> and <code>que install</code>)<a class="anchor-link" href="#declaring-dependencies-quetoml-and-que-install" aria-label="Permalink">#</a></h3>
 <p><code>que_packages/</code> is where packages live; <code>que.toml</code> is what says which ones belong there and at what version.</p>
 <div class="code-block"><span class="code-lang">toml</span><pre class="language-toml"><code class="language-toml"># que.toml
@@ -2829,7 +2847,7 @@ task deploy {
     println(colored(&quot;deploying to ${target}&quot;).green())
 }</code></pre></div>
 <p>This holds however the global task was reached — <code>que run -g deploy</code>, or <code>que run deploy</code> falling through from a project that does not define it. The task still runs in the directory you invoked <code>que</code> from; only import resolution follows the file.</p>
-<p>A project never resolves imports against the global directory. That would make a checkout depend on what the machine happens to have installed, which is the thing <code>que.toml</code> and <code>que.lock</code> exist to prevent.</p>
+<p>A project never resolves imports against the global directory on its own. That would make a checkout depend on what the machine happens to have installed, which is the thing <code>que.toml</code> and <code>que.lock</code> exist to prevent. A loose script that is not part of any project can opt in with <code>que -g script.que</code> — see <a href="#where-a-script-looks-for-packages">Where a Script Looks for Packages</a>.</p>
 <h4 id="rooting-paths-at-the-project-or-at-the-caller">Rooting paths at the project or at the caller<a class="anchor-link" href="#rooting-paths-at-the-project-or-at-the-caller" aria-label="Permalink">#</a></h4>
 <p>Since every relative path resolves against the caller's directory, a Quefile usually wants both roots. A <code>fmt</code> task that formats what you are standing in wants the caller's directory; a <code>build</code> task wants the project's <code>build/</code> wherever you ran it from. Name them both at the top of the Quefile and neither is in doubt:</p>
 <div class="code-block"><span class="code-lang">que</span><pre class="language-que"><code class="language-que">import std.fs { write }
@@ -3113,6 +3131,7 @@ Functions (12):
   fs.copy_dir, fs.remove_dir, fs.find, fs.read_lines, fs.write_lines
   fs.transform</code></pre></div>
 <p><code>help()</code> (no arguments) also lists any user packages found in <code>&lt;package-root&gt;/que_packages/</code>, so a fresh REPL gives you an immediate overview of what's importable in the current project.</p>
+<p>Started with <code>que -g</code> or <code>que --packages &lt;dir&gt;</code>, the session can import from those directories too, and <code>help()</code> and tab completion list their packages alongside the local ones — see <a href="#where-a-script-looks-for-packages">Where a Script Looks for Packages</a>. The directories are fixed when the session starts, because a module loader that changed underneath an already-imported name would make the same import mean two things.</p>
 <h3 id="repl-meta-commands">REPL Meta-Commands<a class="anchor-link" href="#repl-meta-commands" aria-label="Permalink">#</a></h3>
 <p>In an interactive <code>que</code> session, any line starting with <code>:</code> or <code>?</code> is a shortcut that's rewritten before being evaluated as Que code:</p>
 <table><thead><tr><th>Shortcut</th><th>Equivalent</th><th>Purpose</th></tr></thead><tbody><tr><td><code>?</code> / <code>:h</code> / <code>:help</code></td><td><code>help()</code></td><td>Show the overview</td></tr><tr><td><code>?expr</code> / <code>:h expr</code></td><td><code>help(expr)</code></td><td>Inspect a value or a name</td></tr><tr><td><code>:t expr</code></td><td><code>typeof(expr)</code></td><td>Print the type name</td></tr><tr><td><code>:m expr</code></td><td><code>expr.methods()</code></td><td>List available methods</td></tr><tr><td><code>:i expr</code></td><td><code>expr.inspect()</code></td><td>Detailed introspection map</td></tr><tr><td><code>:v</code> / <code>:vars</code></td><td><code>reflect.vars()</code></td><td>List user-defined variables</td></tr><tr><td><code>:load file.que</code></td><td>*(reads + evaluates the file)*</td><td>Bring code into the session</td></tr><tr><td><code>:r</code> / <code>:reset</code></td><td>*(fresh interpreter)*</td><td>Clear all bindings</td></tr><tr><td><code>:q</code> / <code>:exit</code></td><td>*(exits the REPL)*</td><td>Same as Ctrl-D</td></tr></tbody></table>

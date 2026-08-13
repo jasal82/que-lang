@@ -59,6 +59,8 @@ fn main() {
             let mut script_pos: Option<usize> = None;
             let mut strict = false;
             let mut dry_run = false;
+            let mut use_global = false;
+            let mut package_dirs: Vec<std::path::PathBuf> = Vec::new();
             let mut policy: Option<que_lang::permissions::Policy> = None;
             let mut i = 0;
             while i < tail.len() {
@@ -70,6 +72,10 @@ fn main() {
                     strict = true;
                 } else if a == "--dry-run" {
                     dry_run = true;
+                } else if a == "-g" || a == "--global" {
+                    use_global = true;
+                } else if let Some(dir) = packages_flag(tail, &mut i) {
+                    package_dirs.push(dir);
                 } else if let Some(spec) = permission_flag(tail, &mut i) {
                     apply_permission(&mut policy, &spec);
                 } else if script_pos.is_none() {
@@ -90,8 +96,23 @@ fn main() {
                 }
                 i += 1;
             }
+            let global_dir = if use_global { Some(global_packages_dir()) } else { None };
             match script_pos {
-                Some(idx) => run_file(&tail[idx], strict, dry_run, policy, script_args),
+                Some(idx) => run_file(
+                    &tail[idx],
+                    strict,
+                    dry_run,
+                    policy,
+                    script_args,
+                    package_dirs,
+                    global_dir,
+                ),
+                // `que -g` and `que --packages <dir>` with nothing to run are
+                // asking for a REPL that can import those packages: trying
+                // one out is exactly when an interactive session is wanted.
+                None if !package_dirs.is_empty() || global_dir.is_some() => {
+                    repl_with_packages(package_dirs, global_dir)
+                }
                 None => {
                     eprintln!("error: no script file given");
                     eprintln!("Run `que help` to see the available commands and options.");
@@ -100,6 +121,44 @@ fn main() {
             }
         }
     }
+}
+
+/// Recognise `--packages <dir>` in an argument loop.
+///
+/// The value is the packages directory itself — the one holding
+/// `<pkg>/mod.que` — not a project directory containing one. Both
+/// `--packages dir` and `--packages=dir` are accepted, matching
+/// `--allow`/`--deny`. A missing or non-directory path aborts: silently
+/// falling back to `./que_packages` would import a different version of a
+/// package than the one asked for.
+fn packages_flag(tail: &[String], i: &mut usize) -> Option<std::path::PathBuf> {
+    let a = &tail[*i];
+    let (flag, inline) = match a.split_once('=') {
+        Some((f, v)) if f == "--packages" => (f, Some(v.to_string())),
+        _ => (a.as_str(), None),
+    };
+    if flag != "--packages" {
+        return None;
+    }
+    let value = match inline {
+        Some(v) => v,
+        None => {
+            *i += 1;
+            match tail.get(*i) {
+                Some(v) => v.clone(),
+                None => {
+                    eprintln!("error: --packages requires a directory, e.g. --packages ~/.que/que_packages");
+                    process::exit(EXIT_USAGE);
+                }
+            }
+        }
+    };
+    let dir = std::path::PathBuf::from(&value);
+    if !dir.is_dir() {
+        eprintln!("error: --packages: not a directory: {}", value);
+        process::exit(EXIT_USAGE);
+    }
+    Some(dir)
 }
 
 /// Recognise `--allow`/`--deny` in an argument loop.
@@ -310,9 +369,38 @@ fn global_package_root() -> Option<std::path::PathBuf> {
         .find(|d| d.join("que.toml").is_file())
 }
 
+/// The `que_packages/` directory `-g` resolves imports against.
+///
+/// `que install -g` fills the one beside the global Quefile, so that is the
+/// first place to look; a global directory that only has packages and no
+/// Quefile still counts. Exiting when there is none keeps `-g` from being a
+/// silent no-op that later fails as a plain "module not found".
+fn global_packages_dir() -> std::path::PathBuf {
+    if let Some(root) = global_package_root() {
+        let dir = root.join("que_packages");
+        if dir.is_dir() {
+            return dir;
+        }
+    }
+    if let Some(dir) = global_quefile_dirs()
+        .into_iter()
+        .map(|d| d.join("que_packages"))
+        .find(|d| d.is_dir())
+    {
+        return dir;
+    }
+    eprintln!("error: -g: no global que_packages/ directory found");
+    let dirs: Vec<String> = global_quefile_dirs()
+        .iter()
+        .map(|d| d.display().to_string())
+        .collect();
+    eprintln!("Looked in: {}", dirs.join(", "));
+    eprintln!("Put a que.toml in one of them and run `que install -g`.");
+    process::exit(EXIT_USAGE);
+}
+
 /// Report that there is nothing to run and exit.
-fn exit_no_quefile(global_only: bool) -> ! {
-    if global_only {
+fn exit_no_quefile(global_only: bool) -> ! {    if global_only {
         eprintln!("error: no global Quefile found");
     } else {
         eprintln!("error: no Quefile found in this directory or any parent, and no global Quefile");
@@ -1262,6 +1350,8 @@ fn run_file(
     dry_run: bool,
     permissions: Option<que_lang::permissions::Policy>,
     script_args: Vec<String>,
+    package_dirs: Vec<std::path::PathBuf>,
+    global_packages: Option<std::path::PathBuf>,
 ) {
     let source = match fs::read_to_string(path) {
         Ok(s) => s,
@@ -1292,6 +1382,12 @@ fn run_file(
     interp.dry_run = dry_run;
     interp.permissions = permissions;
     interp.set_script_args(script_args);
+    for dir in package_dirs {
+        interp.add_package_dir(dir);
+    }
+    if let Some(dir) = global_packages {
+        interp.add_fallback_package_dir(dir);
+    }
     let abs_path = std::fs::canonicalize(path).unwrap_or_else(|_| Path::new(path).to_path_buf());
     interp.set_script_path(abs_path);
     interp.init_module_loader();
@@ -1314,6 +1410,19 @@ fn run_file(
 }
 
 fn repl() {
+    repl_with_packages(Vec::new(), None);
+}
+
+/// The REPL, with extra directories for bare imports to resolve against.
+///
+/// `packages` come from `--packages` and are searched first; `global` comes
+/// from `-g` and is searched last. Both are handed to the interpreter before
+/// the first line is read, because the module loader is built once and a
+/// session that has already imported cannot be told about a new directory.
+fn repl_with_packages(
+    packages: Vec<std::path::PathBuf>,
+    global: Option<std::path::PathBuf>,
+) {
     use colored::Colorize;
 
     println!(
@@ -1329,7 +1438,18 @@ fn repl() {
     );
 
     let interp = std::rc::Rc::new(std::cell::RefCell::new(Interpreter::new()));
-
+    {
+        let mut i = interp.borrow_mut();
+        for dir in packages {
+            i.add_package_dir(dir);
+        }
+        if let Some(dir) = global {
+            i.add_fallback_package_dir(dir);
+        }
+        // Built now so tab completion can list the packages before the
+        // session's first import.
+        i.init_module_loader();
+    }
     let config = Config::builder()
         .completion_type(CompletionType::List)
         .build();

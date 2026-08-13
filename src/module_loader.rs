@@ -28,6 +28,10 @@ pub struct ModuleLoader {
     loading: HashSet<PathBuf>,
     /// The package root directory (contains que.toml, or the script dir).
     package_root: PathBuf,
+    /// Directories searched for external (bare) imports, in order. Each one
+    /// is a packages directory itself: it holds `<pkg>/mod.que`, not another
+    /// `que_packages/`. Defaults to just `<package_root>/que_packages`.
+    package_dirs: Vec<PathBuf>,
     /// Accumulated output from module loading (println in sub-modules).
     /// Only populated when direct_output is false.
     pub pending_output: Vec<String>,
@@ -47,10 +51,12 @@ pub struct ModuleLoader {
 
 impl ModuleLoader {
     pub fn new(package_root: PathBuf) -> Self {
+        let package_dirs = vec![package_root.join("que_packages")];
         Self {
             cache: HashMap::new(),
             loading: HashSet::new(),
             package_root,
+            package_dirs,
             pending_output: Vec::new(),
             direct_output: false,
             pending_struct_defs: HashMap::new(),
@@ -64,6 +70,30 @@ impl ModuleLoader {
     /// Return a reference to the package root.
     pub fn package_root(&self) -> &Path {
         &self.package_root
+    }
+
+    /// The directories external imports are searched in, in order.
+    pub fn package_dirs(&self) -> &[PathBuf] {
+        &self.package_dirs
+    }
+
+    /// Search `dir` before the package root's own `que_packages/`.
+    ///
+    /// Used for `--packages <dir>`: a directory the user named explicitly
+    /// outranks the one that merely happens to sit beside the script.
+    pub fn prepend_package_dir(&mut self, dir: PathBuf) {
+        self.package_dirs.retain(|d| d != &dir);
+        self.package_dirs.insert(0, dir);
+    }
+
+    /// Search `dir` after every directory already registered.
+    ///
+    /// Used for `-g`: the global packages are a fallback for what the
+    /// project does not provide, never an override of it.
+    pub fn push_package_dir(&mut self, dir: PathBuf) {
+        if !self.package_dirs.contains(&dir) {
+            self.package_dirs.push(dir);
+        }
     }
 
     /// Resolve an import declaration to a file path, load the module,
@@ -209,13 +239,30 @@ impl ModuleLoader {
             .flatten()
             .map(|m| m.dependencies.iter().any(|d| d.dir_name == pkg.replace('-', "_")))
             .unwrap_or(false);
+        // With more than one directory in play, "not installed" is ambiguous
+        // unless the search path is spelled out.
+        let searched = if self.package_dirs.len() > 1 {
+            format!(
+                "\nSearched: {}",
+                self.package_dirs
+                    .iter()
+                    .map(|d| d.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        } else {
+            String::new()
+        };
         if declared {
-            format!("\nHint: '{}' is in que.toml but not installed. Run `que install`.", pkg)
+            format!(
+                "\nHint: '{}' is in que.toml but not installed. Run `que install`.{}",
+                pkg, searched
+            )
         } else {
             format!(
                 "\nHint: to use an external package, add it under [dependencies] in que.toml \
-                 and run `que install`:\n  {} = {{ git = \"<url>\", tag = \"<version>\" }}",
-                pkg
+                 and run `que install`:\n  {} = {{ git = \"<url>\", tag = \"<version>\" }}{}",
+                pkg, searched
             )
         }
     }
@@ -234,7 +281,7 @@ impl ModuleLoader {
     /// Resolve an external (bare identifier) import path.
     /// First segment is the package name. Resolution order:
     ///   1. `std` → built-in (currently no std files, returns None)
-    ///   2. `que_packages/<pkg>/` + remaining path
+    ///   2. each directory in `package_dirs` → `<dir>/<pkg>/` + remaining path
     fn resolve_external_path(&self, segments: &[String]) -> Option<PathBuf> {
         if segments.is_empty() {
             return None;
@@ -249,25 +296,31 @@ impl ModuleLoader {
             return None;
         }
 
-        // Look in que_packages/ (with hyphen→underscore normalization)
+        // Look through the package directories (with hyphen→underscore
+        // normalization). The first one holding the package wins, so a
+        // fallback directory can never shadow a nearer one.
         let normalized = pkg_name.replace('-', "_");
-        let pkg_dir = self.package_root.join("que_packages").join(&normalized);
-
-        if !pkg_dir.is_dir() {
-            return None;
-        }
-
-        if segments.len() == 1 {
-            // `import deploy_tools` → `que_packages/deploy_tools/mod.que`
-            try_resolve_file(&pkg_dir.join("mod"))
-        } else {
-            // `import deploy_tools.k8s` → que_packages/deploy_tools/k8s.que
-            let mut dir = pkg_dir;
-            for seg in &segments[1..] {
-                dir = dir.join(seg);
+        for base in &self.package_dirs {
+            let pkg_dir = base.join(&normalized);
+            if !pkg_dir.is_dir() {
+                continue;
             }
-            try_resolve_file(&dir)
+            let found = if segments.len() == 1 {
+                // `import deploy_tools` → `que_packages/deploy_tools/mod.que`
+                try_resolve_file(&pkg_dir.join("mod"))
+            } else {
+                // `import deploy_tools.k8s` → que_packages/deploy_tools/k8s.que
+                let mut dir = pkg_dir;
+                for seg in &segments[1..] {
+                    dir = dir.join(seg);
+                }
+                try_resolve_file(&dir)
+            };
+            if found.is_some() {
+                return found;
+            }
         }
+        None
     }
 
     /// Load a module from a resolved file path, returning its pub exports

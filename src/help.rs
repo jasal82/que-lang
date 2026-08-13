@@ -63,7 +63,7 @@ const ROOT: Page = Page {
     usage: &[
         "que <script.que> [options] [-- args...]",
         "que <command> [options]",
-        "que                              (starts the interactive REPL)",
+        "que [-g] [--packages <dir>]      (starts the interactive REPL)",
     ],
     sections: &[
         Section {
@@ -85,11 +85,17 @@ const ROOT: Page = Page {
             rows: &[
                 ("--strict", "Enforce type annotations at runtime"),
                 ("--dry-run", "Print effects instead of performing them"),
+                ("-g, --global", "Also import from the global que_packages/"),
+                ("--packages <dir>", "Import from <dir> before ./que_packages"),
                 ("--allow <cap>[=<list>]", "Grant a capability (see Sandbox)"),
                 ("--deny <cap>", "Deny a capability (see Sandbox)"),
                 ("-- <args...>", "Arguments for the script, readable with args()"),
             ],
-            notes: &[],
+            notes: &[
+                "Bare imports are searched in --packages directories, then que_packages/ beside the nearest que.toml, then the global one with -g.",
+                "--packages takes the packages directory itself, the one holding <pkg>/mod.que.",
+                "With no script to run, -g and --packages start a REPL that can import those packages.",
+            ],
         },
         Section {
             title: "Global options",
@@ -226,6 +232,7 @@ const PAGES: &[Page] = &[
                 rows: &[],
                 notes: &[
                     "Packages are resolved from the nearest ancestor directory holding a que.toml and unpacked into que_packages/ beside it.",
+                    "With -g that directory is the global one, and scripts reach those packages with `que -g <script.que>`.",
                     "Use --locked in CI: it verifies que.lock is current instead of updating it.",
                 ],
             },

@@ -136,6 +136,30 @@ impl Fixture {
             .output()
             .expect("failed to run que")
     }
+
+    /// Run `que` from `dir` with `input` on stdin, for the REPL.
+    fn que_repl(&self, dir: &str, args: &[&str], input: &str) -> std::process::Output {
+        use std::io::Write;
+        let mut child = Command::new(env!("CARGO_BIN_EXE_que"))
+            .args(args)
+            .current_dir(self.root.join(dir))
+            .env("NO_COLOR", "1")
+            .env("HOME", self.root.join("home"))
+            .env_remove("QUE_HOME")
+            .env_remove("XDG_CONFIG_HOME")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("failed to run que");
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+        child.wait_with_output().expect("failed to run que")
+    }
 }
 
 impl Drop for Fixture {
@@ -278,6 +302,126 @@ fn a_global_quefile_can_import_packages_installed_with_install_g() {
     let output = fixture.que("project/sub", &["run", "hello"]);
     assert!(output.status.success(), "{:?}", output);
     assert!(stdout(&output).contains("hi global"), "{}", stdout(&output));
+}
+
+// ── Package directories for plain scripts ───────────────────────────
+
+#[test]
+fn a_script_reaches_globally_installed_packages_with_g() {
+    // Without the flag a bare import only sees ./que_packages, so a package
+    // installed once for the whole machine is unreachable from a loose
+    // script that has no project of its own.
+    let fixture = Fixture::new("script-global", None, None);
+    let pkg = fixture.root.join("home/.que/que_packages/shared");
+    fs::create_dir_all(&pkg).unwrap();
+    fs::write(pkg.join("mod.que"), "pub fn greet(who) { \"hi \" + who }").unwrap();
+    fs::write(
+        fixture.root.join("project/s.que"),
+        "import shared { greet }\nprintln(greet(\"global\"))\n",
+    )
+    .unwrap();
+
+    let plain = fixture.que("project", &["s.que"]);
+    assert!(!plain.status.success(), "{:?}", plain);
+    assert!(
+        String::from_utf8_lossy(&plain.stderr).contains("module not found"),
+        "{}",
+        String::from_utf8_lossy(&plain.stderr)
+    );
+
+    for flag in ["-g", "--global"] {
+        let output = fixture.que("project", &[flag, "s.que"]);
+        assert!(output.status.success(), "{flag}: {:?}", output);
+        assert!(stdout(&output).contains("hi global"), "{}", stdout(&output));
+    }
+}
+
+#[test]
+fn packages_points_a_script_at_another_packages_directory() {
+    let fixture = Fixture::new("script-packages", None, None);
+    let pkg = fixture.root.join("elsewhere/shared");
+    fs::create_dir_all(&pkg).unwrap();
+    fs::write(pkg.join("mod.que"), "pub fn greet(who) { \"far \" + who }").unwrap();
+    fs::write(
+        fixture.root.join("project/s.que"),
+        "import shared { greet }\nprintln(greet(\"away\"))\n",
+    )
+    .unwrap();
+    let dir = fixture.root.join("elsewhere");
+
+    // Both spellings of the value.
+    for arg in [
+        vec!["--packages".to_string(), dir.display().to_string()],
+        vec![format!("--packages={}", dir.display())],
+    ] {
+        let mut args: Vec<&str> = arg.iter().map(|s| s.as_str()).collect();
+        args.push("s.que");
+        let output = fixture.que("project", &args);
+        assert!(output.status.success(), "{args:?}: {:?}", output);
+        assert!(stdout(&output).contains("far away"), "{}", stdout(&output));
+    }
+
+    // A directory named by hand that is not there is a mistake worth
+    // reporting, not a quiet fall back to ./que_packages.
+    let missing = fixture.que("project", &["--packages", "/nope/que_packages", "s.que"]);
+    assert!(!missing.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing.stderr).contains("not a directory"),
+        "{}",
+        String::from_utf8_lossy(&missing.stderr)
+    );
+}
+
+#[test]
+fn the_flags_start_a_repl_when_there_is_no_script_to_run() {
+    // Trying a package out is the reason to open a REPL at all, so `que -g`
+    // with nothing after it is a session, not a usage error.
+    let fixture = Fixture::new("repl-global", None, None);
+    let pkg = fixture.root.join("home/.que/que_packages/shared");
+    fs::create_dir_all(&pkg).unwrap();
+    fs::write(pkg.join("mod.que"), "pub fn greet(who) { \"hi \" + who }").unwrap();
+
+    let session = "import shared { greet }\nprintln(greet(\"repl\"))\n";
+
+    let output = fixture.que_repl("project", &["-g"], session);
+    assert!(output.status.success(), "{:?}", output);
+    assert!(stdout(&output).contains("hi repl"), "{}", stdout(&output));
+
+    let dir = fixture.root.join("home/.que/que_packages").display().to_string();
+    let with_dir = fixture.que_repl("project", &["--packages", &dir], session);
+    assert!(with_dir.status.success(), "{:?}", with_dir);
+    assert!(stdout(&with_dir).contains("hi repl"), "{}", stdout(&with_dir));
+
+    // A plain REPL still sees only the local packages.
+    let plain = fixture.que_repl("project", &[], session);
+    assert!(
+        String::from_utf8_lossy(&plain.stderr).contains("module not found"),
+        "{}",
+        String::from_utf8_lossy(&plain.stderr)
+    );
+}
+
+#[test]
+fn a_local_package_wins_over_the_global_one_of_the_same_name() {    // Otherwise a machine-wide install would silently change what a project
+    // that vendored its own copy runs.
+    let fixture = Fixture::new("script-shadow", None, None);
+    for (dir, body) in [
+        ("home/.que/que_packages/shared", "\"global\""),
+        ("project/que_packages/shared", "\"local\""),
+    ] {
+        let pkg = fixture.root.join(dir);
+        fs::create_dir_all(&pkg).unwrap();
+        fs::write(pkg.join("mod.que"), format!("pub fn who() {{ {body} }}")).unwrap();
+    }
+    fs::write(
+        fixture.root.join("project/s.que"),
+        "import shared { who }\nprintln(who())\n",
+    )
+    .unwrap();
+
+    let output = fixture.que("project", &["-g", "s.que"]);
+    assert!(output.status.success(), "{:?}", output);
+    assert!(stdout(&output).contains("local"), "{}", stdout(&output));
 }
 
 // ── Task parameters: the rest parameter ──────────────────────────────
