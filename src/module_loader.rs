@@ -13,10 +13,60 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{ImportDecl, Item, Module, Pattern};
-use crate::error::{QueError, ErrorKind, Signal};
+use crate::error::{ErrorKind, QueError, Signal};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
-use crate::value::{Value, FieldDef, MethodDef};
+use crate::value::{FieldDef, MethodDef, Value};
+
+/// What a module's sub-interpreter takes over from the importing one.
+///
+/// A module's top level runs when it is first imported, so it must be held
+/// to the same policy and limits as the code that imported it; otherwise
+/// `import .helper` would be a way out of the sandbox.
+#[derive(Debug, Clone, Default)]
+pub struct Inherited {
+    pub(crate) permissions: Option<crate::permissions::Policy>,
+    pub(crate) host: crate::embed::HostContext,
+}
+
+/// Where modules come from in embedded mode, besides the search paths.
+#[derive(Debug, Clone, Default)]
+struct EmbeddedSources {
+    /// `kit/mod.que` → source text, under `crate::embed::EMBEDDED_ROOT`.
+    files: std::sync::Arc<BTreeMap<String, String>>,
+}
+
+impl EmbeddedSources {
+    /// The source for a virtual path, if `path` is one.
+    fn get(&self, path: &Path) -> Option<&String> {
+        let rel = path.strip_prefix(crate::embed::EMBEDDED_ROOT).ok()?;
+        let key = rel
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/");
+        self.files.get(&key)
+    }
+
+    fn has_dir(&self, path: &Path) -> bool {
+        let Ok(rel) = path.strip_prefix(crate::embed::EMBEDDED_ROOT) else {
+            return false;
+        };
+        let prefix = format!(
+            "{}/",
+            rel.components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/")
+        );
+        self.files.keys().any(|k| k.starts_with(&prefix))
+    }
+}
+
+/// Whether `path` names a module given as source text.
+fn is_virtual(path: &Path) -> bool {
+    path.starts_with(crate::embed::EMBEDDED_ROOT)
+}
 
 /// Shared module cache and loading state. Passed through all interpreter
 /// instances so that each module is loaded and executed exactly once.
@@ -47,6 +97,13 @@ pub struct ModuleLoader {
     pub pending_enum_defs: HashMap<String, Vec<(String, Vec<String>)>>,
     /// Reverse mapping for imported enum variants: variant_name -> enum_name.
     pub pending_enum_variant_to_enum: HashMap<String, String>,
+    /// Policy and host context for module sub-interpreters, set by the
+    /// importing interpreter before each load.
+    pub inherit: Inherited,
+    /// Embedded mode: only the explicit search paths and embedded sources
+    /// are consulted, and nothing reads `que.toml`.
+    explicit: bool,
+    embedded: EmbeddedSources,
 }
 
 impl ModuleLoader {
@@ -64,6 +121,46 @@ impl ModuleLoader {
             pending_trait_impls: HashMap::new(),
             pending_enum_defs: HashMap::new(),
             pending_enum_variant_to_enum: HashMap::new(),
+            inherit: Inherited::default(),
+            explicit: false,
+            embedded: EmbeddedSources::default(),
+        }
+    }
+
+    /// A loader for embedded use: external imports are searched for in
+    /// the embedded sources and then in `search_paths`, nowhere else.
+    pub fn embedded(
+        search_paths: Vec<PathBuf>,
+        sources: std::sync::Arc<BTreeMap<String, String>>,
+    ) -> Self {
+        let mut loader = ModuleLoader::new(PathBuf::from(crate::embed::EMBEDDED_ROOT));
+        let mut dirs = vec![PathBuf::from(crate::embed::EMBEDDED_ROOT)];
+        dirs.extend(search_paths);
+        loader.package_dirs = dirs;
+        loader.explicit = true;
+        loader.embedded = EmbeddedSources { files: sources };
+        loader
+    }
+
+    /// `<base>.que`, then `<base>/mod.que`, on disk or among the embedded
+    /// sources.
+    fn try_resolve(&self, base: &Path) -> Option<PathBuf> {
+        if !is_virtual(base) {
+            return try_resolve_file(base);
+        }
+        let with_ext = base.with_extension("que");
+        if self.embedded.get(&with_ext).is_some() {
+            return Some(with_ext);
+        }
+        let mod_file = base.join("mod.que");
+        self.embedded.get(&mod_file).map(|_| mod_file)
+    }
+
+    fn is_dir(&self, path: &Path) -> bool {
+        if is_virtual(path) {
+            self.embedded.has_dir(path)
+        } else {
+            path.is_dir()
         }
     }
 
@@ -234,6 +331,17 @@ impl ModuleLoader {
     /// already declares just has not been fetched, while one it does not
     /// declare has to be declared first.
     fn external_import_hint(&self, pkg: &str) -> String {
+        if self.explicit {
+            let searched: Vec<String> = self
+                .package_dirs
+                .iter()
+                .map(|d| d.display().to_string())
+                .collect();
+            return format!(
+                "\nSearched: {} (embedded mode only searches the configured paths)",
+                searched.join(", ")
+            );
+        }
         let declared = crate::manifest::load(&self.package_root)
             .ok()
             .flatten()
@@ -275,7 +383,7 @@ impl ModuleLoader {
         for seg in segments {
             dir = dir.join(seg);
         }
-        try_resolve_file(&dir)
+        self.try_resolve(&dir)
     }
 
     /// Resolve an external (bare identifier) import path.
@@ -302,19 +410,19 @@ impl ModuleLoader {
         let normalized = pkg_name.replace('-', "_");
         for base in &self.package_dirs {
             let pkg_dir = base.join(&normalized);
-            if !pkg_dir.is_dir() {
+            if !self.is_dir(&pkg_dir) {
                 continue;
             }
             let found = if segments.len() == 1 {
                 // `import deploy_tools` → `que_packages/deploy_tools/mod.que`
-                try_resolve_file(&pkg_dir.join("mod"))
+                self.try_resolve(&pkg_dir.join("mod"))
             } else {
                 // `import deploy_tools.k8s` → que_packages/deploy_tools/k8s.que
                 let mut dir = pkg_dir;
                 for seg in &segments[1..] {
                     dir = dir.join(seg);
                 }
-                try_resolve_file(&dir)
+                self.try_resolve(&dir)
             };
             if found.is_some() {
                 return found;
@@ -326,12 +434,16 @@ impl ModuleLoader {
     /// Load a module from a resolved file path, returning its pub exports
     /// as a `Value::Map`. Uses the cache to ensure single evaluation.
     fn load_module_file(&mut self, path: &Path) -> Result<Value, QueError> {
-        let abs = std::fs::canonicalize(path).map_err(|e| {
-            QueError::new(
-                ErrorKind::IoError,
-                format!("cannot resolve module path '{}': {}", path.display(), e),
-            )
-        })?;
+        let abs = if is_virtual(path) {
+            path.to_path_buf()
+        } else {
+            std::fs::canonicalize(path).map_err(|e| {
+                QueError::new(
+                    ErrorKind::IoError,
+                    format!("cannot resolve module path '{}': {}", path.display(), e),
+                )
+            })?
+        };
 
         // Return cached result if already loaded
         if let Some(cached) = self.cache.get(&abs) {
@@ -359,12 +471,31 @@ impl ModuleLoader {
         self.loading.insert(abs.clone());
 
         // Read source
-        let source = std::fs::read_to_string(&abs).map_err(|e| {
-            QueError::new(
-                ErrorKind::IoError,
-                format!("cannot read module '{}': {}", abs.display(), e),
-            )
-        })?;
+        let source = if is_virtual(&abs) {
+            self.embedded.get(&abs).cloned().ok_or_else(|| {
+                QueError::new(
+                    ErrorKind::IoError,
+                    format!("no embedded module '{}'", abs.display()),
+                )
+            })?
+        } else {
+            let read = std::fs::read_to_string(&abs);
+            // The module's contents are an input of whatever imports it.
+            if let Some(tracer) = &self.inherit.host.tracer {
+                tracer.record(&crate::embed::trace::event(
+                    crate::embed::AccessKind::ModuleLoad,
+                    "import",
+                    &abs.to_string_lossy(),
+                    read.as_ref().map(|_| ()).map_err(|e| e.to_string()),
+                ));
+            }
+            read.map_err(|e| {
+                QueError::new(
+                    ErrorKind::IoError,
+                    format!("cannot read module '{}': {}", abs.display(), e),
+                )
+            })?
+        };
 
         // Lex & parse
         let mut lexer = Lexer::new(&source);
@@ -388,6 +519,8 @@ impl ModuleLoader {
 
         let mut interp = Interpreter::new();
         interp.direct_output = self.direct_output;
+        interp.permissions = self.inherit.permissions.clone();
+        interp.host = self.inherit.host.clone();
         // Share the module loader (pass self in)
         interp.set_script_path(module_path.to_path_buf());
 

@@ -211,6 +211,10 @@ pub enum Signal {
     /// SIGINT or SIGTERM arrived. Unwinds like `Exit`, so every `defer` on the
     /// stack still runs, but is deliberately **not** catchable by `try`/`catch`:
     /// a script must not be able to swallow Ctrl-C.
+    ///
+    /// Embedded interpreters also use it for cancellation and time limits,
+    /// with negative numbers no real signal has (see
+    /// `crate::embed::limits`): the unwinding semantics are exactly the same.
     Interrupted(i32),
 }
 

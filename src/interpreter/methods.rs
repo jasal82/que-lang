@@ -501,6 +501,12 @@ impl Interpreter {
                         self.check_permission(crate::permissions::Capability::Env, key)?;
                     }
                 }
+                if matches!(method, "set" | "unset" | "load_file" | "loadFile") {
+                    self.host.refuse_global(&format!(
+                        "env.{}() (changing environment variables)",
+                        method
+                    ))?;
+                }
                 match method {
                     "get" => {
                         // env.get(KEY) -> String | null
@@ -2278,7 +2284,67 @@ impl Interpreter {
         }
     }
 
-    fn path_method(&mut self, p: &str, method: &str, _args: &[Value]) -> IResult {
+    fn path_method(&mut self, p: &str, method: &str, args: &[Value]) -> IResult {
+        // Copying or moving reads the source, and a move removes it. Checking
+        // only the destination would let a read-scoped policy be escaped by
+        // copying a file into a writable directory.
+        if self.permissions.is_some() && matches!(method, "copy_to" | "move_to") {
+            self.check_permission(crate::permissions::Capability::Read, p)?;
+            if method == "move_to" {
+                self.check_permission(crate::permissions::Capability::Write, p)?;
+            }
+        }
+        let result = self.path_method_inner(p, method, args);
+        if self.host.tracer.is_some() {
+            self.trace_path_method(p, method, args, &result);
+        }
+        result
+    }
+
+    /// Report what a `Path` method touched to the embedder's tracer.
+    fn trace_path_method(&self, p: &str, method: &str, args: &[Value], result: &IResult) {
+        use crate::embed::AccessKind::*;
+        let op = format!("Path.{}", method);
+        let outcome = super::std_modules::outcome_of(result);
+        let dest = || {
+            args.first()
+                .and_then(|d| path_arg(d, method).ok())
+                .map(|d| resolve_into_dir(std::path::Path::new(p), d))
+        };
+        match method {
+            "exists" | "is_file" | "is_dir" | "is_link" => self.trace(Exists, &op, p, outcome),
+            "read" | "size" | "modified" => self.trace(Read, &op, p, outcome),
+            "ls" => self.trace(ListDir, &op, p, outcome),
+            "walk" | "files" | "dirs" => self.trace(Walk, &op, p, outcome),
+            "glob" => {
+                if let Ok(pattern) = arg_str(args, 0, "glob") {
+                    let full = format!("{}/{}", p.trim_end_matches('/'), pattern);
+                    self.trace(Glob, &op, &full, outcome);
+                }
+            }
+            "write_text" | "append_text" | "symlink" => self.trace(Write, &op, p, outcome),
+            "mkdir" => self.trace(CreateDir, &op, p, outcome),
+            "delete" => self.trace(Remove, &op, p, outcome),
+            "copy_to" | "move_to" => {
+                let source_kind = if std::path::Path::new(p).is_dir() {
+                    Walk
+                } else {
+                    Read
+                };
+                self.trace(source_kind, &op, p, outcome.clone());
+                if method == "move_to" {
+                    self.trace(Remove, &op, p, outcome.clone());
+                }
+                if let Some(dest) = dest() {
+                    self.trace(Write, &op, &dest, outcome);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[allow(clippy::result_large_err)] // `Signal` is the interpreter's error type (see `IResult`)
+    fn path_method_inner(&mut self, p: &str, method: &str, _args: &[Value]) -> IResult {
         let path = std::path::Path::new(p);
         // Path methods are the other half of the filesystem surface (std.fs
         // is the first). Checking at dispatch keeps both halves enforced from
@@ -2886,6 +2952,31 @@ impl Interpreter {
     // ── Glob methods ─────────────────────────────────────────────────
 
     fn glob_method(&mut self, pattern: &str, method: &str, args: &[Value]) -> IResult {
+        // Expanding a glob lists directories, so it is a read of the
+        // pattern's tree (grants compare by path prefix, which a pattern
+        // shares with every path it can match).
+        let expands = matches!(
+            method,
+            "expand" | "first" | "count" | "any" | "copy_to" | "move_to"
+        );
+        if expands {
+            self.check_permission(crate::permissions::Capability::Read, pattern)?;
+        }
+        let result = self.glob_method_inner(pattern, method, args);
+        if expands && self.host.tracer.is_some() {
+            let outcome = super::std_modules::outcome_of(&result);
+            self.trace(
+                crate::embed::AccessKind::Glob,
+                &format!("Glob.{}", method),
+                pattern,
+                outcome,
+            );
+        }
+        result
+    }
+
+    #[allow(clippy::result_large_err)] // `Signal` is the interpreter's error type (see `IResult`)
+    fn glob_method_inner(&mut self, pattern: &str, method: &str, args: &[Value]) -> IResult {
         match method {
             "test" => {
                 // Test if a path matches this glob pattern
@@ -2974,6 +3065,13 @@ impl Interpreter {
                     crate::permissions::Capability::Write,
                     &target.to_string_lossy(),
                 )?;
+                // A move removes its source.
+                if moving {
+                    self.check_permission(
+                        crate::permissions::Capability::Write,
+                        &src.to_string_lossy(),
+                    )?;
+                }
             }
             if self.dry_run_skip(format!(
                 "{} {} -> {}",
@@ -3003,6 +3101,22 @@ impl Interpreter {
                     std::fs::copy(&src, &target).map(|_| ())
                 }
             });
+            let op = format!("Glob.{}", method);
+            let outcome = result.as_ref().map(|_| ()).map_err(|e| e.to_string());
+            self.trace(
+                crate::embed::AccessKind::Write,
+                &op,
+                &target.to_string_lossy(),
+                outcome.clone(),
+            );
+            if moving {
+                self.trace(
+                    crate::embed::AccessKind::Remove,
+                    &op,
+                    &src.to_string_lossy(),
+                    outcome,
+                );
+            }
             if let Err(e) = result {
                 return Ok(Value::Err(Box::new(Value::String(format!(
                     "{}: {}",
@@ -3376,6 +3490,22 @@ impl Interpreter {
         }
     }
 
+    /// Check a command against the exec policy and report it to the tracer.
+    #[allow(clippy::result_large_err)] // `Signal` is the interpreter's error type (see `IResult`)
+    pub(crate) fn check_command(&self, parts: &[CmdPart]) -> Result<(), Signal> {
+        let display = render_cmd_display(parts);
+        if let Some(policy) = &self.permissions {
+            let shape = crate::permissions::CommandShape::analyse(parts.iter().map(|p| match p {
+                CmdPart::Literal(s) | CmdPart::Raw(s) => (s.as_str(), true),
+                CmdPart::Interpolated(s) | CmdPart::Secret(s) => (s.as_str(), false),
+            }));
+            policy.check_command(&display, &shape).map_err(|denied| {
+                Signal::Error(QueError::new(ErrorKind::Runtime, denied.message()))
+            })?;
+        }
+        self.trace(crate::embed::AccessKind::Exec, "command", &display, Ok(()));
+        Ok(())
+    }
 
     pub(crate) fn run_cmd_parts(&mut self, parts: &[CmdPart], mods: &CmdModifiers) -> IResult {
         if !mods.stdin_from.is_empty() {
@@ -3386,10 +3516,7 @@ impl Interpreter {
         // Every subprocess in the language funnels through here or through
         // `run_pipeline`/`eval_spawn`, which is why exec is the capability
         // that can be enforced completely.
-        self.check_permission(
-            crate::permissions::Capability::Exec,
-            &render_cmd_display(parts),
-        )?;
+        self.check_command(parts)?;
 
         if self.dry_run_skip(render_cmd_display(parts)) {
             return Ok(Value::ProcessResult {
@@ -3434,7 +3561,9 @@ impl Interpreter {
         let has_fwd_stdout = mods.forward_stdout.is_some();
         let has_fwd_stderr = mods.forward_stderr.is_some();
 
-        if has_stdin || has_fwd_stdout || has_fwd_stderr {
+        // Waiting on `output()` can't be interrupted, so a run with a time
+        // limit or a cancellation token takes the polling path.
+        if has_stdin || has_fwd_stdout || has_fwd_stderr || self.host.limits.is_active() {
             cmd.stdin(if has_stdin { std::process::Stdio::piped() } else { std::process::Stdio::null() });
             cmd.stdout(std::process::Stdio::piped());
             cmd.stderr(std::process::Stdio::piped());
@@ -3451,7 +3580,7 @@ impl Interpreter {
                 }
             }
 
-            let (exit_code, stdout, stderr) = capture_child(child, mods)?;
+            let (exit_code, stdout, stderr) = capture_child(child, mods, &self.host.limits)?;
             Ok(Value::ProcessResult { exit_code, stdout, stderr })
         } else {
             // Simple path: no stdin data, no forwarding.
@@ -3480,15 +3609,9 @@ impl Interpreter {
 
         // Each stage is its own process, so each stage is its own check.
         for stage in &mods.stdin_from {
-            self.check_permission(
-                crate::permissions::Capability::Exec,
-                &render_cmd_display(&stage.parts),
-            )?;
+            self.check_command(&stage.parts)?;
         }
-        self.check_permission(
-            crate::permissions::Capability::Exec,
-            &render_cmd_display(last_parts),
-        )?;
+        self.check_command(last_parts)?;
 
         if self.dry_run {
             let mut text = String::new();
@@ -3561,7 +3684,17 @@ impl Interpreter {
                 format!("failed to execute command: {}", e),
             ))
         })?;
-        let (exit_code, stdout, stderr) = capture_child(child, mods)?;
+        let (exit_code, stdout, stderr) = match capture_child(child, mods, &self.host.limits) {
+            Ok(captured) => captured,
+            Err(signal) => {
+                // Don't leave the upstream stages running after a cancel.
+                for (_, mut child) in upstream {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
+                return Err(signal);
+            }
+        };
 
         // Report the leftmost failure: it is the one that caused the rest.
         for (text, mut child) in upstream {
@@ -3891,6 +4024,7 @@ fn build_shell_command(text: &str, mods: &CmdModifiers) -> std::process::Command
 fn capture_child(
     mut child: std::process::Child,
     mods: &CmdModifiers,
+    limits: &crate::embed::limits::Limits,
 ) -> Result<(i64, String, String), Signal> {
     use std::sync::{Arc, Mutex};
 
@@ -3904,12 +4038,7 @@ fn capture_child(
         drain(err, Arc::clone(&stderr_buf), mods.forward_stderr.as_deref().cloned(), mods.silent)
     });
 
-    let status = child.wait().map_err(|e| {
-        Signal::Error(QueError::new(
-            ErrorKind::CommandFailed,
-            format!("failed to wait for command: {}", e),
-        ))
-    })?;
+    let status = wait_child(&mut child, limits)?;
     if let Some(t) = stdout_thread {
         let _ = t.join();
     }
@@ -3929,6 +4058,39 @@ fn capture_child(
     };
 
     Ok((status.code().unwrap_or(-1) as i64, stdout, stderr))
+}
+
+/// Wait for a child, killing it if the run is cancelled or out of time.
+///
+/// Without limits this is a plain blocking `wait`. With them it polls, so a
+/// hung tool can't hold the interpreter past its deadline. On a cancel the
+/// reader threads are left to finish on their own: a grandchild that kept
+/// the pipes open must not block the unwind.
+#[allow(clippy::result_large_err)] // `Signal` is the interpreter's error type (see `IResult`)
+fn wait_child(
+    child: &mut std::process::Child,
+    limits: &crate::embed::limits::Limits,
+) -> Result<std::process::ExitStatus, Signal> {
+    let wait_err = |e: std::io::Error| {
+        Signal::Error(QueError::new(
+            ErrorKind::CommandFailed,
+            format!("failed to wait for command: {}", e),
+        ))
+    };
+    if !limits.is_active() {
+        return child.wait().map_err(wait_err);
+    }
+    loop {
+        if let Some(status) = child.try_wait().map_err(wait_err)? {
+            return Ok(status);
+        }
+        if let Some(reason) = limits.exceeded() {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(reason.into_signal());
+        }
+        std::thread::sleep(crate::embed::limits::POLL_INTERVAL);
+    }
 }
 
 /// Read one child stream to completion on its own thread.
@@ -4119,6 +4281,16 @@ enum WalkFilter {
     All,
     FilesOnly,
     DirsOnly,
+}
+
+/// Every file and directory below `dir`, as `Path.walk()` sees them
+/// (unsorted). Shared with access tracing so a recorded walk is re-checked
+/// with the same rules.
+pub(crate) fn walk_all(dir: &std::path::Path, results: &mut Vec<String>) -> Result<(), String> {
+    walk_dir_recursive(dir, results, WalkFilter::All).map_err(|signal| match signal {
+        Signal::Error(e) => e.message,
+        other => format!("{:?}", other),
+    })
 }
 
 fn walk_dir_recursive(

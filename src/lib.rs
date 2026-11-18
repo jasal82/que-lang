@@ -2,6 +2,7 @@ pub mod ast;
 pub mod completion;
 pub mod config;
 pub mod docs;
+pub mod embed;
 pub mod environment;
 pub mod error;
 pub mod formatter;
@@ -19,3 +20,5 @@ pub mod resolver;
 pub mod test_runner;
 pub mod token;
 pub mod value;
+
+pub use embed::{language_version, LANGUAGE_VERSION};

@@ -1810,10 +1810,7 @@ impl Interpreter {
                     )));
                 }
                 let cmd_str = crate::interpreter::methods::render_cmd(&parts);
-                self.check_permission(
-                    crate::permissions::Capability::Exec,
-                    &crate::interpreter::methods::render_cmd_display(&parts),
-                )?;
+                self.check_command(&parts)?;
 
                 // A `spawn` must hand back a real handle: the script will
                 // `.wait()` or `.kill()` it. In a dry run we start the shell's

@@ -84,6 +84,18 @@ impl Interpreter {
     }
 
     pub(crate) fn call_builtin(&mut self, name: &str, args: Vec<Value>) -> IResult {
+        // Native functions first: their names (`jbuild.run`) look like std
+        // functions, and the std table would classify them as unknown and
+        // deny them. A native is the embedder's own code; it checks the
+        // policy itself through its `NativeContext`.
+        if let Some(native) = self.host.natives.as_ref().and_then(|r| r.get(name)) {
+            let mut ctx = crate::embed::NativeContext {
+                interp: self,
+                function: name,
+            };
+            return native(&mut ctx, args).map_err(crate::embed::NativeError::into_signal);
+        }
+
         // Try std module dispatch first (all std builtins use "module.func" format)
         if let Some(result) = self.call_std_builtin(name, &args) {
             return result;
@@ -93,6 +105,28 @@ impl Interpreter {
             self.check_global_builtin(name, &args)?;
         }
 
+        // `open` is the one global builtin that touches a file by itself.
+        let traced_open = match (name, &self.host.tracer) {
+            ("open", Some(_)) => args.first().map(|p| {
+                let write = matches!(args.get(1), Some(Value::String(m)) if m != "r");
+                (p.display_string(), write)
+            }),
+            _ => None,
+        };
+        let result = self.call_global_builtin(name, args);
+        if let Some((path, write)) = traced_open {
+            let kind = if write {
+                crate::embed::AccessKind::Write
+            } else {
+                crate::embed::AccessKind::Read
+            };
+            self.trace(kind, "open", &path, super::std_modules::outcome_of(&result));
+        }
+        result
+    }
+
+    #[allow(clippy::result_large_err)] // `Signal` is the interpreter's error type (see `IResult`)
+    fn call_global_builtin(&mut self, name: &str, args: Vec<Value>) -> IResult {
         match name {
             "print" => {
                 let mut parts = Vec::with_capacity(args.len());
@@ -287,6 +321,8 @@ impl Interpreter {
             }
             // Contextual enter/exit for EnvScope (called by WithContext via trait impl)
             "__ctx_envscope_enter" => {
+                self.host
+                    .refuse_global("env.scope() (setting environment variables)")?;
                 let vars = match args.first() {
                     Some(Value::Instance { fields, .. }) => match fields.get("vars") {
                         Some(Value::Map(m)) => m.clone(),
@@ -310,6 +346,8 @@ impl Interpreter {
                 Ok(Value::Map(saved))
             }
             "__ctx_envscope_exit" => {
+                self.host
+                    .refuse_global("env.scope() (setting environment variables)")?;
                 if let Some(Value::Map(saved)) = args.get(1) {
                     for (key, original) in saved {
                         match original {
@@ -496,7 +534,7 @@ impl Interpreter {
                         )));
                     }
                 };
-                std::thread::sleep(std::time::Duration::from_millis(duration_ms as u64));
+                self.sleep_checked(std::time::Duration::from_millis(duration_ms as u64))?;
                 Ok(Value::Null)
             }
             // Both halves of what `now()` was asked for live in `std.time`:
@@ -509,6 +547,7 @@ impl Interpreter {
                     .to_string(),
             ))),
             "input" => {
+                self.host.refuse_global("input() (reading the terminal)")?;
                 let prompt = args.first().map(|v| v.display_string()).unwrap_or_default();
                 if !prompt.is_empty() {
                     eprint!("{}", prompt);
@@ -518,6 +557,8 @@ impl Interpreter {
                 Ok(Value::String(line.trim_end_matches('\n').to_string()))
             }
             "confirm" => {
+                self.host
+                    .refuse_global("confirm() (reading the terminal)")?;
                 let prompt = args.first().map(|v| v.display_string()).unwrap_or_else(|| "Confirm?".to_string());
                 eprint!("{} [y/N] ", prompt);
                 let mut line = String::new();
@@ -544,6 +585,8 @@ impl Interpreter {
                 Ok(Value::Path(crate::interpreter::helpers::expand_tilde(&s)))
             }
             "cd" => {
+                self.host
+                    .refuse_global("cd() (changing the working directory)")?;
                 // Change the working directory of the whole `que` process and
                 // hand back the one we left. Returning the old directory is
                 // what lets a scoped form be written in Que rather than baked
@@ -614,6 +657,8 @@ impl Interpreter {
             // Entering hands the old directory to `exit` as the resource, so
             // the restore needs nothing stored on the instance.
             "__ctx_dir_enter" => {
+                self.host
+                    .refuse_global("with dir(...) (changing the working directory)")?;
                 let target = match args.first() {
                     Some(Value::Instance { fields, .. }) => fields
                         .get("path")
@@ -641,6 +686,8 @@ impl Interpreter {
             // caller is waiting on, and a directory that has since been
             // removed should not turn a successful block into a failure.
             "__ctx_dir_exit" => {
+                self.host
+                    .refuse_global("with dir(...) (changing the working directory)")?;
                 if let Some(previous) = args.get(1).and_then(|v| v.as_path()) {
                     let _ = std::env::set_current_dir(&previous);
                 }
@@ -696,7 +743,7 @@ impl Interpreter {
                         Err(Signal::Error(e)) => {
                             last_err = Some(e);
                             if delay_ms > 0 && attempt < max_retries - 1 {
-                                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                                self.sleep_checked(std::time::Duration::from_millis(delay_ms))?;
                             }
                         }
                         Err(other) => return Err(other),
