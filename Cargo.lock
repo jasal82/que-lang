@@ -1304,7 +1304,7 @@ dependencies = [
 
 [[package]]
 name = "que"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -1334,7 +1334,7 @@ dependencies = [
 
 [[package]]
 name = "que-lsp"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "dashmap 6.2.1",
  "env_logger",

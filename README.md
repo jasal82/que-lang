@@ -122,6 +122,12 @@ que install --locked   # CI: fail rather than resolve anything unpinned
 - **Language server** (LSP) with diagnostics, completions, hover, go-to-definition, and document symbols
 - **VS Code extension** with syntax highlighting, snippets, and LSP integration
 
+## Embedding
+
+The `que_lang` library runs scripts inside Rust programs, with native modules,
+deny-by-default capability policies, time limits, explicit module search paths
+and access tracing. See [docs/embedding.md](docs/embedding.md).
+
 ## Tutorial
 
 See [tutorial.md](tutorial.md) for a comprehensive walkthrough of the language covering all features with runnable examples.

@@ -22,3 +22,8 @@ pub mod token;
 pub mod value;
 
 pub use embed::{language_version, LANGUAGE_VERSION};
+
+/// Compiles and runs the Rust examples in `docs/embedding.md`.
+#[cfg(doctest)]
+#[doc = include_str!("../docs/embedding.md")]
+pub struct EmbeddingGuide;
