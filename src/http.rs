@@ -537,13 +537,12 @@ pub fn url_decode(args: &[Value]) -> Result<Value, String> {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            let hex = &s[i + 1..i + 3];
-            match u8::from_str_radix(hex, 16) {
-                Ok(byte) => {
+            match s.get(i + 1..i + 3).map(|hex| u8::from_str_radix(hex, 16)) {
+                Some(Ok(byte)) => {
                     decoded.push(byte);
                     i += 3;
                 }
-                Err(_) => {
+                _ => {
                     decoded.push(bytes[i]);
                     i += 1;
                 }

@@ -1565,10 +1565,10 @@ pub fn method_doc(name: &str) -> Option<String> {
         "reverse" => "```que\n.reverse() -> String | List\n```\n\nReverse the characters in a string or elements in a list.\n\n**Available on:** String, List",
         "matches" => "```que\n.matches(pattern: String) -> Bool\n```\n\nTest the string against a regex pattern.\n\n**Available on:** String",
         "bytes" => "```que\n.bytes() -> List<Int>\n```\n\nGet the byte values of a string.\n\n**Available on:** String",
-        "substring" => "```que\n.substring(start: Int, end?: Int) -> String\n```\n\nExtract a sub-range of the string.\n\n**Available on:** String",
+        "substring" => "```que\n.substring(start: Int, end?: Int) -> String\n```\n\nExtract a sub-range of the string by character index (not byte offset). Indices past the end are clamped; the result is empty when `start >= end`.\n\n**Available on:** String",
         "slice" => "```que\n.slice(start: Int, end?: Int) -> List\n```\n\nExtract a sub-range of the list. Use `.substring()` on a String.\n\n**Available on:** List",
-        "pad_start" => "```que\n.pad_start(width: Int, fill?: String) -> String\n```\n\nPad the string on the left to the given width.\n\n**Available on:** String",
-        "pad_end" => "```que\n.pad_end(width: Int, fill?: String) -> String\n```\n\nPad the string on the right to the given width.\n\n**Available on:** String",
+        "pad_start" => "```que\n.pad_start(width: Int, fill?: String) -> String\n```\n\nPad the string on the left to the given width in characters.\n\n**Available on:** String",
+        "pad_end" => "```que\n.pad_end(width: Int, fill?: String) -> String\n```\n\nPad the string on the right to the given width in characters.\n\n**Available on:** String",
 
         // ── List methods ──
         "push" => "```que\n.push(value) -> List\n```\n\nAppend a value to the end of the list (returns new list).\n\n**Available on:** List",

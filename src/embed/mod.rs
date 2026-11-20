@@ -118,7 +118,7 @@ impl HostContext {
 /// that can make existing scripts behave differently the major version. It
 /// is independent of the crate version, which also changes for API-only
 /// releases.
-pub const LANGUAGE_VERSION: &str = "1.2.0";
+pub const LANGUAGE_VERSION: &str = "1.2.1";
 
 /// [`LANGUAGE_VERSION`] as a function, for callers that prefer one.
 pub fn language_version() -> &'static str {

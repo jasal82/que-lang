@@ -280,6 +280,12 @@ pub(crate) fn arg_int(args: &[Value], idx: usize, method: &str) -> Result<i64, S
     }
 }
 
+/// Clamp a script-supplied index to `0..=len`. A negative index clamps to
+/// `len`, as it always did for `substring` and `slice`.
+pub(crate) fn char_index(i: i64, len: usize) -> usize {
+    usize::try_from(i).map_or(len, |i| i.min(len))
+}
+
 pub(crate) fn value_cmp(a: &Value, b: &Value) -> std::cmp::Ordering {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => a.cmp(b),

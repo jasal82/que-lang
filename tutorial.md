@@ -408,13 +408,17 @@ println(upper_names.join(" | "))
 | `.parse_int()` | Parse as integer (returns `Result`) |
 | `.parse_float()` | Parse as float (returns `Result`) |
 | `.reverse()` | Reverse the string |
-| `.index_of(s)` | Index of substring or `-1` |
-| `.substring(start, end)` | Extract substring by index |
-| `.pad_start(len, char)` | Pad from the left |
-| `.pad_end(len, char)` | Pad from the right |
+| `.index_of(s)` | Character index of substring or `-1` |
+| `.substring(start, end)` | Extract substring by character index (clamped; empty if `start >= end`) |
+| `.pad_start(len, char)` | Pad from the left to `len` characters |
+| `.pad_end(len, char)` | Pad from the right to `len` characters |
 | `.matches(regex)` | Check if string matches a regex |
-| `.bytes()` | List of byte values |
+| `.bytes()` | List of byte values (UTF-8) |
 | `.to_path()` | Convert to a `Path` value |
+
+All string lengths and indices (`len`, `index_of`, `substring`, `pad_*`, `s[i]`)
+count characters (Unicode scalar values), not bytes: `"aπb".len()` is `3`. Use
+`s.bytes().len()` for the UTF-8 size.
 
 ---
 

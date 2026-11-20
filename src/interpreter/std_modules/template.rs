@@ -120,7 +120,14 @@ fn parse_template(template: &str) -> Result<Vec<TemplateToken>, String> {
                     tokens.push(for_token);
                     rest = consumed;
                 } else {
-                    return Err(format!("unknown template directive: {{{{# {}}}}}", &directive_rest[..directive_rest.find("}}").unwrap_or(20).min(20)]));
+                    let shown: String = directive_rest
+                        .split("}}")
+                        .next()
+                        .unwrap_or_default()
+                        .chars()
+                        .take(20)
+                        .collect();
+                    return Err(format!("unknown template directive: {{{{# {}}}}}", shown));
                 }
             } else if rest_trimmed.starts_with('/') {
                 return Err("unexpected closing tag outside of block directive".to_string());

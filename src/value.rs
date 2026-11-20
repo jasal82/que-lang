@@ -709,7 +709,7 @@ impl Value {
                 );
             }
             Value::String(s) => {
-                m.insert("length".into(), Value::Int(s.len() as i64));
+                m.insert("length".into(), Value::Int(s.chars().count() as i64));
                 m.insert("empty".into(), Value::Bool(s.is_empty()));
             }
             Value::Function { name, params, .. } => {

@@ -861,7 +861,7 @@ impl Interpreter {
 
     fn string_method(&self, s: &str, method: &str, args: &[Value]) -> IResult {
         match method {
-            "len" => Ok(Value::Int(s.len() as i64)),
+            "len" => Ok(Value::Int(s.chars().count() as i64)),
             "trim" => Ok(Value::String(s.trim().to_string())),
             "trim_start" => Ok(Value::String(s.trim_start().to_string())),
             "trim_end" => Ok(Value::String(s.trim_end().to_string())),
@@ -926,50 +926,45 @@ impl Interpreter {
                 Ok(f) => Ok(Value::Ok(Box::new(Value::Float(f)))),
                 Err(e) => Ok(Value::Err(Box::new(Value::String(e.to_string())))),
             },
+            // Indices count characters (Unicode scalar values), like `len`
+            // and `chars`; use `bytes()` for the UTF-8 encoding.
             "index_of" => {
                 let sub = arg_str(args, 0, "index_of")?;
                 match s.find(sub) {
-                    Some(idx) => Ok(Value::Int(idx as i64)),
+                    Some(idx) => Ok(Value::Int(s[..idx].chars().count() as i64)),
                     None => Ok(Value::Int(-1)),
                 }
             }
             "substring" => {
-                let start = arg_int(args, 0, "substring")? as usize;
+                let len = s.chars().count();
+                let start = char_index(arg_int(args, 0, "substring")?, len);
                 let end = if args.len() > 1 {
-                    arg_int(args, 1, "substring")? as usize
+                    char_index(arg_int(args, 1, "substring")?, len)
                 } else {
-                    s.len()
+                    len
                 };
-                let start = start.min(s.len());
-                let end = end.min(s.len());
-                Ok(Value::String(s[start..end].to_string()))
-            }
-            "pad_start" => {
-                let width = arg_int(args, 0, "pad_start")? as usize;
-                let fill = if args.len() > 1 {
-                    arg_str(args, 1, "pad_start")?
-                } else {
-                    " "
-                };
-                if s.len() >= width {
-                    Ok(Value::String(s.to_string()))
-                } else {
-                    let padding = fill.repeat((width - s.len()) / fill.len().max(1) + 1);
-                    Ok(Value::String(format!("{}{}", &padding[..width - s.len()], s)))
+                if start >= end {
+                    return Ok(Value::String(String::new()));
                 }
+                Ok(Value::String(s.chars().skip(start).take(end - start).collect()))
             }
-            "pad_end" => {
-                let width = arg_int(args, 0, "pad_end")? as usize;
+            "pad_start" | "pad_end" => {
+                let width = arg_int(args, 0, method)?.max(0) as usize;
                 let fill = if args.len() > 1 {
-                    arg_str(args, 1, "pad_end")?
+                    arg_str(args, 1, method)?
                 } else {
                     " "
                 };
-                if s.len() >= width {
+                let len = s.chars().count();
+                if len >= width {
                     Ok(Value::String(s.to_string()))
                 } else {
-                    let padding = fill.repeat((width - s.len()) / fill.len().max(1) + 1);
-                    Ok(Value::String(format!("{}{}", s, &padding[..width - s.len()])))
+                    let padding: String = fill.chars().cycle().take(width - len).collect();
+                    Ok(Value::String(if method == "pad_start" {
+                        format!("{}{}", padding, s)
+                    } else {
+                        format!("{}{}", s, padding)
+                    }))
                 }
             }
             "reverse" => {
@@ -1814,14 +1809,15 @@ impl Interpreter {
                 Ok(idx.map(|i| Value::Int(i as i64)).unwrap_or(Value::Int(-1)))
             }
             "slice" => {
-                let start = arg_int(&args, 0, "slice")? as usize;
+                let start = char_index(arg_int(&args, 0, "slice")?, items.len());
                 let end = if args.len() > 1 {
-                    arg_int(&args, 1, "slice")? as usize
+                    char_index(arg_int(&args, 1, "slice")?, items.len())
                 } else {
                     items.len()
                 };
-                let start = start.min(items.len());
-                let end = end.min(items.len());
+                if start >= end {
+                    return Ok(Value::List(Vec::new()));
+                }
                 Ok(Value::List(items[start..end].to_vec()))
             }
             "window" => {
@@ -2940,7 +2936,7 @@ impl Interpreter {
     fn secret_method(&self, s: &str, method: &str) -> IResult {
         match method {
             "expose" => Ok(Value::String(s.to_string())),
-            "len" => Ok(Value::Int(s.len() as i64)),
+            "len" => Ok(Value::Int(s.chars().count() as i64)),
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
                 format!("Secret has no method '{}'", method),

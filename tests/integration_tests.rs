@@ -15248,3 +15248,120 @@ fn printing_and_pure_transformation_survive_the_strictest_policy() {
         vec!["hi".to_string(), "[1, 2, 3]".to_string(), "2".to_string()]
     );
 }
+
+// ── Non-ASCII strings: indices and lengths count characters ──────────
+
+#[test]
+fn string_len_counts_characters() {
+    assert_output(
+        "println(\"aπb\".len())\nprintln(\"ä ö ü €\".len())\nprintln(\"a😀b\".len())\nprintln(\"a😀b\".bytes().len())",
+        &["3", "7", "3", "6"],
+    );
+}
+
+#[test]
+fn string_substring_uses_character_indices() {
+    assert_output(
+        r#"
+let s = "aπb"
+println(s.substring(0, 2))
+println(s.substring(1, 2))
+println(s.substring(1))
+let t = "ä ö ü €"
+println(t.substring(2, 5))
+println(t.substring(6))
+let e = "x😀y😀z"
+println(e.substring(1, 4))
+println(e.substring(0, e.len()))
+"#,
+        &["aπ", "π", "πb", "ö ü", "€", "😀y😀", "x😀y😀z"],
+    );
+}
+
+#[test]
+fn string_substring_clamps_and_never_panics() {
+    assert_output(
+        r#"
+let s = "a😀b"
+println("[${s.substring(2, 99)}]")
+println("[${s.substring(99)}]")
+println("[${s.substring(2, 1)}]")
+println("[${s.substring(1, 1)}]")
+"#,
+        &["[b]", "[]", "[]", "[]"],
+    );
+}
+
+#[test]
+fn string_index_of_returns_a_character_index() {
+    assert_output(
+        r#"
+let s = "ä ö ü € 😀 end"
+println(s.index_of("€"))
+println(s.index_of("😀"))
+println(s.index_of("end"))
+println(s.index_of("nope"))
+println(s.substring(s.index_of("😀")))
+"#,
+        &["6", "8", "10", "-1", "😀 end"],
+    );
+}
+
+#[test]
+fn string_padding_counts_characters() {
+    assert_output(
+        r#"
+println("[${"π".pad_start(3)}]")
+println("[${"€".pad_end(3, "-")}]")
+println("[${"ä".pad_start(5, "😀ö")}]")
+println("[${"abc".pad_start(2)}]")
+println("[${"a".pad_end(3, "")}]")
+"#,
+        &["[  π]", "[€--]", "[😀ö😀öä]", "[abc]", "[a]"],
+    );
+}
+
+#[test]
+fn string_indexing_with_negative_index_counts_characters() {
+    assert_output(
+        "let s = \"aπ€😀\"\nprintln(s[-1])\nprintln(s[-3])\nprintln(s[1])\nprintln(s[3])",
+        &["😀", "π", "π", "😀"],
+    );
+    assert_error("let s = \"aπ\"\nprintln(s[2])");
+}
+
+#[test]
+fn string_reverse_chars_and_secret_len_agree_on_characters() {
+    assert_output(
+        "println(\"aπ€\".reverse())\nprintln(\"aπ€\".chars().len())\nprintln(secret(\"π€\").len())",
+        &["€πa", "3", "2"],
+    );
+}
+
+#[test]
+fn list_slice_with_inverted_range_is_empty() {
+    assert_output("println([1, 2, 3].slice(2, 1))\nprintln([1, 2, 3].slice(1))", &["[]", "[2, 3]"]);
+}
+
+#[test]
+fn url_decode_does_not_panic_on_non_ascii_after_percent() {
+    assert_output(
+        r#"
+import std.http { url_decode }
+println(url_decode("a%é€b"))
+println(url_decode("%C3%A4%20x"))
+"#,
+        &["a%é€b", "ä x"],
+    );
+}
+
+#[test]
+fn template_unknown_directive_error_with_non_ascii_text_does_not_panic() {
+    assert_error_contains(
+        r#"
+import std.template
+template.render("{{# ääääääääääääääääääääääääää }}", {})
+"#,
+        "unknown template directive",
+    );
+}

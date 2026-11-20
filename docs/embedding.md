@@ -261,13 +261,17 @@ JSON. Lossy and refused cases (also listed in `src/embed/convert.rs`):
 
 ## Language version
 
-`que_lang::LANGUAGE_VERSION` (currently `1.2.0`) identifies the semantics of
+`que_lang::LANGUAGE_VERSION` (currently `1.2.1`) identifies the semantics of
 evaluation and of the standard library, independent of the crate version.
 **Compatibility rule:** it changes whenever a script could observe a
 difference: any change to a stdlib function's behaviour or result, a changed
 evaluation rule, a changed error. Bug fixes bump the patch level, compatible
 additions the minor version, changes that can make existing scripts behave
 differently the major version. Put the whole string into cache keys.
+
+History: `1.2.1` made string lengths and indices count characters (see
+`CHANGELOG.md`); embedders that cache script results must not reuse `1.2.0`
+entries.
 
 ## Isolation and concurrency
 
@@ -335,6 +339,5 @@ and native modules, and cancels one engine while another keeps running.
 
 ## Releasing
 
-The crate version is 1.2.0. Publishing is a manual step for a maintainer with
-a registry token: `cargo publish` from a clean checkout
-of the release commit.
+The crate version is 1.2.1. Publishing is a manual step for a maintainer with
+a registry token: `cargo publish` from a clean checkout of the release commit.

@@ -1649,8 +1649,9 @@ impl Interpreter {
                 })
             }
             (Value::String(s), Value::Int(i)) => {
+                let len = s.chars().count();
                 let index = if *i < 0 {
-                    (s.len() as i64 + i) as usize
+                    (len as i64 + i) as usize
                 } else {
                     *i as usize
                 };
@@ -1663,7 +1664,7 @@ impl Interpreter {
                             format!(
                                 "string index {} out of bounds (len {})",
                                 i,
-                                s.len()
+                                len
                             ),
                         ))
                     })

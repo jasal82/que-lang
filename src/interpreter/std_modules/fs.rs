@@ -449,15 +449,15 @@ fn find_files_recursive(
 }
 
 fn glob_matches(pattern: &str, name: &str) -> bool {
-    let pat_bytes = pattern.as_bytes();
-    let name_bytes = name.as_bytes();
-    glob_match_recursive(pat_bytes, name_bytes)
+    let pat: Vec<char> = pattern.chars().collect();
+    let name: Vec<char> = name.chars().collect();
+    glob_match_recursive(&pat, &name)
 }
 
-fn glob_match_recursive(pat: &[u8], name: &[u8]) -> bool {
+fn glob_match_recursive(pat: &[char], name: &[char]) -> bool {
     match (pat.first(), name.first()) {
         (None, None) => true,
-        (Some(b'*'), _) => {
+        (Some('*'), _) => {
             if glob_match_recursive(&pat[1..], name) {
                 return true;
             }
@@ -466,8 +466,21 @@ fn glob_match_recursive(pat: &[u8], name: &[u8]) -> bool {
             }
             false
         }
-        (Some(b'?'), Some(_)) => glob_match_recursive(&pat[1..], &name[1..]),
+        (Some('?'), Some(_)) => glob_match_recursive(&pat[1..], &name[1..]),
         (Some(p), Some(n)) if p == n => glob_match_recursive(&pat[1..], &name[1..]),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::glob_matches;
+
+    #[test]
+    fn question_mark_matches_one_character_not_one_byte() {
+        assert!(glob_matches("?.txt", "π.txt"));
+        assert!(glob_matches("a?c", "a😀c"));
+        assert!(!glob_matches("?.txt", "ab.txt"));
+        assert!(glob_matches("*€", "preis €"));
     }
 }
