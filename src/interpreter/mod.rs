@@ -2,7 +2,6 @@
 ///
 /// Evaluates an AST produced by the parser, executing statements and
 /// computing expressions in an environment that supports lexical scoping.
-
 use crate::ast::*;
 use crate::environment::Environment;
 use crate::error::*;
@@ -12,7 +11,6 @@ use crate::parser::Parser;
 use crate::value::Value;
 
 use std::collections::BTreeMap;
-
 
 mod builtins;
 mod expr;
@@ -132,7 +130,8 @@ pub struct Interpreter {
     /// User-defined methods: type_name → list of method defs.
     pub(crate) impl_methods: std::collections::HashMap<String, Vec<crate::value::MethodDef>>,
     /// Trait implementations: (type_name, trait_name) → method defs.
-    pub(crate) trait_impls: std::collections::HashMap<(String, String), Vec<crate::value::MethodDef>>,
+    pub(crate) trait_impls:
+        std::collections::HashMap<(String, String), Vec<crate::value::MethodDef>>,
     /// Trait definitions: trait_name → method signatures (with optional defaults).
     pub(crate) trait_defs: std::collections::HashMap<String, Vec<crate::value::TraitMethodDef>>,
     /// Every type this module can reach: the ones it declares plus the ones
@@ -196,52 +195,129 @@ impl Default for Interpreter {
 /// Shared with the resolver so static analysis and the runtime cannot
 /// disagree about what counts as a defined name.
 pub const BUILTIN_NAMES: &[&str] = &[
-        "print", "println", "typeof", "str", "int", "float", "bool", "abs",
-        "min", "max", "range", "chr", "ord",
-        "Ok", "Err", "assert", "compose",
-        // Additional builtins
-        "secret", "fail", "sleep", "input", "confirm",
-        "quefile_dir", "script_dir", "dry_run",
-        "path", "cd", "dir",
-        "glob",
-        // File handle
-        "open",
-        // Tool discovery
-        "which",
-        // Retry and timeout
-        "retry", "timeout",
-        // Semver parse
-        "semver_parse",
-        // Regex constructor
-        "regex",
-        // Debugging aids you reach for mid-edit or at a REPL prompt
-        "dbg", "help",
-        // CLI arguments
-        "args",
-        // Task runner
-        "tasks", "run_task",
-        // Strict mode
-        "strict",
-        // Removed, but still bound so that calling one reaches the arm in
-        // `call_builtin` that says what to write instead. Dropping the
-        // binding too would turn a sentence naming the replacement into
-        // "undefined variable", which tells nobody anything.
-        "Some", "None", "env", "error", "assert_eq", "to_path",
-        "len", "push", "pop", "keys", "values", "contains", "split", "trim",
-        "join", "replace", "chars", "filter", "map", "fold", "flat_map",
-        "group_by", "sort_by", "any", "all", "find", "zip", "enumerate",
-        "take", "skip", "chunk", "partition", "flatten", "each", "for_each",
-        "config_get", "config_set", "config_delete", "config_has",
-        "config_merge", "config_paths", "config_read", "config_write",
-        "stream", "stream_of", "stdout", "stderr", "stdin",
-        "inspect", "methods", "is_type", "type_info", "fields", "has_method",
-        "vars", "var_info", "scope_depth", "modules",
-        "now",
-        // Internal context-manager builtins (not user-visible, used by TempDir/TempFile/EnvScope impls)
-        "__ctx_tempdir_enter", "__ctx_tempdir_exit",
-        "__ctx_tempfile_enter", "__ctx_tempfile_exit",
-        "__ctx_envscope_enter", "__ctx_envscope_exit",
-        "__ctx_dir_enter", "__ctx_dir_exit",
+    "print",
+    "println",
+    "typeof",
+    "str",
+    "int",
+    "float",
+    "bool",
+    "abs",
+    "min",
+    "max",
+    "range",
+    "chr",
+    "ord",
+    "Ok",
+    "Err",
+    "assert",
+    "compose",
+    // Additional builtins
+    "secret",
+    "fail",
+    "sleep",
+    "input",
+    "confirm",
+    "quefile_dir",
+    "script_dir",
+    "dry_run",
+    "path",
+    "cd",
+    "dir",
+    "glob",
+    // File handle
+    "open",
+    // Tool discovery
+    "which",
+    // Retry and timeout
+    "retry",
+    "timeout",
+    // Semver parse
+    "semver_parse",
+    // Regex constructor
+    "regex",
+    // Debugging aids you reach for mid-edit or at a REPL prompt
+    "dbg",
+    "help",
+    // CLI arguments
+    "args",
+    // Task runner
+    "tasks",
+    "run_task",
+    // Strict mode
+    "strict",
+    // Removed, but still bound so that calling one reaches the arm in
+    // `call_builtin` that says what to write instead. Dropping the
+    // binding too would turn a sentence naming the replacement into
+    // "undefined variable", which tells nobody anything.
+    "Some",
+    "None",
+    "env",
+    "error",
+    "assert_eq",
+    "to_path",
+    "len",
+    "push",
+    "pop",
+    "keys",
+    "values",
+    "contains",
+    "split",
+    "trim",
+    "join",
+    "replace",
+    "chars",
+    "filter",
+    "map",
+    "fold",
+    "flat_map",
+    "group_by",
+    "sort_by",
+    "any",
+    "all",
+    "find",
+    "zip",
+    "enumerate",
+    "take",
+    "skip",
+    "chunk",
+    "partition",
+    "flatten",
+    "each",
+    "for_each",
+    "config_get",
+    "config_set",
+    "config_delete",
+    "config_has",
+    "config_merge",
+    "config_paths",
+    "config_read",
+    "config_write",
+    "stream",
+    "stream_of",
+    "stdout",
+    "stderr",
+    "stdin",
+    "inspect",
+    "methods",
+    "is_type",
+    "type_info",
+    "fields",
+    "has_method",
+    "vars",
+    "var_info",
+    "scope_depth",
+    "modules",
+    "now",
+    // Internal context-manager builtins (not user-visible, used by TempDir/TempFile/EnvScope impls)
+    "__ctx_tempdir_enter",
+    "__ctx_tempdir_exit",
+    "__ctx_tempfile_enter",
+    "__ctx_tempfile_exit",
+    "__ctx_envscope_enter",
+    "__ctx_envscope_exit",
+    "__ctx_dir_enter",
+    "__ctx_dir_exit",
 ];
 
 impl Interpreter {
@@ -391,9 +467,9 @@ impl Interpreter {
             None => return Ok(()),
             Some(p) => p,
         };
-        policy.check(cap, subject).map_err(|denied| {
-            Signal::Error(QueError::new(ErrorKind::Runtime, denied.message()))
-        })
+        policy
+            .check(cap, subject)
+            .map_err(|denied| Signal::Error(QueError::new(ErrorKind::Runtime, denied.message())))
     }
 
     /// Emit a line of output: write directly to stdout when `direct_output` is set,
@@ -492,87 +568,155 @@ impl Interpreter {
 
         // ── OS object with platform info ──
         let mut os_fields = BTreeMap::new();
-        os_fields.insert("path_separator".into(), Value::String(
-            if cfg!(windows) { ";".into() } else { ":".into() }
-        ));
-        os_fields.insert("dir_separator".into(), Value::String(
-            std::path::MAIN_SEPARATOR.to_string(),
-        ));
-        os_fields.insert("family".into(), Value::String(std::env::consts::FAMILY.into()));
+        os_fields.insert(
+            "path_separator".into(),
+            Value::String(if cfg!(windows) {
+                ";".into()
+            } else {
+                ":".into()
+            }),
+        );
+        os_fields.insert(
+            "dir_separator".into(),
+            Value::String(std::path::MAIN_SEPARATOR.to_string()),
+        );
+        os_fields.insert(
+            "family".into(),
+            Value::String(std::env::consts::FAMILY.into()),
+        );
         os_fields.insert("name".into(), Value::String(std::env::consts::OS.into()));
         os_fields.insert("arch".into(), Value::String(std::env::consts::ARCH.into()));
         // os.exit(code) — exits the process with the given exit code
         os_fields.insert("exit".into(), Value::BuiltinFn("os.exit".into()));
-        self.env.define("os", Value::Instance { type_name: "OsInfo".to_string(), fields: os_fields }, false);
+        self.env.define(
+            "os",
+            Value::Instance {
+                type_name: "OsInfo".to_string(),
+                fields: os_fields,
+            },
+            false,
+        );
 
         // ── Built-in Display trait ──
         // Any struct implementing `to_string(self) -> String` gets automatic
         // string coercion in println(), str(), and string interpolation.
-        self.trait_defs.insert("Display".to_string(), vec![
-            crate::value::TraitMethodDef {
+        self.trait_defs.insert(
+            "Display".to_string(),
+            vec![crate::value::TraitMethodDef {
                 name: "to_string".to_string(),
-                params: vec![Param { name: "self".to_string(), type_ann: None, default: None, rest: false }],
+                params: vec![Param {
+                    name: "self".to_string(),
+                    type_ann: None,
+                    default: None,
+                    rest: false,
+                }],
                 default_body: None,
-            },
-        ]);
+            }],
+        );
 
         // ── Built-in Eq trait ──
         // Implementing `equals(self, other) -> Bool` enables == and != dispatch
         // for user-defined types.
-        self.trait_defs.insert("Eq".to_string(), vec![
-            crate::value::TraitMethodDef {
+        self.trait_defs.insert(
+            "Eq".to_string(),
+            vec![crate::value::TraitMethodDef {
                 name: "equals".to_string(),
                 params: vec![
-                    Param { name: "self".to_string(), type_ann: None, default: None, rest: false },
-                    Param { name: "other".to_string(), type_ann: None, default: None, rest: false },
+                    Param {
+                        name: "self".to_string(),
+                        type_ann: None,
+                        default: None,
+                        rest: false,
+                    },
+                    Param {
+                        name: "other".to_string(),
+                        type_ann: None,
+                        default: None,
+                        rest: false,
+                    },
                 ],
                 default_body: None,
-            },
-        ]);
+            }],
+        );
 
         // ── Built-in Ord trait ──
         // Implementing `compare(self, other) -> Int` (returning -1, 0, or 1)
         // enables <, >, <=, >= dispatch for user-defined types.
-        self.trait_defs.insert("Ord".to_string(), vec![
-            crate::value::TraitMethodDef {
+        self.trait_defs.insert(
+            "Ord".to_string(),
+            vec![crate::value::TraitMethodDef {
                 name: "compare".to_string(),
                 params: vec![
-                    Param { name: "self".to_string(), type_ann: None, default: None, rest: false },
-                    Param { name: "other".to_string(), type_ann: None, default: None, rest: false },
+                    Param {
+                        name: "self".to_string(),
+                        type_ann: None,
+                        default: None,
+                        rest: false,
+                    },
+                    Param {
+                        name: "other".to_string(),
+                        type_ann: None,
+                        default: None,
+                        rest: false,
+                    },
                 ],
                 default_body: None,
-            },
-        ]);
+            }],
+        );
 
         // ── Built-in Hash trait ──
         // Implementing `hash(self) -> Int` is required for using a user-defined
         // type as a Map key or Set element.
-        self.trait_defs.insert("Hash".to_string(), vec![
-            crate::value::TraitMethodDef {
+        self.trait_defs.insert(
+            "Hash".to_string(),
+            vec![crate::value::TraitMethodDef {
                 name: "hash".to_string(),
-                params: vec![Param { name: "self".to_string(), type_ann: None, default: None, rest: false }],
+                params: vec![Param {
+                    name: "self".to_string(),
+                    type_ann: None,
+                    default: None,
+                    rest: false,
+                }],
                 default_body: None,
-            },
-        ]);
+            }],
+        );
 
         // ── Built-in Contextual trait ──
         // Any struct implementing `enter(self) -> Any` and `exit(self, resource)`
         // can be used in `with expr as name { }` blocks.
-        self.trait_defs.insert("Contextual".to_string(), vec![
-            crate::value::TraitMethodDef {
-                name: "enter".to_string(),
-                params: vec![Param { name: "self".to_string(), type_ann: None, default: None, rest: false }],
-                default_body: None,
-            },
-            crate::value::TraitMethodDef {
-                name: "exit".to_string(),
-                params: vec![
-                    Param { name: "self".to_string(), type_ann: None, default: None, rest: false },
-                    Param { name: "resource".to_string(), type_ann: None, default: None, rest: false },
-                ],
-                default_body: None,
-            },
-        ]);
+        self.trait_defs.insert(
+            "Contextual".to_string(),
+            vec![
+                crate::value::TraitMethodDef {
+                    name: "enter".to_string(),
+                    params: vec![Param {
+                        name: "self".to_string(),
+                        type_ann: None,
+                        default: None,
+                        rest: false,
+                    }],
+                    default_body: None,
+                },
+                crate::value::TraitMethodDef {
+                    name: "exit".to_string(),
+                    params: vec![
+                        Param {
+                            name: "self".to_string(),
+                            type_ann: None,
+                            default: None,
+                            rest: false,
+                        },
+                        Param {
+                            name: "resource".to_string(),
+                            type_ann: None,
+                            default: None,
+                            rest: false,
+                        },
+                    ],
+                    default_body: None,
+                },
+            ],
+        );
 
         // ── Register stdlib context manager types ──
         // TempDir and TempFile are defined as Que structs with Contextual impls.
@@ -588,11 +732,13 @@ impl Interpreter {
             },
             crate::value::FieldDef {
                 name: "dir".to_string(),
-                default: Some(Value::Null),  // None → use OS temp dir
+                default: Some(Value::Null), // None → use OS temp dir
             },
         ];
-        self.struct_defs.insert("TempDir".to_string(), temp_dir_fields);
-        self.env.define("TempDir", Value::TypeRef("TempDir".to_string()), false);
+        self.struct_defs
+            .insert("TempDir".to_string(), temp_dir_fields);
+        self.env
+            .define("TempDir", Value::TypeRef("TempDir".to_string()), false);
 
         // TempDir.new(prefix = "que_", dir = null) static method
         let td_new_src = r#"
@@ -602,7 +748,10 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             // The body names TempDir, so it needs an environment where that
             // name is bound -- the one this method is parsed with is empty.
             m.closure_env = self.env.clone();
-            self.impl_methods.entry("TempDir".to_string()).or_default().push(m);
+            self.impl_methods
+                .entry("TempDir".to_string())
+                .or_default()
+                .push(m);
         }
 
         // Contextual impl for TempDir — enter and exit are Rust builtins via BuiltinFn
@@ -620,11 +769,13 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             },
             crate::value::FieldDef {
                 name: "dir".to_string(),
-                default: Some(Value::Null),  // None → use OS temp dir
+                default: Some(Value::Null), // None → use OS temp dir
             },
         ];
-        self.struct_defs.insert("TempFile".to_string(), temp_file_fields);
-        self.env.define("TempFile", Value::TypeRef("TempFile".to_string()), false);
+        self.struct_defs
+            .insert("TempFile".to_string(), temp_file_fields);
+        self.env
+            .define("TempFile", Value::TypeRef("TempFile".to_string()), false);
 
         self.register_builtin_contextual("TempFile", "__ctx_tempfile_enter", "__ctx_tempfile_exit");
 
@@ -633,7 +784,8 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             name: "vars".to_string(),
             default: None,
         }];
-        self.struct_defs.insert("EnvScope".to_string(), env_scope_fields);
+        self.struct_defs
+            .insert("EnvScope".to_string(), env_scope_fields);
 
         self.register_builtin_contextual("EnvScope", "__ctx_envscope_enter", "__ctx_envscope_exit");
 
@@ -662,7 +814,11 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         let module = parser.parse_module().map_err(|_| ())?;
         for (_, item) in module.items {
             if let crate::ast::Item::FnDecl(decl) = item {
-                let is_static = decl.params.first().map(|p| p.name != "self").unwrap_or(true);
+                let is_static = decl
+                    .params
+                    .first()
+                    .map(|p| p.name != "self")
+                    .unwrap_or(true);
                 return Ok(crate::value::MethodDef {
                     name: decl.name,
                     is_static,
@@ -685,7 +841,10 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         // The builtin names must be flat (no dots) so they work as function calls.
         // We capture self.env as closure_env so the internal builtins are in scope.
         let enter_src = format!(r#"fn enter(self) {{ {}(self) }}"#, enter_fn);
-        let exit_src = format!(r#"fn exit(self, resource) {{ {}(self, resource) }}"#, exit_fn);
+        let exit_src = format!(
+            r#"fn exit(self, resource) {{ {}(self, resource) }}"#,
+            exit_fn
+        );
         let closure_env = self.env.clone();
         for src in [enter_src, exit_src] {
             if let Ok(mut m) = Self::parse_single_method(&src) {
@@ -700,35 +859,46 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
 
     /// Compile a list of FnDecl into MethodDef values, capturing the current env.
     pub(crate) fn compile_methods(&self, decls: &[FnDecl]) -> Vec<crate::value::MethodDef> {
-        decls.iter().map(|d| {
-            let is_static = d.params.first().map(|p| p.name != "self").unwrap_or(true);
-            crate::value::MethodDef {
-                name: d.name.clone(),
-                is_static,
-                mutates_self: d.mutates_self,
-                params: d.params.clone(),
-                body: d.body.clone(),
-                closure_env: self.env.clone(),
-                def_file: self.current_file.clone(),
-            }
-        }).collect()
+        decls
+            .iter()
+            .map(|d| {
+                let is_static = d.params.first().map(|p| p.name != "self").unwrap_or(true);
+                crate::value::MethodDef {
+                    name: d.name.clone(),
+                    is_static,
+                    mutates_self: d.mutates_self,
+                    params: d.params.clone(),
+                    body: d.body.clone(),
+                    closure_env: self.env.clone(),
+                    def_file: self.current_file.clone(),
+                }
+            })
+            .collect()
     }
 
     /// Look up an instance method for `type_name` named `method_name`.
     /// Searches impl_methods first, then all trait_impls for this type.
-    pub(crate) fn find_instance_method(&self, type_name: &str, method_name: &str)
-        -> Option<crate::value::MethodDef>
-    {
+    pub(crate) fn find_instance_method(
+        &self,
+        type_name: &str,
+        method_name: &str,
+    ) -> Option<crate::value::MethodDef> {
         // Search impl_methods
         if let Some(methods) = self.impl_methods.get(type_name) {
-            if let Some(m) = methods.iter().find(|m| m.name == method_name && !m.is_static) {
+            if let Some(m) = methods
+                .iter()
+                .find(|m| m.name == method_name && !m.is_static)
+            {
                 return Some(m.clone());
             }
         }
         // Search trait_impls
         for ((tname, _trait_name), methods) in &self.trait_impls {
             if tname == type_name {
-                if let Some(m) = methods.iter().find(|m| m.name == method_name && !m.is_static) {
+                if let Some(m) = methods
+                    .iter()
+                    .find(|m| m.name == method_name && !m.is_static)
+                {
                     return Some(m.clone());
                 }
             }
@@ -737,17 +907,25 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
     }
 
     /// Look up a static method for `type_name` named `method_name`.
-    pub(crate) fn find_static_method(&self, type_name: &str, method_name: &str)
-        -> Option<crate::value::MethodDef>
-    {
+    pub(crate) fn find_static_method(
+        &self,
+        type_name: &str,
+        method_name: &str,
+    ) -> Option<crate::value::MethodDef> {
         if let Some(methods) = self.impl_methods.get(type_name) {
-            if let Some(m) = methods.iter().find(|m| m.name == method_name && m.is_static) {
+            if let Some(m) = methods
+                .iter()
+                .find(|m| m.name == method_name && m.is_static)
+            {
                 return Some(m.clone());
             }
         }
         for ((tname, _), methods) in &self.trait_impls {
             if tname == type_name {
-                if let Some(m) = methods.iter().find(|m| m.name == method_name && m.is_static) {
+                if let Some(m) = methods
+                    .iter()
+                    .find(|m| m.name == method_name && m.is_static)
+                {
                     return Some(m.clone());
                 }
             }
@@ -757,7 +935,8 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
 
     /// Check whether `type_name` implements `trait_name`.
     pub(crate) fn implements_trait(&self, type_name: &str, trait_name: &str) -> bool {
-        self.trait_impls.contains_key(&(type_name.to_string(), trait_name.to_string()))
+        self.trait_impls
+            .contains_key(&(type_name.to_string(), trait_name.to_string()))
     }
 
     /// Convert `val` to a display string, calling `to_string()` if the value
@@ -781,23 +960,27 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         left: &Value,
         right: &Value,
     ) -> Result<Option<std::cmp::Ordering>, crate::error::Signal> {
-        if let (
-            Value::Instance { type_name: ta, .. },
-            Value::Instance { type_name: tb, .. },
-        ) = (left, right)
+        if let (Value::Instance { type_name: ta, .. }, Value::Instance { type_name: tb, .. }) =
+            (left, right)
         {
             if ta == tb {
                 let ta = ta.clone();
                 if let Some(m) = self.find_instance_method(&ta, "compare") {
-                    let result = self.call_method_def(m, Some(left.clone()), vec![right.clone()])?;
+                    let result =
+                        self.call_method_def(m, Some(left.clone()), vec![right.clone()])?;
                     let ord = match result {
                         Value::Int(n) if n < 0 => std::cmp::Ordering::Less,
                         Value::Int(n) if n > 0 => std::cmp::Ordering::Greater,
                         Value::Int(_) => std::cmp::Ordering::Equal,
-                        other => return Err(crate::error::Signal::Error(crate::error::QueError::new(
-                            crate::error::ErrorKind::TypeMismatch,
-                            format!("Ord.compare() must return -1, 0, or 1, got {}", other.type_name()),
-                        ))),
+                        other => {
+                            return Err(crate::error::Signal::Error(crate::error::QueError::new(
+                                crate::error::ErrorKind::TypeMismatch,
+                                format!(
+                                    "Ord.compare() must return -1, 0, or 1, got {}",
+                                    other.type_name()
+                                ),
+                            )))
+                        }
                     };
                     return Ok(Some(ord));
                 }
@@ -809,8 +992,14 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
     /// Check equality between two values, dispatching to the language-level
     /// `equals()` method for Instance types that implement the `Eq` trait.
     /// For all other types falls back to Rust structural equality.
-    pub(crate) fn interpreter_eq(&mut self, a: &Value, b: &Value) -> Result<bool, crate::error::Signal> {
-        if let (Value::Instance { type_name: ta, .. }, Value::Instance { type_name: tb, .. }) = (a, b) {
+    pub(crate) fn interpreter_eq(
+        &mut self,
+        a: &Value,
+        b: &Value,
+    ) -> Result<bool, crate::error::Signal> {
+        if let (Value::Instance { type_name: ta, .. }, Value::Instance { type_name: tb, .. }) =
+            (a, b)
+        {
             if ta == tb {
                 let ta = ta.clone();
                 if let Some(m) = self.find_instance_method(&ta, "equals") {
@@ -825,7 +1014,11 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
     /// Test whether `val` is in `items`, using language-level equality for
     /// Instance types.  Enforces that any Instance value implements the `Hash`
     /// trait — the contract guarantees a consistent hash alongside equality.
-    pub(crate) fn set_contains(&mut self, items: &[Value], val: &Value) -> Result<bool, crate::error::Signal> {
+    pub(crate) fn set_contains(
+        &mut self,
+        items: &[Value],
+        val: &Value,
+    ) -> Result<bool, crate::error::Signal> {
         if let Value::Instance { type_name, .. } = val {
             if !self.implements_trait(type_name, "Hash") {
                 return Err(crate::error::Signal::Error(crate::error::QueError::new(
@@ -932,9 +1125,17 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 // Every `@deps` entry is an `Expr::Ident`; the parser refuses
                 // anything else, since the name is what gets looked up when
                 // the task runs.
-                let dep_names: Vec<String> = decl.depends_on.iter().filter_map(|e| {
-                    if let Expr::Ident(name) = e { Some(name.clone()) } else { None }
-                }).collect();
+                let dep_names: Vec<String> = decl
+                    .depends_on
+                    .iter()
+                    .filter_map(|e| {
+                        if let Expr::Ident(name) = e {
+                            Some(name.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
                 let task = Value::Task(Box::new(crate::value::TaskData {
                     name: decl.name.clone(),
                     description: decl.description.clone(),
@@ -962,10 +1163,12 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 // Register enum definition and bind the type name + unit variants in the environment.
                 let mut variants: Vec<(String, Vec<String>)> = Vec::new();
                 for v in &decl.variants {
-                    let field_names: Vec<String> = v.fields.iter().map(|(n, _)| n.clone()).collect();
+                    let field_names: Vec<String> =
+                        v.fields.iter().map(|(n, _)| n.clone()).collect();
                     variants.push((v.name.clone(), field_names.clone()));
                     // Register reverse mapping: variant_name → enum_name
-                    self.enum_variant_to_enum.insert(v.name.clone(), decl.name.clone());
+                    self.enum_variant_to_enum
+                        .insert(v.name.clone(), decl.name.clone());
                     // Bind unit variants (no fields) directly as values in the environment
                     if field_names.is_empty() {
                         self.env.define(
@@ -982,7 +1185,8 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 self.enum_defs.insert(decl.name.clone(), variants);
                 self.known_type_names.insert(decl.name.clone());
                 // Bind the enum type name as a TypeRef so Enum.Variant(...) dispatch works
-                self.env.define(&decl.name, Value::TypeRef(decl.name.clone()), false);
+                self.env
+                    .define(&decl.name, Value::TypeRef(decl.name.clone()), false);
                 Ok(Value::Null)
             }
             Item::StructDecl(decl) => {
@@ -1002,7 +1206,8 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 self.struct_defs.insert(decl.name.clone(), field_defs);
                 self.known_type_names.insert(decl.name.clone());
                 // Bind the type name in the environment so `TypeName.method()` works.
-                self.env.define(&decl.name, Value::TypeRef(decl.name.clone()), false);
+                self.env
+                    .define(&decl.name, Value::TypeRef(decl.name.clone()), false);
                 Ok(Value::Null)
             }
             Item::ImplDecl(decl) => {
@@ -1015,13 +1220,15 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 Ok(Value::Null)
             }
             Item::TraitDecl(decl) => {
-                let trait_method_defs: Vec<crate::value::TraitMethodDef> = decl.methods.iter().map(|m| {
-                    crate::value::TraitMethodDef {
+                let trait_method_defs: Vec<crate::value::TraitMethodDef> = decl
+                    .methods
+                    .iter()
+                    .map(|m| crate::value::TraitMethodDef {
                         name: m.name.clone(),
                         params: m.params.clone(),
                         default_body: m.default_body.clone(),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 self.trait_defs.insert(decl.name.clone(), trait_method_defs);
                 Ok(Value::Null)
             }
@@ -1046,9 +1253,12 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                     let mut defaults_to_add: Vec<crate::value::MethodDef> = Vec::new();
                     for default_method in &trait_def {
                         if let Some(body) = &default_method.default_body {
-                            let overridden = decl.methods.iter().any(|m| m.name == default_method.name);
+                            let overridden =
+                                decl.methods.iter().any(|m| m.name == default_method.name);
                             if !overridden {
-                                let is_static = default_method.params.first()
+                                let is_static = default_method
+                                    .params
+                                    .first()
                                     .map(|p| p.name != "self")
                                     .unwrap_or(true);
                                 defaults_to_add.push(crate::value::MethodDef {
@@ -1067,7 +1277,10 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                         }
                     }
                     let key = (decl.type_name.clone(), decl.trait_name.clone());
-                    self.trait_impls.entry(key.clone()).or_default().extend(defaults_to_add);
+                    self.trait_impls
+                        .entry(key.clone())
+                        .or_default()
+                        .extend(defaults_to_add);
                 }
                 let methods = self.compile_methods(&decl.methods);
                 let key = (decl.type_name.clone(), decl.trait_name.clone());
@@ -1080,9 +1293,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 self.bind_pattern(pattern, val, false)?;
                 Ok(Value::Null)
             }
-            Item::Import(decl) => {
-                self.exec_import(decl)
-            }
+            Item::Import(decl) => self.exec_import(decl),
         }
     }
 
@@ -1267,10 +1478,14 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         // e.g. StdModule { name: "hash", functions: ["sha256", ...] }
         //  → { "sha256": BuiltinFn("hash.sha256"), ... }
         let build_mod_map = |module: &std_modules::StdModule| -> BTreeMap<String, Value> {
-            module.functions.iter().map(|&fn_name| {
-                let fq_name = format!("{}.{}", module.name, fn_name);
-                (fn_name.to_string(), Value::BuiltinFn(fq_name))
-            }).collect()
+            module
+                .functions
+                .iter()
+                .map(|&fn_name| {
+                    let fq_name = format!("{}.{}", module.name, fn_name);
+                    (fn_name.to_string(), Value::BuiltinFn(fq_name))
+                })
+                .collect()
         };
 
         let find_module = |name: &str| -> Option<&std_modules::StdModule> {
@@ -1284,7 +1499,14 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 for item_name in items {
                     if let Some(module) = find_module(item_name) {
                         let mod_map = build_mod_map(module);
-                        self.env.define(item_name, Value::Module { name: item_name.clone(), entries: mod_map }, false);
+                        self.env.define(
+                            item_name,
+                            Value::Module {
+                                name: item_name.clone(),
+                                entries: mod_map,
+                            },
+                            false,
+                        );
                     } else {
                         return Err(Signal::Error(QueError::new(
                             ErrorKind::KeyNotFound,
@@ -1332,10 +1554,23 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             let mut std_entries = BTreeMap::new();
             for module in &modules {
                 let mod_map = build_mod_map(module);
-                std_entries.insert(module.name.to_string(), Value::Module { name: module.name.to_string(), entries: mod_map });
+                std_entries.insert(
+                    module.name.to_string(),
+                    Value::Module {
+                        name: module.name.to_string(),
+                        entries: mod_map,
+                    },
+                );
             }
             let name = decl.alias.as_deref().unwrap_or("std");
-            self.env.define(name, Value::Module { name: name.to_string(), entries: std_entries }, false);
+            self.env.define(
+                name,
+                Value::Module {
+                    name: name.to_string(),
+                    entries: std_entries,
+                },
+                false,
+            );
             return Ok(Value::Null);
         }
 
@@ -1345,7 +1580,10 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             if let Some(module) = find_module(mod_name) {
                 let mod_map = build_mod_map(module);
                 let bind_name = decl.alias.as_deref().unwrap_or(mod_name);
-                let module_val = Value::Module { name: bind_name.to_string(), entries: mod_map };
+                let module_val = Value::Module {
+                    name: bind_name.to_string(),
+                    entries: mod_map,
+                };
                 self.env.define(bind_name, module_val, false);
                 return Ok(Value::Null);
             } else {
@@ -1361,11 +1599,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
 
     fn exec_stmt(&mut self, stmt: &Stmt) -> IResult {
         match stmt {
-            Stmt::Let {
-                pattern,
-                value,
-                ..
-            } => {
+            Stmt::Let { pattern, value, .. } => {
                 let val = self.eval_expr(value)?;
                 self.bind_pattern(pattern, val, false)?;
                 Ok(Value::Null)
@@ -1475,9 +1709,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 // error channels never meet and `try { might_fail() }` falls
                 // straight through every `catch`.
                 let result = match result {
-                    Ok(Value::Err(payload)) => {
-                        Err(Signal::Error(err_value_to_error(&payload)))
-                    }
+                    Ok(Value::Err(payload)) => Err(Signal::Error(err_value_to_error(&payload))),
                     other => other,
                 };
                 let final_result = match result {
@@ -1541,9 +1773,10 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
 
     pub(crate) fn assign_target(&mut self, target: &Expr, value: Value) -> Result<(), Signal> {
         match target {
-            Expr::Ident(name) => self.env.set(name, value).map_err(|msg| {
-                Signal::Error(QueError::new(ErrorKind::ImmutableVariable, msg))
-            }),
+            Expr::Ident(name) => self
+                .env
+                .set(name, value)
+                .map_err(|msg| Signal::Error(QueError::new(ErrorKind::ImmutableVariable, msg))),
             Expr::Index { .. } | Expr::FieldAccess { .. } => {
                 let (root_name, segments) = self.extract_assign_path(target)?;
                 let root_val = self.env.get(&root_name).ok_or_else(|| {
@@ -1553,9 +1786,9 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                     ))
                 })?;
                 let new_root = Self::set_nested(&root_val, &segments, value)?;
-                self.env.set(&root_name, new_root).map_err(|msg| {
-                    Signal::Error(QueError::new(ErrorKind::ImmutableVariable, msg))
-                })
+                self.env
+                    .set(&root_name, new_root)
+                    .map_err(|msg| Signal::Error(QueError::new(ErrorKind::ImmutableVariable, msg)))
             }
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::InvalidAssignmentTarget,
@@ -1595,7 +1828,11 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
     }
 
     /// Recursively clone-and-modify a value at the given path of segments.
-    fn set_nested(root: &Value, segments: &[AssignSegment], new_val: Value) -> Result<Value, Signal> {
+    fn set_nested(
+        root: &Value,
+        segments: &[AssignSegment],
+        new_val: Value,
+    ) -> Result<Value, Signal> {
         if segments.is_empty() {
             return Ok(new_val);
         }
@@ -1605,7 +1842,11 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 Value::Map(map) => {
                     let mut new_map = map.clone();
                     let child = map.get(key).cloned().unwrap_or_else(|| {
-                        if tail.is_empty() { Value::Null } else { Value::Map(BTreeMap::new()) }
+                        if tail.is_empty() {
+                            Value::Null
+                        } else {
+                            Value::Map(BTreeMap::new())
+                        }
                     });
                     new_map.insert(key.clone(), Self::set_nested(&child, tail, new_val)?);
                     Ok(Value::Map(new_map))
@@ -1613,10 +1854,17 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 Value::Instance { type_name, fields } => {
                     let mut new_fields = fields.clone();
                     let child = fields.get(key).cloned().unwrap_or_else(|| {
-                        if tail.is_empty() { Value::Null } else { Value::Map(BTreeMap::new()) }
+                        if tail.is_empty() {
+                            Value::Null
+                        } else {
+                            Value::Map(BTreeMap::new())
+                        }
                     });
                     new_fields.insert(key.clone(), Self::set_nested(&child, tail, new_val)?);
-                    Ok(Value::Instance { type_name: type_name.clone(), fields: new_fields })
+                    Ok(Value::Instance {
+                        type_name: type_name.clone(),
+                        fields: new_fields,
+                    })
                 }
                 _ => Err(Signal::Error(QueError::new(
                     ErrorKind::TypeMismatch,
@@ -1639,7 +1887,11 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                 (Value::Map(map), Value::String(k)) => {
                     let mut new_map = map.clone();
                     let child = map.get(k).cloned().unwrap_or_else(|| {
-                        if tail.is_empty() { Value::Null } else { Value::Map(BTreeMap::new()) }
+                        if tail.is_empty() {
+                            Value::Null
+                        } else {
+                            Value::Map(BTreeMap::new())
+                        }
                     });
                     new_map.insert(k.clone(), Self::set_nested(&child, tail, new_val)?);
                     Ok(Value::Map(new_map))
@@ -1651,7 +1903,6 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             },
         }
     }
-
 
     // ── Block evaluation ─────────────────────────────────────────────
 
@@ -1879,7 +2130,6 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
         }
     }
 
-
     // ── Helpers ──────────────────────────────────────────────────────
 
     fn value_to_iterable(&self, val: Value) -> Result<Vec<Value>, Signal> {
@@ -1888,14 +2138,9 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
             Value::Set(items) => Ok(items),
             Value::Map(map) => Ok(map
                 .into_iter()
-                .map(|(k, v)| {
-                    Value::Tuple(vec![Value::String(k), v])
-                })
+                .map(|(k, v)| Value::Tuple(vec![Value::String(k), v]))
                 .collect()),
-            Value::String(s) => Ok(s
-                .chars()
-                .map(|c| Value::String(c.to_string()))
-                .collect()),
+            Value::String(s) => Ok(s.chars().map(|c| Value::String(c.to_string())).collect()),
             Value::Tuple(items) => Ok(items),
             // Iterating a glob or a directory reads the filesystem, so it is
             // checked and traced like `Glob.expand()` and `Path.ls()`.
@@ -1917,9 +2162,7 @@ fn new(prefix, dir) -> TempDir { TempDir { prefix, dir } }
                         Ok(entries) => {
                             let mut items = Vec::new();
                             for entry in entries.flatten() {
-                                items.push(Value::Path(
-                                    entry.path().to_string_lossy().to_string(),
-                                ));
+                                items.push(Value::Path(entry.path().to_string_lossy().to_string()));
                             }
                             Ok(items)
                         }
@@ -1972,10 +2215,10 @@ pub fn run(source: &str) -> Result<(Vec<String>, Value), QueError> {
         Err(Signal::Continue) => Err(QueError::runtime("continue outside of loop")),
         // In the library/test context, represent exit as an error so callers can observe it.
         Err(Signal::Exit(code)) => Err(QueError::runtime(format!("exit({})", code))),
-        Err(Signal::Interrupted(sig)) => Err(QueError::runtime(format!(
-            "interrupted by signal {}", sig
-        ))
-        .with_exit_code(crate::interrupt::exit_code_for(sig))),
+        Err(Signal::Interrupted(sig)) => {
+            Err(QueError::runtime(format!("interrupted by signal {}", sig))
+                .with_exit_code(crate::interrupt::exit_code_for(sig)))
+        }
     }
 }
 
@@ -1998,10 +2241,10 @@ pub fn run_strict(source: &str) -> Result<(Vec<String>, Value), QueError> {
         Err(Signal::Break(_)) => Err(QueError::runtime("break outside of loop")),
         Err(Signal::Continue) => Err(QueError::runtime("continue outside of loop")),
         Err(Signal::Exit(code)) => Err(QueError::runtime(format!("exit({})", code))),
-        Err(Signal::Interrupted(sig)) => Err(QueError::runtime(format!(
-            "interrupted by signal {}", sig
-        ))
-        .with_exit_code(crate::interrupt::exit_code_for(sig))),
+        Err(Signal::Interrupted(sig)) => {
+            Err(QueError::runtime(format!("interrupted by signal {}", sig))
+                .with_exit_code(crate::interrupt::exit_code_for(sig)))
+        }
     }
 }
 
@@ -2292,20 +2535,14 @@ mod tests {
 
     #[test]
     fn map_index_access() {
-        assert_eq!(
-            eval_val("let m = { \"x\": 42 }\nm[\"x\"]"),
-            Value::Int(42)
-        );
+        assert_eq!(eval_val("let m = { \"x\": 42 }\nm[\"x\"]"), Value::Int(42));
     }
 
     #[test]
     fn map_keys_method() {
         assert_eq!(
             eval_val("{ \"a\": 1, \"b\": 2 }.keys()"),
-            Value::List(vec![
-                Value::String("a".into()),
-                Value::String("b".into())
-            ])
+            Value::List(vec![Value::String("a".into()), Value::String("b".into())])
         );
     }
 
@@ -2391,14 +2628,8 @@ apply(|x| x * x, 5)
 
     #[test]
     fn if_expression() {
-        assert_eq!(
-            eval_val("if true { 1 } else { 2 }"),
-            Value::Int(1)
-        );
-        assert_eq!(
-            eval_val("if false { 1 } else { 2 }"),
-            Value::Int(2)
-        );
+        assert_eq!(eval_val("if true { 1 } else { 2 }"), Value::Int(1));
+        assert_eq!(eval_val("if false { 1 } else { 2 }"), Value::Int(2));
     }
 
     #[test]
@@ -2584,22 +2815,16 @@ if value == null { 0 } else { value }
             .duration_since(UNIX_EPOCH)
             .expect("time went backwards")
             .as_nanos();
-        let temp_root = std::env::temp_dir().join(format!("que-import-enum-{}-{}", std::process::id(), unique));
+        let temp_root =
+            std::env::temp_dir().join(format!("que-import-enum-{}-{}", std::process::id(), unique));
         fs::create_dir_all(&temp_root).expect("create temp dir");
 
         let colors_path = temp_root.join("colors.que");
         let main_path = temp_root.join("main.que");
 
-        fs::write(
-            &colors_path,
-            "pub enum Color {\n    Red\n    Blue\n}\n",
-        )
-        .expect("write colors module");
-        fs::write(
-            &main_path,
-            "import .colors { Color }\nColor.Red\n",
-        )
-        .expect("write main module");
+        fs::write(&colors_path, "pub enum Color {\n    Red\n    Blue\n}\n")
+            .expect("write colors module");
+        fs::write(&main_path, "import .colors { Color }\nColor.Red\n").expect("write main module");
 
         let result = eval_file(&main_path);
 
@@ -2669,10 +2894,7 @@ fn add_one(x) { x + 1 }
 
     #[test]
     fn pipe_with_lambda() {
-        assert_eq!(
-            eval_val("10 |> |x| x * 3"),
-            Value::Int(30)
-        );
+        assert_eq!(eval_val("10 |> |x| x * 3"), Value::Int(30));
     }
 
     #[test]
@@ -2765,10 +2987,7 @@ let name = "world"
 
     #[test]
     fn builtin_type() {
-        assert_eq!(
-            eval_val("typeof(42)"),
-            Value::String("Int".into())
-        );
+        assert_eq!(eval_val("typeof(42)"), Value::String("Int".into()));
         assert_eq!(
             eval_val("typeof(\"hello\")"),
             Value::String("String".into())
@@ -2791,10 +3010,7 @@ let name = "world"
 
     #[test]
     fn builtin_str() {
-        assert_eq!(
-            eval_val("str(42)"),
-            Value::String("42".into())
-        );
+        assert_eq!(eval_val("str(42)"), Value::String("42".into()));
     }
 
     #[test]
@@ -2883,7 +3099,6 @@ let name = "world"
         );
     }
 
-
     // ── Blocks as expressions ──
 
     #[test]
@@ -2903,10 +3118,7 @@ x
 
     #[test]
     fn path_literal() {
-        assert_eq!(
-            eval_val("path(\"./src\")"),
-            Value::Path("./src".into())
-        );
+        assert_eq!(eval_val("path(\"./src\")"), Value::Path("./src".into()));
     }
 
     #[test]
@@ -2996,17 +3208,17 @@ x
     #[test]
     fn path_depth_method() {
         assert_eq!(eval_val("path(\"src/main.rs\").depth()"), Value::Int(2));
-        assert_eq!(eval_val("path(\"/home/user/file.txt\").depth()"), Value::Int(4));
+        assert_eq!(
+            eval_val("path(\"/home/user/file.txt\").depth()"),
+            Value::Int(4)
+        );
     }
 
     // ── Duration ──
 
     #[test]
     fn duration_literal() {
-        assert_eq!(
-            eval_val("5s"),
-            Value::Duration(5.0, DurationUnit::Seconds)
-        );
+        assert_eq!(eval_val("5s"), Value::Duration(5.0, DurationUnit::Seconds));
     }
 
     #[test]
@@ -3109,7 +3321,10 @@ add5(3) + add10(3)
 
     #[test]
     fn optional_chaining_on_present_value() {
-        assert_eq!(eval_val("let x = \"hi\"\nx?.to_upper()"), Value::String("HI".into()));
+        assert_eq!(
+            eval_val("let x = \"hi\"\nx?.to_upper()"),
+            Value::String("HI".into())
+        );
     }
 
     #[test]
@@ -3124,26 +3339,14 @@ x ?? 0
 
     #[test]
     fn list_any_all() {
-        assert_eq!(
-            eval_val("[1, 2, 3].any(|x| x > 2)"),
-            Value::Bool(true)
-        );
-        assert_eq!(
-            eval_val("[1, 2, 3].all(|x| x > 0)"),
-            Value::Bool(true)
-        );
-        assert_eq!(
-            eval_val("[1, 2, 3].all(|x| x > 2)"),
-            Value::Bool(false)
-        );
+        assert_eq!(eval_val("[1, 2, 3].any(|x| x > 2)"), Value::Bool(true));
+        assert_eq!(eval_val("[1, 2, 3].all(|x| x > 0)"), Value::Bool(true));
+        assert_eq!(eval_val("[1, 2, 3].all(|x| x > 2)"), Value::Bool(false));
     }
 
     #[test]
     fn semver_literal() {
-        assert_eq!(
-            eval_val("v\"1.2.3\""),
-            Value::Semver("1.2.3".into())
-        );
+        assert_eq!(eval_val("v\"1.2.3\""), Value::Semver("1.2.3".into()));
     }
 
     #[test]
@@ -3212,18 +3415,12 @@ m
 
     #[test]
     fn regex_literal() {
-        assert_eq!(
-            eval_val("re\"\\d+\""),
-            Value::Regex("\\d+".into())
-        );
+        assert_eq!(eval_val("re\"\\d+\""), Value::Regex("\\d+".into()));
     }
 
     #[test]
     fn glob_literal() {
-        assert_eq!(
-            eval_val("glob(\"*.rs\")"),
-            Value::Glob("*.rs".into())
-        );
+        assert_eq!(eval_val("glob(\"*.rs\")"), Value::Glob("*.rs".into()));
     }
 
     #[test]
@@ -3329,10 +3526,7 @@ merged.keys()
 
     #[test]
     fn map_len_method() {
-        assert_eq!(
-            eval_val("{ \"a\": 1, \"b\": 2 }.len()"),
-            Value::Int(2)
-        );
+        assert_eq!(eval_val("{ \"a\": 1, \"b\": 2 }.len()"), Value::Int(2));
     }
 
     #[test]
@@ -3584,7 +3778,10 @@ task build {
 }
 str(build)
 "#;
-        assert_eq!(eval_val(source), Value::String("<task build — Build it>".into()));
+        assert_eq!(
+            eval_val(source),
+            Value::String("<task build — Build it>".into())
+        );
     }
 
     #[test]

@@ -2,7 +2,6 @@
 ///
 /// Covers all declarations, statements, expressions, and patterns
 /// described in the spec.
-
 use crate::token::{DurationUnit, Span};
 
 /// A complete Que source module.
@@ -288,7 +287,6 @@ pub enum Stmt {
     },
 }
 
-
 // ── Expressions ──
 
 #[derive(Debug, Clone, PartialEq)]
@@ -504,15 +502,20 @@ pub enum Pattern {
     StringLit(String),
     BoolLit(bool),
     NullLit,
-    Glob(String),                                   // glob("*.rs")
-    List(Vec<Pattern>, Option<Box<Pattern>>),     // [a, b, ...rest]
+    Glob(String),                             // glob("*.rs")
+    List(Vec<Pattern>, Option<Box<Pattern>>), // [a, b, ...rest]
     Tuple(Vec<Pattern>),
     Struct(Vec<(String, Option<Pattern>)>, Option<String>), // { name, age: p, ...rest }
     /// `TypeName { field, other: pat, ... }` or `EnumName.Variant { ... }`.
-    Instance(Option<String>, String, Vec<(String, Option<Pattern>)>, Option<String>),
+    Instance(
+        Option<String>,
+        String,
+        Vec<(String, Option<Pattern>)>,
+        Option<String>,
+    ),
     /// `Ok(value)` or `EnumName.variant(value)`.
     Enum(Option<String>, String, Vec<Pattern>),
     Range(Option<Box<Pattern>>, Option<Box<Pattern>>, bool), // 0..=255
     Or(Vec<Pattern>),
-    Binding(String, Box<Pattern>),                  // x @ pattern
+    Binding(String, Box<Pattern>), // x @ pattern
 }

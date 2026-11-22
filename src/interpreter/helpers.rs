@@ -6,7 +6,10 @@ use crate::value::Value;
 
 /// Recursively copy a directory tree from `src` to `dst`.
 /// Creates `dst` and all intermediate directories as needed.
-pub(crate) fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+pub(crate) fn copy_dir_recursive(
+    src: &std::path::Path,
+    dst: &std::path::Path,
+) -> std::io::Result<()> {
     std::fs::create_dir_all(dst)?;
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
@@ -56,9 +59,7 @@ pub(crate) fn resolve_into_dir(src: &std::path::Path, dest: String) -> String {
 /// origin for the matches: stripping it off `src/lib/a/b.rs` leaves `a/b.rs`,
 /// the shape the copy should keep at the destination.
 pub(crate) fn glob_base(pattern: &str) -> &str {
-    let wildcard = pattern
-        .find(['*', '?', '[', '{'])
-        .unwrap_or(pattern.len());
+    let wildcard = pattern.find(['*', '?', '[', '{']).unwrap_or(pattern.len());
     match pattern[..wildcard].rfind('/') {
         Some(slash) => &pattern[..slash],
         None => "",
@@ -187,7 +188,12 @@ pub(crate) fn shell_escape(s: &str) -> String {
 fn cmd_escape(s: &str) -> String {
     if !s.is_empty()
         && s.chars().all(|c| {
-            c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '/' || c == '\\'
+            c.is_alphanumeric()
+                || c == '-'
+                || c == '_'
+                || c == '.'
+                || c == '/'
+                || c == '\\'
                 || c == ':'
         })
     {
@@ -209,7 +215,10 @@ fn posix_escape(s: &str) -> String {
     }
 }
 
-pub(crate) fn two_args<'a>(args: &'a [Value], name: &str) -> Result<(&'a Value, &'a Value), Signal> {
+pub(crate) fn two_args<'a>(
+    args: &'a [Value],
+    name: &str,
+) -> Result<(&'a Value, &'a Value), Signal> {
     if args.len() < 2 {
         return Err(Signal::Error(QueError::new(
             ErrorKind::ArityMismatch,
@@ -289,9 +298,7 @@ pub(crate) fn char_index(i: i64, len: usize) -> usize {
 pub(crate) fn value_cmp(a: &Value, b: &Value) -> std::cmp::Ordering {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => a.cmp(b),
-        (Value::Float(a), Value::Float(b)) => {
-            a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-        }
+        (Value::Float(a), Value::Float(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal),
         (Value::String(a), Value::String(b)) => a.cmp(b),
         _ => std::cmp::Ordering::Equal,
     }
@@ -302,7 +309,12 @@ pub(crate) fn expect_int(args: &[Value], idx: usize, name: &str) -> Result<i64, 
         Some(Value::Int(n)) => Ok(*n),
         Some(other) => Err(Signal::Error(QueError::new(
             ErrorKind::TypeMismatch,
-            format!("{}() argument {} must be an int, got {}", name, idx + 1, other.type_name()),
+            format!(
+                "{}() argument {} must be an int, got {}",
+                name,
+                idx + 1,
+                other.type_name()
+            ),
         ))),
         None => Err(Signal::Error(QueError::new(
             ErrorKind::ArityMismatch,
@@ -338,7 +350,7 @@ pub(crate) fn check_semver_constraint(constraint: &str, version: &str) -> bool {
     };
 
     let ver = parse_ver(version);
-    
+
     for part in constraint.split(',') {
         let part = part.trim();
         let satisfied = if let Some(rest) = part.strip_prefix(">=") {
@@ -520,7 +532,10 @@ pub(crate) fn simple_regex_find(pattern: &str, input: &str) -> Option<String> {
 /// Find all regex matches.
 pub(crate) fn simple_regex_find_all(pattern: &str, input: &str) -> Vec<String> {
     match regex_lite::Regex::new(pattern) {
-        Ok(re) => re.find_iter(input).map(|m| m.as_str().to_string()).collect(),
+        Ok(re) => re
+            .find_iter(input)
+            .map(|m| m.as_str().to_string())
+            .collect(),
         Err(_) => Vec::new(),
     }
 }
@@ -558,7 +573,10 @@ pub(crate) fn simple_regex_captures(pattern: &str, input: &str) -> Vec<String> {
 
 /// Named regex captures — returns a map of capture group name → matched string.
 /// Groups that did not participate in the match are omitted from the map.
-pub(crate) fn simple_regex_named_captures(pattern: &str, input: &str) -> std::collections::BTreeMap<String, String> {
+pub(crate) fn simple_regex_named_captures(
+    pattern: &str,
+    input: &str,
+) -> std::collections::BTreeMap<String, String> {
     let mut result = std::collections::BTreeMap::new();
     let re = match regex_lite::Regex::new(pattern) {
         Ok(r) => r,
@@ -582,27 +600,29 @@ pub(crate) fn simple_regex_split(pattern: &str, input: &str) -> Vec<String> {
     }
 }
 
-
-
-
-
 // ── log types ──────────────────────────────────────────────────────────────
 
 /// Output format for log lines.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum LogFormat { Text, Json }
+pub(crate) enum LogFormat {
+    Text,
+    Json,
+}
 
 /// Where a log sink writes to.
 #[derive(Clone, Debug)]
-pub(crate) enum LogSinkKind { Console, File(String) }
+pub(crate) enum LogSinkKind {
+    Console,
+    File(String),
+}
 
 /// A registered log sink with optional overrides.
 #[derive(Clone, Debug)]
 pub(crate) struct LogSink {
     pub kind: LogSinkKind,
-    pub level: Option<u8>,                                     // per-sink min level
-    pub format: Option<LogFormat>,                             // per-sink format override
-    pub filter: Option<std::collections::BTreeMap<String, crate::value::Value>>,  // field-match filter
+    pub level: Option<u8>,         // per-sink min level
+    pub format: Option<LogFormat>, // per-sink format override
+    pub filter: Option<std::collections::BTreeMap<String, crate::value::Value>>, // field-match filter
 }
 
 /// Render one structured log field as JSON.
@@ -627,12 +647,16 @@ pub(crate) fn log_field_to_json(v: &crate::value::Value) -> serde_json::Value {
 }
 
 /// Parse a level name to its numeric value.
-pub(crate) fn parse_log_level(s: &str) -> Result<u8, String> {    match s.to_lowercase().as_str() {
+pub(crate) fn parse_log_level(s: &str) -> Result<u8, String> {
+    match s.to_lowercase().as_str() {
         "debug" => Ok(0),
-        "info"  => Ok(1),
-        "warn"  => Ok(2),
+        "info" => Ok(1),
+        "warn" => Ok(2),
         "error" => Ok(3),
-        other   => Err(format!("unknown log level '{}' (expected debug/info/warn/error)", other)),
+        other => Err(format!(
+            "unknown log level '{}' (expected debug/info/warn/error)",
+            other
+        )),
     }
 }
 
@@ -641,7 +665,10 @@ pub(crate) fn parse_log_format(s: &str) -> Result<LogFormat, String> {
     match s.to_lowercase().as_str() {
         "text" => Ok(LogFormat::Text),
         "json" => Ok(LogFormat::Json),
-        other  => Err(format!("unknown log format '{}' (expected text/json)", other)),
+        other => Err(format!(
+            "unknown log format '{}' (expected text/json)",
+            other
+        )),
     }
 }
 
@@ -706,10 +733,15 @@ impl super::Interpreter {
                 for (fk, fv) in filter {
                     match merged.get(fk) {
                         Some(v) if v.display_string() == fv.display_string() => {}
-                        _ => { matches = false; break; }
+                        _ => {
+                            matches = false;
+                            break;
+                        }
                     }
                 }
-                if !matches { continue; }
+                if !matches {
+                    continue;
+                }
             }
 
             // Format the line
@@ -719,7 +751,8 @@ impl super::Interpreter {
                     if merged.is_empty() {
                         format!("[{}] {} | {}", level, ts, msg)
                     } else {
-                        let kv: Vec<String> = merged.iter()
+                        let kv: Vec<String> = merged
+                            .iter()
                             .map(|(k, v)| format!("{}={}", k, v.display_string()))
                             .collect();
                         format!("[{}] {} | {} | {}", level, ts, msg, kv.join(" "))
@@ -763,8 +796,6 @@ impl super::Interpreter {
         Ok(crate::value::Value::Null)
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -816,7 +847,10 @@ mod tests {
 
     #[test]
     fn cmd_quoting_uses_double_quotes_because_cmd_has_no_single_ones() {
-        assert_eq!(cmd_escape("C:\\Program Files\\app"), "\"C:\\Program Files\\app\"");
+        assert_eq!(
+            cmd_escape("C:\\Program Files\\app"),
+            "\"C:\\Program Files\\app\""
+        );
         assert_eq!(cmd_escape("plain.txt"), "plain.txt");
         assert_eq!(cmd_escape("say \"hi\""), "\"say \"\"hi\"\"\"");
     }

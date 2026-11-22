@@ -21,11 +21,12 @@ impl Interpreter {
                     args.into_iter().map(|v| (None, v)).collect();
                 self.execute_task(task, named_args)
             }
-            "deps" => {
-                Ok(Value::List(
-                    task.depends_on.iter().map(|d| Value::String(d.clone())).collect(),
-                ))
-            }
+            "deps" => Ok(Value::List(
+                task.depends_on
+                    .iter()
+                    .map(|d| Value::String(d.clone()))
+                    .collect(),
+            )),
             "inputs" => {
                 // Evaluate input expressions and return as list.
                 // Plain strings are promoted to Path values since inputs are always file paths.
@@ -55,7 +56,10 @@ impl Interpreter {
             "env" => {
                 // Return the list of tracked env var names
                 Ok(Value::List(
-                    task.env_keys.iter().map(|k| Value::String(k.clone())).collect(),
+                    task.env_keys
+                        .iter()
+                        .map(|k| Value::String(k.clone()))
+                        .collect(),
                 ))
             }
             "status" => {
@@ -66,16 +70,17 @@ impl Interpreter {
                 }
             }
             "result" => self.task_result(&task.name),
-            "description" => {
-                Ok(task.description.as_ref()
-                    .map(|d| Value::String(d.clone()))
-                    .unwrap_or(Value::Null))
-            }
-            "aliases" => {
-                Ok(Value::List(
-                    task.aliases.iter().map(|a| Value::String(a.clone())).collect(),
-                ))
-            }
+            "description" => Ok(task
+                .description
+                .as_ref()
+                .map(|d| Value::String(d.clone()))
+                .unwrap_or(Value::Null)),
+            "aliases" => Ok(Value::List(
+                task.aliases
+                    .iter()
+                    .map(|a| Value::String(a.clone()))
+                    .collect(),
+            )),
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
                 format!("Task has no method '{}'", method),
@@ -132,14 +137,21 @@ impl Interpreter {
         // 1. Resolve and execute dependencies first
         for dep_name in depends_on {
             // Skip already-succeeded dependencies in this execution
-            if let Some(("succeeded", _)) = self.task_status.get(dep_name.as_str()).map(|(s, v)| (s.as_str(), v)) {
+            if let Some(("succeeded", _)) = self
+                .task_status
+                .get(dep_name.as_str())
+                .map(|(s, v)| (s.as_str(), v))
+            {
                 continue;
             }
 
             let dep_task = self.env.get(dep_name).ok_or_else(|| {
                 Signal::Error(QueError::new(
                     ErrorKind::UndefinedVariable,
-                    format!("dependency task '{}' not found (required by '{}')", dep_name, name),
+                    format!(
+                        "dependency task '{}' not found (required by '{}')",
+                        dep_name, name
+                    ),
                 ))
             })?;
 
@@ -194,11 +206,16 @@ impl Interpreter {
         }
 
         // Flat values for hashing (order: positional then named values)
-        let hash_args: Vec<Value> = positional.iter().chain(named.iter().map(|(_, v)| v)).cloned().collect();
+        let hash_args: Vec<Value> = positional
+            .iter()
+            .chain(named.iter().map(|(_, v)| v))
+            .cloned()
+            .collect();
 
         // 2. Check if we can skip (inputs/outputs freshness + param/env hash check)
         if self.should_skip_task(task, &hash_args)? {
-            self.task_status.insert(name.to_string(), ("skipped".to_string(), Value::Null));
+            self.task_status
+                .insert(name.to_string(), ("skipped".to_string(), Value::Null));
             self.emit(format!("{}", format!("[SKIP] {}", name).yellow()));
             return Ok(Value::Null);
         }
@@ -265,12 +282,16 @@ impl Interpreter {
                 let hash = self.compute_task_hash(task, &hash_args);
                 self.task_cache.insert(name.to_string(), hash);
                 self.record_task_result(task, &hash_args);
-                self.task_status.insert(name.to_string(), ("succeeded".to_string(), v.clone()));
+                self.task_status
+                    .insert(name.to_string(), ("succeeded".to_string(), v.clone()));
                 self.emit(format!("{}", format!("[DONE] {}", name).green()));
                 Ok(v)
             }
             Err(Signal::Error(e)) => {
-                self.task_status.insert(name.to_string(), ("failed".to_string(), Value::String(e.to_string())));
+                self.task_status.insert(
+                    name.to_string(),
+                    ("failed".to_string(), Value::String(e.to_string())),
+                );
                 self.emit(format!("{}", format!("[FAIL] {}", name).red()));
                 Err(Signal::Error(e))
             }
@@ -292,8 +313,13 @@ impl Interpreter {
         for key in &task.env_keys {
             key.hash(&mut hasher);
             match std::env::var(key) {
-                Ok(val) => { true.hash(&mut hasher); val.hash(&mut hasher); }
-                Err(_)  => { false.hash(&mut hasher); }
+                Ok(val) => {
+                    true.hash(&mut hasher);
+                    val.hash(&mut hasher);
+                }
+                Err(_) => {
+                    false.hash(&mut hasher);
+                }
             }
         }
         hasher.finish()
@@ -417,10 +443,7 @@ impl Interpreter {
         if let Some(dir) = &self.task_cache_dir_override {
             return Some(dir.clone());
         }
-        self.script_path
-            .as_ref()?
-            .parent()
-            .map(|p| p.to_path_buf())
+        self.script_path.as_ref()?.parent().map(|p| p.to_path_buf())
     }
 
     /// Content-hash a set of paths, dropping the ones that cannot be read.
@@ -446,8 +469,12 @@ impl Interpreter {
         };
         self.task_cache_file.load_from(&dir);
 
-        let inputs = self.eval_task_paths(&task.inputs.clone(), true).unwrap_or_default();
-        let outputs = self.eval_task_paths(&task.outputs.clone(), false).unwrap_or_default();
+        let inputs = self
+            .eval_task_paths(&task.inputs.clone(), true)
+            .unwrap_or_default();
+        let outputs = self
+            .eval_task_paths(&task.outputs.clone(), false)
+            .unwrap_or_default();
         let entry = super::task_cache::TaskEntry {
             args_hash: self.compute_task_hash(task, args),
             inputs: Self::hash_paths(&inputs),
@@ -468,7 +495,11 @@ impl Interpreter {
     ///    successful run recorded? A timestamp says when a file was written,
     ///    not whether the bytes differ, and a checkout, a restored CI cache or
     ///    a `touch` rewrites the former without touching the latter.
-    fn should_skip_task(&mut self, task: &crate::value::TaskData, args: &[Value]) -> Result<bool, Signal> {
+    fn should_skip_task(
+        &mut self,
+        task: &crate::value::TaskData,
+        args: &[Value],
+    ) -> Result<bool, Signal> {
         // No outputs declared → always run (side-effect-only task)
         if task.outputs.is_empty() {
             return Ok(false);
@@ -572,5 +603,4 @@ impl Interpreter {
 
         Ok(true)
     }
-
 }

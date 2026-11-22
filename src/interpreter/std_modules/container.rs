@@ -9,10 +9,10 @@
 //! everything here and pretending otherwise would force every podman user to
 //! write `docker` in their scripts.
 
-use crate::error::*;
-use crate::value::{CmdModifiers, CmdPart, Value};
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::{CmdModifiers, CmdPart, Value};
 use std::collections::BTreeMap;
 
 pub(super) fn module() -> StdModule {
@@ -61,9 +61,7 @@ fn detect_engine() -> Option<&'static str> {
 
 fn which_exists(name: &str) -> bool {
     std::env::var_os("PATH")
-        .map(|paths| {
-            std::env::split_paths(&paths).any(|dir| dir.join(name).is_file())
-        })
+        .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()))
         .unwrap_or(false)
 }
 
@@ -174,9 +172,7 @@ impl Interpreter {
                             b.flag_value("-e", &k);
                             b.child_env(k.clone(), plain.clone());
                         }
-                        other => {
-                            b.flag_value("-e", &format!("{}={}", k, other.display_string()))
-                        }
+                        other => b.flag_value("-e", &format!("{}={}", k, other.display_string())),
                     }
                 }
                 if let Some(v) = opts.get("workdir") {
@@ -189,7 +185,10 @@ impl Interpreter {
                         b.flag_value("-u", &v.display_string());
                     }
                 }
-                if opts.get("network") .is_some_and(|v| !matches!(v, Value::Null)) {
+                if opts
+                    .get("network")
+                    .is_some_and(|v| !matches!(v, Value::Null))
+                {
                     b.flag_value("--network", &opts["network"].display_string());
                 }
                 b.extra(opts.get("args"));
@@ -227,12 +226,12 @@ impl Interpreter {
                     // handle every other function in this module accepts.
                     // Attached: stdout is whatever the container printed,
                     // which is what the caller wanted in that case.
-                    Outcome::Ok(_) if tty => {
-                        Ok(Value::Ok(Box::new(Value::String(named.unwrap_or_default()))))
-                    }
-                    Outcome::Ok(stdout) => {
-                        Ok(Value::Ok(Box::new(Value::String(stdout.trim().to_string()))))
-                    }
+                    Outcome::Ok(_) if tty => Ok(Value::Ok(Box::new(Value::String(
+                        named.unwrap_or_default(),
+                    )))),
+                    Outcome::Ok(stdout) => Ok(Value::Ok(Box::new(Value::String(
+                        stdout.trim().to_string(),
+                    )))),
                 }
             }
 
@@ -314,15 +313,22 @@ impl Interpreter {
                 b.value(&name);
                 let (parts, mods) = b.build();
                 match self.run_cmd_parts(&parts, &mods)? {
-                    Value::ProcessResult { exit_code, stdout, stderr } => {
+                    Value::ProcessResult {
+                        exit_code,
+                        stdout,
+                        stderr,
+                    } => {
                         if exit_code == 0 {
                             // Container logs arrive on both streams; a caller
                             // asking for "the logs" wants both.
                             Ok(Value::Ok(Box::new(Value::String(format!(
-                                "{}{}", stdout, stderr
+                                "{}{}",
+                                stdout, stderr
                             )))))
                         } else {
-                            Ok(Value::Err(Box::new(Value::String(stderr.trim().to_string()))))
+                            Ok(Value::Err(Box::new(Value::String(
+                                stderr.trim().to_string(),
+                            ))))
                         }
                     }
                     other => Ok(Value::Ok(Box::new(other))),
@@ -393,9 +399,11 @@ impl Interpreter {
                     return Ok(Value::Ok(Box::new(Value::Null)));
                 }
                 match self.run_cmd_parts(&parts, &mods)? {
-                    Value::ProcessResult { exit_code, stderr, .. } if exit_code != 0 => {
-                        Ok(Value::Err(Box::new(Value::String(stderr.trim().to_string()))))
-                    }
+                    Value::ProcessResult {
+                        exit_code, stderr, ..
+                    } if exit_code != 0 => Ok(Value::Err(Box::new(Value::String(
+                        stderr.trim().to_string(),
+                    )))),
                     _ => Ok(Value::Ok(Box::new(Value::Null))),
                 }
             }
@@ -418,9 +426,9 @@ impl Interpreter {
         let result = self.run_cmd_parts(&parts, &mods);
         self.dry_run = was_dry;
         match result? {
-            Value::ProcessResult { exit_code, stdout, .. } if exit_code == 0 => {
-                Ok(Some(stdout.trim().to_string()))
-            }
+            Value::ProcessResult {
+                exit_code, stdout, ..
+            } if exit_code == 0 => Ok(Some(stdout.trim().to_string())),
             _ => Ok(None),
         }
     }
@@ -432,7 +440,10 @@ impl Interpreter {
         let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
         loop {
             self.check_interrupt()?;
-            match self.inspect(name, "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}")? {
+            match self.inspect(
+                name,
+                "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}",
+            )? {
                 None => {
                     return Ok(Value::Err(Box::new(Value::String(format!(
                         "container '{}' does not exist",
@@ -498,7 +509,11 @@ impl Interpreter {
             return Ok(Outcome::DryRun);
         }
         match self.run_cmd_parts(&parts, &mods)? {
-            Value::ProcessResult { exit_code, stdout, stderr } => {
+            Value::ProcessResult {
+                exit_code,
+                stdout,
+                stderr,
+            } => {
                 if exit_code == 0 {
                     Ok(Outcome::Ok(stdout))
                 } else {
@@ -613,7 +628,12 @@ fn string_arg(v: Option<&Value>, who: &str, what: &str) -> Result<String, Signal
         Some(Value::String(s)) | Some(Value::Path(s)) => Ok(s.clone()),
         Some(other) => Err(Signal::Error(QueError::new(
             ErrorKind::TypeMismatch,
-            format!("{}: {} must be a String, got {}", who, what, other.type_name()),
+            format!(
+                "{}: {} must be a String, got {}",
+                who,
+                what,
+                other.type_name()
+            ),
         ))),
         None => Err(Signal::Error(QueError::new(
             ErrorKind::ArityMismatch,
@@ -651,7 +671,10 @@ mod tests {
         let (parts, mods) = b.build();
         let text = crate::interpreter::methods::render_cmd(&parts);
         assert!(!text.contains("hunter2"), "{}", text);
-        assert_eq!(mods.env_vars, vec![("TOKEN".to_string(), "hunter2".to_string())]);
+        assert_eq!(
+            mods.env_vars,
+            vec![("TOKEN".to_string(), "hunter2".to_string())]
+        );
     }
 
     #[test]

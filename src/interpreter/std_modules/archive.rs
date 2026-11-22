@@ -1,10 +1,10 @@
 //! std.archive module — Create and extract tar.gz and zip archives.
 
-use crate::error::*;
-use crate::value::Value;
-use crate::interpreter::helpers::{arg_path_str, path_arg};
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::interpreter::helpers::{arg_path_str, path_arg};
+use crate::value::Value;
 
 pub(super) fn module() -> StdModule {
     StdModule {
@@ -56,7 +56,9 @@ impl Interpreter {
             "list" => {
                 let src = arg_path_str(args, 0, "archive.list")?;
                 let entries = list_archive(&src).map_err(|e| sig_err(e))?;
-                Ok(Value::List(entries.into_iter().map(Value::String).collect()))
+                Ok(Value::List(
+                    entries.into_iter().map(Value::String).collect(),
+                ))
             }
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
@@ -108,11 +110,21 @@ fn resolve_archive_entries(
             Value::Map(m) => {
                 let src_str = match m.get("src").and_then(|v| v.as_path()) {
                     Some(s) => s,
-                    None => return Err("archive entry map must have a \"src\" key of type Path or String".into()),
+                    None => {
+                        return Err(
+                            "archive entry map must have a \"src\" key of type Path or String"
+                                .into(),
+                        )
+                    }
                 };
                 let dest_str = match m.get("dest") {
                     Some(Value::Path(d)) | Some(Value::String(d)) => d.clone(),
-                    _ => return Err("archive entry map must have a \"dest\" key of type Path or String".into()),
+                    _ => {
+                        return Err(
+                            "archive entry map must have a \"dest\" key of type Path or String"
+                                .into(),
+                        )
+                    }
                 };
                 // Optional Unix permission bits: { src: ..., dest: ..., mode: 0o755 }
                 let mode = match m.get("mode") {
@@ -129,10 +141,12 @@ fn resolve_archive_entries(
                 let local_path = std::path::Path::new(&src_str);
                 expand_source_with_mode(local_path, &src_str, &archive_base, mode, &mut entries)?;
             }
-            other => return Err(format!(
-                "archive source list must contain Paths or {{src, dest}} maps, got {}",
-                other.type_name()
-            )),
+            other => {
+                return Err(format!(
+                    "archive source list must contain Paths or {{src, dest}} maps, got {}",
+                    other.type_name()
+                ))
+            }
         }
     }
     Ok(entries)
@@ -143,7 +157,11 @@ fn resolve_archive_entries(
 fn normalize_dest(dest: &str) -> String {
     let s = dest.replace('\\', "/");
     let s = s.trim_matches('/');
-    if s == "." { String::new() } else { s.to_string() }
+    if s == "." {
+        String::new()
+    } else {
+        s.to_string()
+    }
 }
 
 fn join_archive_path(prefix: Option<&str>, component: &str) -> String {
@@ -151,7 +169,11 @@ fn join_archive_path(prefix: Option<&str>, component: &str) -> String {
         Some(p) if !p.is_empty() => {
             let p = p.trim_end_matches('/');
             let c = component.trim_start_matches('/');
-            if c.is_empty() { p.to_string() } else { format!("{}/{}", p, c) }
+            if c.is_empty() {
+                p.to_string()
+            } else {
+                format!("{}/{}", p, c)
+            }
         }
         _ => component.to_string(),
     }
@@ -161,9 +183,9 @@ fn join_archive_path(prefix: Option<&str>, component: &str) -> String {
 /// Avoids producing paths with leading `./` or double slashes.
 fn make_archive_path(base: &str, rel: &str) -> String {
     match (base.is_empty(), rel.is_empty()) {
-        (true,  true)  => String::new(),
-        (true,  false) => rel.to_string(),
-        (false, true)  => base.to_string(),
+        (true, true) => String::new(),
+        (true, false) => rel.to_string(),
+        (false, true) => base.to_string(),
         (false, false) => format!("{}/{}", base, rel),
     }
 }
@@ -218,7 +240,8 @@ fn expand_dir(
     if items.is_empty() {
         // Empty directory — record as a directory entry so it is preserved
         // in the archive (tar DIRTYPE entry, zip directory entry).
-        let rel = dir.strip_prefix(base_dir)
+        let rel = dir
+            .strip_prefix(base_dir)
             .map(|r| r.to_string_lossy().replace('\\', "/"))
             .unwrap_or_default();
         let archive_path = make_archive_path(archive_base, &rel);
@@ -241,7 +264,8 @@ fn expand_dir(
 
     for item in &items {
         let path = item.path();
-        let rel = path.strip_prefix(base_dir)
+        let rel = path
+            .strip_prefix(base_dir)
             .map(|r| r.to_string_lossy().replace('\\', "/"))
             .unwrap_or_default();
         let archive_path = make_archive_path(archive_base, &rel);
@@ -260,11 +284,7 @@ fn expand_dir(
     Ok(())
 }
 
-fn create_tar_gz(
-    out_path: &str,
-    sources: &[Value],
-    prefix: Option<&str>,
-) -> Result<(), String> {
+fn create_tar_gz(out_path: &str, sources: &[Value], prefix: Option<&str>) -> Result<(), String> {
     use flate2::write::GzEncoder;
     use flate2::Compression;
     use tar::{Builder, Header};
@@ -316,8 +336,8 @@ fn create_zip_archive(
     sources: &[Value],
     prefix: Option<&str>,
 ) -> Result<(), String> {
-    use zip::write::ZipWriter;
     use zip::write::SimpleFileOptions;
+    use zip::write::ZipWriter;
     let entries = resolve_archive_entries(sources, prefix)?;
     let file = std::fs::File::create(out_path).map_err(|e| e.to_string())?;
     let mut zip = ZipWriter::new(file);
@@ -339,7 +359,8 @@ fn create_zip_archive(
             // zipping a build script and unzipping it produced a file that
             // would not run. tar preserved the source mode all along; this
             // makes the two formats agree.
-            let mut opts = options.unix_permissions(entry.mode.unwrap_or_else(|| source_mode(&metadata)));
+            let mut opts =
+                options.unix_permissions(entry.mode.unwrap_or_else(|| source_mode(&metadata)));
             if let Some(mtime) = zip_mtime(&metadata) {
                 opts = opts.last_modified_time(mtime);
             }
@@ -434,25 +455,37 @@ fn list_archive(src: &str) -> Result<Vec<String>, String> {
         let file = std::fs::File::open(src).map_err(|e| e.to_string())?;
         let dec = GzDecoder::new(file);
         let mut archive = Archive::new(dec);
-        archive.entries().map_err(|e| e.to_string())?
+        archive
+            .entries()
+            .map_err(|e| e.to_string())?
             .filter_map(|e| e.ok())
-            .map(|e| e.path().map(|p| p.to_string_lossy().into_owned()).map_err(|e| e.to_string()))
+            .map(|e| {
+                e.path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|e| e.to_string())
+            })
             .collect()
     } else if lower.ends_with(".tar") {
         use tar::Archive;
         let file = std::fs::File::open(src).map_err(|e| e.to_string())?;
         let mut archive = Archive::new(file);
-        archive.entries().map_err(|e| e.to_string())?
+        archive
+            .entries()
+            .map_err(|e| e.to_string())?
             .filter_map(|e| e.ok())
-            .map(|e| e.path().map(|p| p.to_string_lossy().into_owned()).map_err(|e| e.to_string()))
+            .map(|e| {
+                e.path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|e| e.to_string())
+            })
             .collect()
     } else if lower.ends_with(".zip") {
         use zip::ZipArchive;
         let file = std::fs::File::open(src).map_err(|e| e.to_string())?;
         let archive = ZipArchive::new(file).map_err(|e| e.to_string())?;
-        Ok((0..archive.len()).map(|i| {
-            archive.name_for_index(i).unwrap_or("").to_string()
-        }).collect())
+        Ok((0..archive.len())
+            .map(|i| archive.name_for_index(i).unwrap_or("").to_string())
+            .collect())
     } else {
         Err(format!("unsupported archive format: {}", src))
     }

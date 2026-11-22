@@ -1,10 +1,10 @@
 //! std.dotenv module — Load, parse, and write .env files.
 
-use crate::error::*;
-use crate::value::Value;
-use crate::interpreter::helpers::arg_path_str;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::interpreter::helpers::arg_path_str;
+use crate::value::Value;
 
 use std::collections::BTreeMap;
 
@@ -37,7 +37,8 @@ impl Interpreter {
             "parse" => {
                 let path_str = arg_path_str(args, 0, "dotenv.parse")?;
                 let vars = dotenv_parse_file(&path_str).map_err(|e| sig_err(e))?;
-                let map: BTreeMap<String, Value> = vars.into_iter()
+                let map: BTreeMap<String, Value> = vars
+                    .into_iter()
                     .map(|(k, v)| (k, Value::String(v)))
                     .collect();
                 Ok(Value::Map(map))
@@ -82,7 +83,9 @@ fn dotenv_parse_str(content: &str) -> Result<std::collections::HashMap<String, S
     let mut map = std::collections::HashMap::new();
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() || line.starts_with('#') { continue; }
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
         if let Some((key_val, _comment)) = line.split_once(" #") {
             let line = key_val.trim();
             if let Some((k, v)) = line.split_once('=') {
@@ -101,7 +104,7 @@ fn dotenv_parse_str(content: &str) -> Result<std::collections::HashMap<String, S
 
 fn unquote_dotenv_value(s: &str) -> String {
     if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
-        s[1..s.len()-1].to_string()
+        s[1..s.len() - 1].to_string()
     } else {
         s.to_string()
     }

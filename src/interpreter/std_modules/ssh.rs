@@ -13,10 +13,10 @@
 //! pipelines and `--dry-run` all work on a remote command with no extra code,
 //! and a remote command reads like a local one.
 
-use crate::error::*;
-use crate::value::{CmdModifiers, CmdPart, Value};
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::{CmdModifiers, CmdPart, Value};
 
 pub(super) fn module() -> StdModule {
     StdModule {
@@ -79,9 +79,7 @@ impl Interpreter {
                 };
                 match self.run_cmd_parts(&parts, &mods) {
                     Ok(result) => Ok(Value::Ok(Box::new(result))),
-                    Err(Signal::Error(e)) => {
-                        Ok(Value::Err(Box::new(Value::String(e.message))))
-                    }
+                    Err(Signal::Error(e)) => Ok(Value::Err(Box::new(Value::String(e.message)))),
                     Err(other) => Err(other),
                 }
             }
@@ -93,7 +91,11 @@ impl Interpreter {
                     _ => unreachable!(),
                 };
                 match self.run_cmd_parts(&parts, &mods)? {
-                    Value::ProcessResult { exit_code, stdout, stderr } => {
+                    Value::ProcessResult {
+                        exit_code,
+                        stdout,
+                        stderr,
+                    } => {
                         if exit_code == 0 {
                             Ok(Value::Ok(Box::new(Value::String(
                                 stdout.trim_end().to_string(),
@@ -124,9 +126,7 @@ impl Interpreter {
                 };
                 mods.silent = true;
                 match self.run_cmd_parts(&parts, &mods) {
-                    Ok(Value::ProcessResult { exit_code, .. }) => {
-                        Ok(Value::Bool(exit_code == 0))
-                    }
+                    Ok(Value::ProcessResult { exit_code, .. }) => Ok(Value::Bool(exit_code == 0)),
                     Ok(_) => Ok(Value::Bool(false)),
                     Err(Signal::Error(_)) => Ok(Value::Bool(false)),
                     Err(other) => Err(other),
@@ -197,7 +197,9 @@ impl Interpreter {
             text.push_str(&format!(" -p {}", port));
         }
         text.push(' ');
-        text.push_str(&crate::interpreter::helpers::shell_escape(&target(host, opts)));
+        text.push_str(&crate::interpreter::helpers::shell_escape(&target(
+            host, opts,
+        )));
         text.push(' ');
         text.push_str(&shell_quote(command));
         Value::Cmd(
@@ -226,7 +228,9 @@ impl Interpreter {
             return Ok(Value::Ok(Box::new(success)));
         }
         match self.run_cmd_parts(&parts, &mods)? {
-            Value::ProcessResult { exit_code, stderr, .. } => {
+            Value::ProcessResult {
+                exit_code, stderr, ..
+            } => {
                 if exit_code == 0 {
                     Ok(Value::Ok(Box::new(success)))
                 } else {
@@ -336,7 +340,12 @@ fn string_arg(v: Option<&Value>, who: &str, what: &str) -> Result<String, Signal
         Some(Value::String(s)) => Ok(s.clone()),
         Some(other) => Err(Signal::Error(QueError::new(
             ErrorKind::TypeMismatch,
-            format!("{}: {} must be a String, got {}", who, what, other.type_name()),
+            format!(
+                "{}: {} must be a String, got {}",
+                who,
+                what,
+                other.type_name()
+            ),
         ))),
         None => Err(Signal::Error(QueError::new(
             ErrorKind::ArityMismatch,

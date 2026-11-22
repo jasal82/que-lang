@@ -11,7 +11,6 @@ use std::io::{BufReader, BufWriter};
 use std::sync::{Arc, Mutex};
 
 impl Interpreter {
-
     /// Enforce the capability policy for a global builtin.
     ///
     /// Split out of `call_builtin` because the two argument-dependent cases
@@ -38,7 +37,11 @@ impl Interpreter {
                 // Anything that is not a read is treated as a write,
                 // including a mode string the interpreter will go on to
                 // reject: the check must not be the lenient one.
-                let cap = if mode == "r" { Capability::Read } else { Capability::Write };
+                let cap = if mode == "r" {
+                    Capability::Read
+                } else {
+                    Capability::Write
+                };
                 (cap, Some(0))
             }
             GlobalEffect::EnvVars(idx) => {
@@ -68,9 +71,10 @@ impl Interpreter {
             }
             GlobalEffect::DirTarget => {
                 let target = match args.first() {
-                    Some(Value::Instance { fields, .. }) => {
-                        fields.get("path").map(|v| v.display_string()).unwrap_or_default()
-                    }
+                    Some(Value::Instance { fields, .. }) => fields
+                        .get("path")
+                        .map(|v| v.display_string())
+                        .unwrap_or_default(),
                     other => other.map(|v| v.display_string()).unwrap_or_default(),
                 };
                 return self.check_permission(Capability::Read, &target);
@@ -201,25 +205,23 @@ impl Interpreter {
             }
             "min" => {
                 let (a, b) = two_args(&args, "min")?;
-                self.eval_cmp(a, b, |o| o.is_lt())
-                    .and_then(|v| {
-                        if v == Value::Bool(true) {
-                            Ok(a.clone())
-                        } else {
-                            Ok(b.clone())
-                        }
-                    })
+                self.eval_cmp(a, b, |o| o.is_lt()).and_then(|v| {
+                    if v == Value::Bool(true) {
+                        Ok(a.clone())
+                    } else {
+                        Ok(b.clone())
+                    }
+                })
             }
             "max" => {
                 let (a, b) = two_args(&args, "max")?;
-                self.eval_cmp(a, b, |o| o.is_gt())
-                    .and_then(|v| {
-                        if v == Value::Bool(true) {
-                            Ok(a.clone())
-                        } else {
-                            Ok(b.clone())
-                        }
-                    })
+                self.eval_cmp(a, b, |o| o.is_gt()).and_then(|v| {
+                    if v == Value::Bool(true) {
+                        Ok(a.clone())
+                    } else {
+                        Ok(b.clone())
+                    }
+                })
             }
             "range" => {
                 let (start, end) = two_args(&args, "range")?;
@@ -248,11 +250,10 @@ impl Interpreter {
             // Map.map_values). `|>` keeps working — it is for your own
             // functions, and `xs |> filter(f)` was only ever `xs.filter(f)`
             // spelled longer.
-            "len" | "push" | "pop" | "keys" | "values" | "contains" | "split"
-            | "trim" | "join" | "replace" | "chars" | "filter" | "map"
-            | "fold" | "flat_map" | "group_by" | "sort_by" | "any" | "all"
-            | "find" | "zip" | "enumerate" | "take" | "skip" | "chunk"
-            | "partition" | "flatten" | "each" | "for_each" => {
+            "len" | "push" | "pop" | "keys" | "values" | "contains" | "split" | "trim" | "join"
+            | "replace" | "chars" | "filter" | "map" | "fold" | "flat_map" | "group_by"
+            | "sort_by" | "any" | "all" | "find" | "zip" | "enumerate" | "take" | "skip"
+            | "chunk" | "partition" | "flatten" | "each" | "for_each" => {
                 // `for_each` and `each` were already one arm; both now point
                 // at the one surviving method.
                 let method = if name == "for_each" { "each" } else { name };
@@ -264,41 +265,35 @@ impl Interpreter {
                     ),
                 )))
             }
-            "chr" => {
-                match args.first() {
-                    Some(Value::Int(n)) => {
-                        match char::from_u32(*n as u32) {
-                            Some(c) => Ok(Value::String(c.to_string())),
-                            None => Err(Signal::Error(QueError::new(
-                                ErrorKind::Runtime,
-                                &format!("chr(): {} is not a valid Unicode code point", n),
-                            ))),
-                        }
-                    }
-                    _ => Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "chr() requires an integer",
+            "chr" => match args.first() {
+                Some(Value::Int(n)) => match char::from_u32(*n as u32) {
+                    Some(c) => Ok(Value::String(c.to_string())),
+                    None => Err(Signal::Error(QueError::new(
+                        ErrorKind::Runtime,
+                        &format!("chr(): {} is not a valid Unicode code point", n),
                     ))),
-                }
-            }
-            "ord" => {
-                match args.first() {
-                    Some(Value::String(s)) => {
-                        let mut chars = s.chars();
-                        match (chars.next(), chars.next()) {
-                            (Some(c), None) => Ok(Value::Int(c as i64)),
-                            _ => Err(Signal::Error(QueError::new(
-                                ErrorKind::Runtime,
-                                "ord() requires a single-character string",
-                            ))),
-                        }
+                },
+                _ => Err(Signal::Error(QueError::new(
+                    ErrorKind::TypeMismatch,
+                    "chr() requires an integer",
+                ))),
+            },
+            "ord" => match args.first() {
+                Some(Value::String(s)) => {
+                    let mut chars = s.chars();
+                    match (chars.next(), chars.next()) {
+                        (Some(c), None) => Ok(Value::Int(c as i64)),
+                        _ => Err(Signal::Error(QueError::new(
+                            ErrorKind::Runtime,
+                            "ord() requires a single-character string",
+                        ))),
                     }
-                    _ => Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "ord() requires a string",
-                    ))),
                 }
-            }
+                _ => Err(Signal::Error(QueError::new(
+                    ErrorKind::TypeMismatch,
+                    "ord() requires a string",
+                ))),
+            },
             "Ok" => {
                 let val = args.into_iter().next().unwrap_or(Value::Null);
                 Ok(Value::Ok(Box::new(val)))
@@ -307,18 +302,14 @@ impl Interpreter {
                 let val = args.into_iter().next().unwrap_or(Value::Null);
                 Ok(Value::Err(Box::new(val)))
             }
-            "Some" | "None" => {
-                Err(Signal::Error(QueError::new(
-                    ErrorKind::Runtime,
-                    "`Option`/`Some`/`None` were removed; use `null`, `??` and `?.` instead",
-                )))
-            }
-            "env" => {
-                Err(Signal::Error(QueError::new(
-                    ErrorKind::Runtime,
-                    "`env(KEY)` was removed; `env` is a namespace — use `env.get(KEY)`",
-                )))
-            }
+            "Some" | "None" => Err(Signal::Error(QueError::new(
+                ErrorKind::Runtime,
+                "`Option`/`Some`/`None` were removed; use `null`, `??` and `?.` instead",
+            ))),
+            "env" => Err(Signal::Error(QueError::new(
+                ErrorKind::Runtime,
+                "`env(KEY)` was removed; `env` is a namespace — use `env.get(KEY)`",
+            ))),
             // Contextual enter/exit for EnvScope (called by WithContext via trait impl)
             "__ctx_envscope_enter" => {
                 self.host
@@ -326,10 +317,12 @@ impl Interpreter {
                 let vars = match args.first() {
                     Some(Value::Instance { fields, .. }) => match fields.get("vars") {
                         Some(Value::Map(m)) => m.clone(),
-                        _ => return Err(Signal::Error(QueError::new(
-                            ErrorKind::TypeMismatch,
-                            "env.scope() requires a map of variables",
-                        ))),
+                        _ => {
+                            return Err(Signal::Error(QueError::new(
+                                ErrorKind::TypeMismatch,
+                                "env.scope() requires a map of variables",
+                            )))
+                        }
                     },
                     _ => BTreeMap::new(),
                 };
@@ -360,15 +353,23 @@ impl Interpreter {
             }
             // Contextual enter/exit for TempDir (called by WithContext via trait impl)
             "__ctx_tempdir_enter" => {
-                let (prefix, parent_dir) = if let Some(Value::Instance { fields, .. }) = args.first() {
-                    let prefix = fields.get("prefix")
-                        .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
-                        .unwrap_or_else(|| "que_".to_string());
-                    let parent = fields.get("dir").and_then(|v| v.as_path());
-                    (prefix, parent)
-                } else {
-                    ("que_".to_string(), None)
-                };
+                let (prefix, parent_dir) =
+                    if let Some(Value::Instance { fields, .. }) = args.first() {
+                        let prefix = fields
+                            .get("prefix")
+                            .and_then(|v| {
+                                if let Value::String(s) = v {
+                                    Some(s.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_else(|| "que_".to_string());
+                        let parent = fields.get("dir").and_then(|v| v.as_path());
+                        (prefix, parent)
+                    } else {
+                        ("que_".to_string(), None)
+                    };
                 match super::std_modules::fs::create_temp_dir_in(&prefix, parent_dir.as_deref()) {
                     Ok(path) => Ok(Value::Path(path)),
                     Err(e) => Err(Signal::Error(QueError::new(ErrorKind::IoError, e))),
@@ -384,19 +385,38 @@ impl Interpreter {
                 Ok(Value::Null)
             }
             "__ctx_tempfile_enter" => {
-                let (prefix, suffix, parent_dir) = if let Some(Value::Instance { fields, .. }) = args.first() {
-                    let p = fields.get("prefix")
-                        .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
-                        .unwrap_or_else(|| "que_".to_string());
-                    let s = fields.get("suffix")
-                        .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
-                        .unwrap_or_default();
-                    let d = fields.get("dir").and_then(|v| v.as_path());
-                    (p, s, d)
-                } else {
-                    ("que_".to_string(), "".to_string(), None)
-                };
-                match super::std_modules::fs::create_temp_file_in(&prefix, &suffix, parent_dir.as_deref()) {
+                let (prefix, suffix, parent_dir) =
+                    if let Some(Value::Instance { fields, .. }) = args.first() {
+                        let p = fields
+                            .get("prefix")
+                            .and_then(|v| {
+                                if let Value::String(s) = v {
+                                    Some(s.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_else(|| "que_".to_string());
+                        let s = fields
+                            .get("suffix")
+                            .and_then(|v| {
+                                if let Value::String(s) = v {
+                                    Some(s.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_default();
+                        let d = fields.get("dir").and_then(|v| v.as_path());
+                        (p, s, d)
+                    } else {
+                        ("que_".to_string(), "".to_string(), None)
+                    };
+                match super::std_modules::fs::create_temp_file_in(
+                    &prefix,
+                    &suffix,
+                    parent_dir.as_deref(),
+                ) {
                     Ok(path) => Ok(Value::Path(path)),
                     Err(e) => Err(Signal::Error(QueError::new(ErrorKind::IoError, e))),
                 }
@@ -414,12 +434,10 @@ impl Interpreter {
             // `error(msg)` was `fail(msg)` without the optional exit code, so
             // scripts that started with `error` had to be rewritten the first
             // time they needed to say *which* failure it was.
-            "error" => {
-                Err(Signal::Error(QueError::new(
-                    ErrorKind::Runtime,
-                    "`error(msg)` was removed; use `fail(msg)`, which also takes an exit code",
-                )))
-            }
+            "error" => Err(Signal::Error(QueError::new(
+                ErrorKind::Runtime,
+                "`error(msg)` was removed; use `fail(msg)`, which also takes an exit code",
+            ))),
             // Reached only when `assert` is called through a value rather than
             // written as a call — `[1, 2].each(assert)`, say. The direct form is
             // intercepted in eval_expr so it can see the unevaluated condition.
@@ -435,12 +453,10 @@ impl Interpreter {
                     Err(Signal::Error(QueError::runtime(msg)))
                 }
             }
-            "assert_eq" => {
-                Err(Signal::Error(QueError::new(
-                    ErrorKind::Runtime,
-                    "`assert_eq(a, b)` was removed; `assert(a == b)` reports both values on its own",
-                )))
-            }
+            "assert_eq" => Err(Signal::Error(QueError::new(
+                ErrorKind::Runtime,
+                "`assert_eq(a, b)` was removed; `assert(a == b)` reports both values on its own",
+            ))),
             // ── Functional combinator free functions ──────────────────
             "compose" => {
                 // compose(f, g, h) returns a value that when called with x,
@@ -460,7 +476,10 @@ impl Interpreter {
             // ── Additional builtins ──────────────────────────────────
             "secret" => {
                 let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "secret requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "secret requires 1 argument",
+                    ))
                 })?;
                 match val {
                     Value::String(s) => {
@@ -485,16 +504,11 @@ impl Interpreter {
                 // signal *which* kind of failure happened to whatever is
                 // gating on it in CI.
                 let err = match args.get(1) {
-                    Some(Value::Int(code)) => {
-                        QueError::runtime(msg).with_exit_code(*code as i32)
-                    }
+                    Some(Value::Int(code)) => QueError::runtime(msg).with_exit_code(*code as i32),
                     Some(other) => {
                         return Err(Signal::Error(QueError::new(
                             ErrorKind::TypeMismatch,
-                            format!(
-                                "fail() exit code must be an Int, got {}",
-                                other.type_name()
-                            ),
+                            format!("fail() exit code must be an Int, got {}", other.type_name()),
                         )))
                     }
                     None => QueError::runtime(msg),
@@ -506,7 +520,9 @@ impl Interpreter {
                 // currently-executing Quefile or .que script.
                 // Falls back to the current working directory when the
                 // interpreter was not started from a file (e.g. in tests or REPL).
-                let dir = self.script_path.as_ref()
+                let dir = self
+                    .script_path
+                    .as_ref()
                     .and_then(|p| p.parent())
                     .map(|p| p.to_string_lossy().into_owned())
                     .unwrap_or_else(|| {
@@ -559,7 +575,10 @@ impl Interpreter {
             "confirm" => {
                 self.host
                     .refuse_global("confirm() (reading the terminal)")?;
-                let prompt = args.first().map(|v| v.display_string()).unwrap_or_else(|| "Confirm?".to_string());
+                let prompt = args
+                    .first()
+                    .map(|v| v.display_string())
+                    .unwrap_or_else(|| "Confirm?".to_string());
                 eprint!("{} [y/N] ", prompt);
                 let mut line = String::new();
                 std::io::stdin().read_line(&mut line).ok();
@@ -572,15 +591,20 @@ impl Interpreter {
             }
             "path" => {
                 let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "path() requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "path() requires 1 argument",
+                    ))
                 })?;
                 let s = match val {
                     Value::String(s) => s.clone(),
                     Value::Path(s) => s.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "path() requires a string or path",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "path() requires a string or path",
+                        )))
+                    }
                 };
                 Ok(Value::Path(crate::interpreter::helpers::expand_tilde(&s)))
             }
@@ -601,7 +625,10 @@ impl Interpreter {
                 // resolved to absolute paths when the flags were parsed, so
                 // `cd` moves the script, never the fence around it.
                 let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "cd() requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "cd() requires 1 argument",
+                    ))
                 })?;
                 let target = match val {
                     Value::String(s) | Value::Path(s) => {
@@ -636,7 +663,10 @@ impl Interpreter {
             // nothing.
             "dir" => {
                 let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "dir() requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "dir() requires 1 argument",
+                    ))
                 })?;
                 let path = match val {
                     Value::String(s) | Value::Path(s) => s.clone(),
@@ -695,24 +725,27 @@ impl Interpreter {
             }
             // The global spelling only; `"a/b".to_path()` is still a String
             // method, and that is the form worth keeping.
-            "to_path" => {
-                Err(Signal::Error(QueError::new(
-                    ErrorKind::Runtime,
-                    "`to_path(s)` was removed; use `path(s)` or `s.to_path()`",
-                )))
-            }
+            "to_path" => Err(Signal::Error(QueError::new(
+                ErrorKind::Runtime,
+                "`to_path(s)` was removed; use `path(s)` or `s.to_path()`",
+            ))),
             "glob" => {
                 let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "glob() requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "glob() requires 1 argument",
+                    ))
                 })?;
                 let s = match val {
                     Value::String(s) => s.clone(),
                     Value::Path(p) => p.clone(),
                     Value::Glob(g) => g.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "glob() requires a string, path, or glob argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "glob() requires a string, path, or glob argument",
+                        )))
+                    }
                 };
                 Ok(Value::Glob(s))
             }
@@ -721,7 +754,8 @@ impl Interpreter {
                 // retry(max, delay_ms, fn) — with delay between retries
                 if args.is_empty() {
                     return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch, "retry requires at least 2 arguments: max, fn",
+                        ErrorKind::ArityMismatch,
+                        "retry requires at least 2 arguments: max, fn",
                     )));
                 }
                 let max_retries = expect_int(&args, 0, "retry max")?;
@@ -759,30 +793,38 @@ impl Interpreter {
                 // that checks after execution
                 if args.len() < 2 {
                     return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch, "timeout requires 2 arguments: duration, fn",
+                        ErrorKind::ArityMismatch,
+                        "timeout requires 2 arguments: duration, fn",
                     )));
                 }
                 let timeout_ms = match &args[0] {
                     Value::Int(ms) => *ms as u128,
                     Value::Duration(val, unit) => duration_to_ms(*val, *unit) as u128,
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "timeout first arg must be a duration",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "timeout first arg must be a duration",
+                        )))
+                    }
                 };
                 let func = args[1].clone();
                 let start = std::time::Instant::now();
                 let result = self.call_value(func, vec![]);
                 let elapsed = start.elapsed().as_millis();
                 if elapsed > timeout_ms {
-                    return Err(Signal::Error(QueError::runtime(
-                        format!("operation timed out after {}ms (limit: {}ms)", elapsed, timeout_ms),
-                    )));
+                    return Err(Signal::Error(QueError::runtime(format!(
+                        "operation timed out after {}ms (limit: {}ms)",
+                        elapsed, timeout_ms
+                    ))));
                 }
                 result
             }
             "semver_parse" => {
                 let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "semver_parse requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "semver_parse requires 1 argument",
+                    ))
                 })?;
                 match val {
                     Value::String(s) => {
@@ -792,9 +834,10 @@ impl Interpreter {
                         if parts.len() >= 2 && parts.iter().all(|p| p.parse::<u64>().is_ok()) {
                             Ok(Value::Ok(Box::new(Value::Semver(s.clone()))))
                         } else {
-                            Ok(Value::Err(Box::new(Value::String(
-                                format!("invalid semver string: {}", s),
-                            ))))
+                            Ok(Value::Err(Box::new(Value::String(format!(
+                                "invalid semver string: {}",
+                                s
+                            )))))
                         }
                     }
                     _ => Ok(Value::Err(Box::new(Value::String(
@@ -805,18 +848,20 @@ impl Interpreter {
 
             "regex" => {
                 let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "regex() requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "regex() requires 1 argument",
+                    ))
                 })?;
                 match val {
                     Value::Regex(_) => Ok(val.clone()),
-                    Value::String(s) => {
-                        match regex_lite::Regex::new(s) {
-                            Ok(_) => Ok(Value::Ok(Box::new(Value::Regex(s.clone())))),
-                            Err(e) => Ok(Value::Err(Box::new(Value::String(
-                                format!("invalid regex: {}", e),
-                            )))),
-                        }
-                    }
+                    Value::String(s) => match regex_lite::Regex::new(s) {
+                        Ok(_) => Ok(Value::Ok(Box::new(Value::Regex(s.clone())))),
+                        Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                            "invalid regex: {}",
+                            e
+                        ))))),
+                    },
                     _ => Ok(Value::Err(Box::new(Value::String(
                         "regex() requires a string".to_string(),
                     )))),
@@ -824,7 +869,6 @@ impl Interpreter {
             }
 
             // ── Inspection & Reflection builtins ─────────────────────
-
             "dbg" => {
                 // dbg(value) → prints debug info to output AND returns the value
                 let val = args.first().cloned().unwrap_or(Value::Null);
@@ -839,13 +883,17 @@ impl Interpreter {
             // script that never asks about itself should not carry them.
             // `help` and `dbg` stay global — you type them at a prompt or
             // drop them into a line mid-edit, where an import is friction.
-            "inspect" | "methods" | "is_type" | "type_info" | "fields"
-            | "has_method" | "vars" | "var_info" | "scope_depth"
-            | "modules" => {
+            "inspect" | "methods" | "is_type" | "type_info" | "fields" | "has_method" | "vars"
+            | "var_info" | "scope_depth" | "modules" => {
                 let msg = match name {
-                    "inspect" => "`inspect(x)` was removed; use the method `x.inspect()`".to_string(),
-                    "methods" => "`methods(x)` was removed; use the method `x.methods()`".to_string(),
-                    "is_type" => "`is_type(x, name)` was removed; use the method `x.is_type(name)`".to_string(),
+                    "inspect" => {
+                        "`inspect(x)` was removed; use the method `x.inspect()`".to_string()
+                    }
+                    "methods" => {
+                        "`methods(x)` was removed; use the method `x.methods()`".to_string()
+                    }
+                    "is_type" => "`is_type(x, name)` was removed; use the method `x.is_type(name)`"
+                        .to_string(),
                     other => format!(
                         "`{}(...)` was removed; use `import std.reflect` and `reflect.{}(...)`",
                         other, other
@@ -903,10 +951,12 @@ impl Interpreter {
                 // run_task("name", ...args) → run a task by name with dependency resolution
                 let task_name = match args.first() {
                     Some(Value::String(s)) => s.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "run_task requires a string task name as first argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "run_task requires a string task name as first argument",
+                        )))
+                    }
                 };
                 let task_args: Vec<(Option<String>, Value)> =
                     args.into_iter().skip(1).map(|v| (None, v)).collect();
@@ -933,9 +983,7 @@ impl Interpreter {
                     }
                 }
                 match task {
-                    Value::Task(t) => {
-                        self.execute_task(&t, task_args)
-                    }
+                    Value::Task(t) => self.execute_task(&t, task_args),
                     _ => Err(Signal::Error(QueError::new(
                         ErrorKind::TypeMismatch,
                         format!("'{}' is not a task", task_name),
@@ -950,15 +998,19 @@ impl Interpreter {
             // a name that often did not do one.
             "stream" | "stream_of" | "stdout" | "stderr" | "stdin" => {
                 let instead = match name {
-                    "stream" => "stream.file(path) for a file, stream.of(x) for text, a list or a handle",
+                    "stream" => {
+                        "stream.file(path) for a file, stream.of(x) for text, a list or a handle"
+                    }
                     "stream_of" => "stream.of(x)",
-                    other => return Err(Signal::Error(QueError::new(
-                        ErrorKind::Runtime,
-                        format!(
-                            "`{}()` was removed; use `import std.stream` and `stream.{}()`",
-                            other, other
-                        ),
-                    ))),
+                    other => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::Runtime,
+                            format!(
+                                "`{}()` was removed; use `import std.stream` and `stream.{}()`",
+                                other, other
+                            ),
+                        )))
+                    }
                 };
                 Err(Signal::Error(QueError::new(
                     ErrorKind::Runtime,
@@ -986,8 +1038,8 @@ impl Interpreter {
             // `crate::config::*` functions the Map methods below already call.
             // A config is a Map, so the method form reads better and is one
             // fewer name to learn.
-            "config_get" | "config_set" | "config_delete" | "config_has"
-            | "config_merge" | "config_paths" => {
+            "config_get" | "config_set" | "config_delete" | "config_has" | "config_merge"
+            | "config_paths" => {
                 let instead = match name {
                     "config_get" => "map.get_path(path)",
                     "config_set" => "map.set_path(path, value)",
@@ -1002,16 +1054,17 @@ impl Interpreter {
                 )))
             }
 
-
             // ── Tool discovery ────────────────────────────────────────
             "which" => {
                 let cmd_name = match args.first() {
                     Some(Value::String(s)) => s.clone(),
                     Some(v) => v.display_string(),
-                    None => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "which() requires a command name",
-                    ))),
+                    None => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "which() requires a command name",
+                        )))
+                    }
                 };
                 Ok(which_command(&cmd_name))
             }
@@ -1021,10 +1074,15 @@ impl Interpreter {
                 let code = match args.first() {
                     Some(Value::Int(n)) => *n as i32,
                     Some(Value::Null) | None => 0,
-                    Some(other) => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        format!("os.exit() expects an Int exit code, got {}", other.type_name()),
-                    ))),
+                    Some(other) => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            format!(
+                                "os.exit() expects an Int exit code, got {}",
+                                other.type_name()
+                            ),
+                        )))
+                    }
                 };
                 Err(Signal::Exit(code))
             }
@@ -1035,10 +1093,12 @@ impl Interpreter {
                     Some(Value::String(s)) => s.clone(),
                     Some(Value::Path(s)) => s.clone(),
                     Some(v) => v.display_string(),
-                    None => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "open() requires a path argument",
-                    ))),
+                    None => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "open() requires a path argument",
+                        )))
+                    }
                 };
                 let mode = match args.get(1) {
                     Some(Value::String(s)) => s.clone(),
@@ -1046,26 +1106,25 @@ impl Interpreter {
                     Some(v) => v.display_string(),
                 };
                 match mode.as_str() {
-                    "r" => {
-                        match std::fs::File::open(&path) {
-                            Ok(file) => {
-                                let inner = FileHandleInner {
-                                    path,
-                                    mode: "r".into(),
-                                    reader: Some(BufReader::new(file)),
-                                    writer: None,
-                                    open: true,
-                                    discard: false,
-                                };
-                                Ok(Value::FileHandle(FileHandle {
-                                    inner: Arc::new(Mutex::new(inner)),
-                                }))
-                            }
-                            Err(e) => Ok(Value::Err(Box::new(Value::String(
-                                format!("open failed: {}", e),
-                            )))),
+                    "r" => match std::fs::File::open(&path) {
+                        Ok(file) => {
+                            let inner = FileHandleInner {
+                                path,
+                                mode: "r".into(),
+                                reader: Some(BufReader::new(file)),
+                                writer: None,
+                                open: true,
+                                discard: false,
+                            };
+                            Ok(Value::FileHandle(FileHandle {
+                                inner: Arc::new(Mutex::new(inner)),
+                            }))
                         }
-                    }
+                        Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                            "open failed: {}",
+                            e
+                        ))))),
+                    },
                     "w" => {
                         // Creating the file is itself the destructive act: it
                         // truncates. So the dry run stops here rather than at
@@ -1087,16 +1146,21 @@ impl Interpreter {
                                     inner: Arc::new(Mutex::new(inner)),
                                 }))
                             }
-                            Err(e) => Ok(Value::Err(Box::new(Value::String(
-                                format!("open failed: {}", e),
-                            )))),
+                            Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                "open failed: {}",
+                                e
+                            ))))),
                         }
                     }
                     "a" => {
                         if self.dry_run_skip(format!("open {} for appending", path)) {
                             return Ok(discarding_handle(path, "a"));
                         }
-                        match std::fs::OpenOptions::new().append(true).create(true).open(&path) {
+                        match std::fs::OpenOptions::new()
+                            .append(true)
+                            .create(true)
+                            .open(&path)
+                        {
                             Ok(file) => {
                                 let inner = FileHandleInner {
                                     path,
@@ -1110,20 +1174,18 @@ impl Interpreter {
                                     inner: Arc::new(Mutex::new(inner)),
                                 }))
                             }
-                            Err(e) => Ok(Value::Err(Box::new(Value::String(
-                                format!("open failed: {}", e),
-                            )))),
+                            Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                "open failed: {}",
+                                e
+                            ))))),
                         }
                     }
-                    other => Ok(Value::Err(Box::new(Value::String(
-                        format!("invalid file mode '{}'; use \"r\", \"w\", or \"a\"", other),
-                    )))),
+                    other => Ok(Value::Err(Box::new(Value::String(format!(
+                        "invalid file mode '{}'; use \"r\", \"w\", or \"a\"",
+                        other
+                    ))))),
                 }
             }
-
-
-
-
 
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
@@ -1174,11 +1236,13 @@ fn which_command(cmd: &str) -> Value {
         // On Windows, also try appending PATHEXT extensions (.EXE, .CMD, …).
         #[cfg(windows)]
         {
-            let pathext = std::env::var("PATHEXT")
-                .unwrap_or_else(|_| ".EXE;.CMD;.BAT;.COM".to_string());
+            let pathext =
+                std::env::var("PATHEXT").unwrap_or_else(|_| ".EXE;.CMD;.BAT;.COM".to_string());
             for ext in pathext.split(';') {
                 let ext = ext.trim_start_matches('.');
-                if ext.is_empty() { continue; }
+                if ext.is_empty() {
+                    continue;
+                }
                 let mut with_ext = candidate.clone();
                 with_ext.set_extension(ext);
                 if with_ext.is_file() {
@@ -1220,10 +1284,14 @@ impl Interpreter {
             Some(Value::BuiltinFn(name)) => help_for_builtin(name)
                 .unwrap_or_else(|| format!("Builtin function `{}` (no documentation)", name)),
             Some(Value::Module { name, entries }) => help_for_module(name, entries),
-            Some(Value::Instance { type_name, fields }) => self.help_for_instance(type_name, fields),
-            Some(Value::Enum { enum_name, variant, fields }) => {
-                self.help_for_enum_value(enum_name, variant, fields)
+            Some(Value::Instance { type_name, fields }) => {
+                self.help_for_instance(type_name, fields)
             }
+            Some(Value::Enum {
+                enum_name,
+                variant,
+                fields,
+            }) => self.help_for_enum_value(enum_name, variant, fields),
             Some(Value::Function { name, params, .. }) => {
                 help_for_function(name.as_deref(), params)
             }
@@ -1338,7 +1406,10 @@ impl Interpreter {
             .filter(|(ty, _)| ty == name)
             .collect();
         for (_, trait_name) in trait_keys {
-            if let Some(methods) = self.trait_impls.get(&(name.to_string(), trait_name.clone())) {
+            if let Some(methods) = self
+                .trait_impls
+                .get(&(name.to_string(), trait_name.clone()))
+            {
                 out.push_str(&format!(
                     "\n{} {} {} {} {{\n",
                     keyword("impl"),
@@ -1360,7 +1431,11 @@ impl Interpreter {
         out
     }
 
-    fn help_for_instance(&self, type_name: &str, fields: &std::collections::BTreeMap<String, Value>) -> String {
+    fn help_for_instance(
+        &self,
+        type_name: &str,
+        fields: &std::collections::BTreeMap<String, Value>,
+    ) -> String {
         let mut out = format!(
             "{}\n\n{}\n",
             heading("Instance of", type_name),
@@ -1378,7 +1453,10 @@ impl Interpreter {
             if !methods.is_empty() {
                 out.push_str(&format!("\n{}\n", section("Methods:")));
                 for m in methods.iter().filter(|m| !m.is_static) {
-                    out.push_str(&format!("  {}\n", ident(&format!(".{}({})", m.name, format_params(&m.params)))));
+                    out.push_str(&format!(
+                        "  {}\n",
+                        ident(&format!(".{}({})", m.name, format_params(&m.params)))
+                    ));
                 }
             }
         }
@@ -1408,7 +1486,10 @@ impl Interpreter {
         }
         out.push_str(&format!(
             "\n{}\n",
-            hint(&format!("Use `help(\"{}\")` to see all variants.", enum_name))
+            hint(&format!(
+                "Use `help(\"{}\")` to see all variants.",
+                enum_name
+            ))
         ));
         out
     }
@@ -1420,26 +1501,56 @@ impl Interpreter {
         s.push_str("─────────────\n");
         s.push_str(&format!("\n{}\n", section("Usage:")));
         s.push_str(&entry("help()", "show this overview"));
-        s.push_str(&entry("help(value)", "show type, fields, and methods of a value"));
-        s.push_str(&entry("help(MyType)", "show definition of a user-defined struct/enum/trait"));
-        s.push_str(&entry("help(\"println\")", "look up a builtin, keyword, method, or module by name"));
-        s.push_str(&entry("modules()", "map of std module names → exported function names"));
-        s.push_str(&entry("methods(value)", "list method names available on a value"));
-        s.push_str(&entry("inspect(value)", "detailed map of the value's contents"));
-        s.push_str(&entry("vars()", "map of all user-defined variables in scope"));
+        s.push_str(&entry(
+            "help(value)",
+            "show type, fields, and methods of a value",
+        ));
+        s.push_str(&entry(
+            "help(MyType)",
+            "show definition of a user-defined struct/enum/trait",
+        ));
+        s.push_str(&entry(
+            "help(\"println\")",
+            "look up a builtin, keyword, method, or module by name",
+        ));
+        s.push_str(&entry(
+            "modules()",
+            "map of std module names → exported function names",
+        ));
+        s.push_str(&entry(
+            "methods(value)",
+            "list method names available on a value",
+        ));
+        s.push_str(&entry(
+            "inspect(value)",
+            "detailed map of the value's contents",
+        ));
+        s.push_str(&entry(
+            "vars()",
+            "map of all user-defined variables in scope",
+        ));
         s.push_str(&entry("typeof(value)", "type name as a string"));
         s.push_str(&format!(
             "\n{}\n",
             section("REPL meta-commands (no parentheses needed):")
         ));
         s.push_str(&entry(":h, :help", "show this overview"));
-        s.push_str(&entry(":h <expr>, ?<expr>", "help on an expression's value"));
+        s.push_str(&entry(
+            ":h <expr>, ?<expr>",
+            "help on an expression's value",
+        ));
         s.push_str(&entry(":t <expr>", "typeof an expression"));
         s.push_str(&entry(":m <expr>", "methods of an expression's value"));
         s.push_str(&entry(":i <expr>", "inspect an expression's value"));
         s.push_str(&entry(":v, :vars", "list user-defined variables"));
-        s.push_str(&entry(":load <file.que>", "evaluate a Que file in the current session"));
-        s.push_str(&entry(":reset", "reset the interpreter (clears all bindings)"));
+        s.push_str(&entry(
+            ":load <file.que>",
+            "evaluate a Que file in the current session",
+        ));
+        s.push_str(&entry(
+            ":reset",
+            "reset the interpreter (clears all bindings)",
+        ));
         s.push_str(&entry(":q, :exit", "exit the REPL (or press Ctrl-D)"));
         s.push_str(&format!("\n{}\n", section("Builtin categories:")));
         for (cat, names) in &builtin_groups() {
@@ -1500,17 +1611,33 @@ impl Interpreter {
 
 fn builtin_groups() -> Vec<(&'static str, Vec<&'static str>)> {
     vec![
-        ("I/O",            vec!["print", "println", "input", "confirm"]),
-        ("Types",          vec!["typeof", "str", "int", "float", "bool"]),
-        ("Numbers",        vec!["abs", "min", "max", "range"]),
-        ("Strings",        vec!["chr", "ord"]),
-        ("Paths & FS",     vec!["path", "glob", "open", "cd", "quefile_dir", "script_dir"]),
+        ("I/O", vec!["print", "println", "input", "confirm"]),
+        ("Types", vec!["typeof", "str", "int", "float", "bool"]),
+        ("Numbers", vec!["abs", "min", "max", "range"]),
+        ("Strings", vec!["chr", "ord"]),
+        (
+            "Paths & FS",
+            vec!["path", "glob", "open", "cd", "quefile_dir", "script_dir"],
+        ),
         ("Errors/Results", vec!["Ok", "Err", "fail", "assert"]),
-        ("Process",        vec!["which", "retry", "timeout", "sleep", "dry_run"]),
-        ("Tasks",          vec!["tasks", "run_task"]),
-        ("Debugging",      vec!["help", "dbg"]),
-        ("Misc",           vec!["env", "args", "secret", "regex", "semver_parse", "compose",
-                                "strict"]),
+        (
+            "Process",
+            vec!["which", "retry", "timeout", "sleep", "dry_run"],
+        ),
+        ("Tasks", vec!["tasks", "run_task"]),
+        ("Debugging", vec!["help", "dbg"]),
+        (
+            "Misc",
+            vec![
+                "env",
+                "args",
+                "secret",
+                "regex",
+                "semver_parse",
+                "compose",
+                "strict",
+            ],
+        ),
     ]
 }
 
@@ -1545,7 +1672,10 @@ fn help_for_std_module(m: &crate::interpreter::std_modules::StdModule) -> String
             m.functions.first().copied().unwrap_or("…")
         ))
     );
-    s.push_str(&format!("{}\n", section(&format!("Functions ({}):", m.functions.len()))));
+    s.push_str(&format!(
+        "{}\n",
+        section(&format!("Functions ({}):", m.functions.len()))
+    ));
     let qualified: Vec<String> = m
         .functions
         .iter()
@@ -1578,9 +1708,16 @@ fn help_for_primitive_type(name: &str, methods: &[(&'static str, &'static str)])
 fn help_for_value(v: &Value) -> String {
     let ty = v.type_name();
     let methods = v.available_methods();
-    let mut s = format!("{}\n  = {}\n", heading("Value of type", ty), v.debug_string());
+    let mut s = format!(
+        "{}\n  = {}\n",
+        heading("Value of type", ty),
+        v.debug_string()
+    );
     if !methods.is_empty() {
-        s.push_str(&format!("\n{}\n", section(&format!("Methods ({}):", methods.len()))));
+        s.push_str(&format!(
+            "\n{}\n",
+            section(&format!("Methods ({}):", methods.len()))
+        ));
         s.push_str(&paint_lines(&wrap_list(&methods, 76, "  ")));
         s.push('\n');
         s.push_str(&format!(
@@ -1779,6 +1916,3 @@ fn render_inline_md(line: &str) -> String {
     }
     out
 }
-
-
-

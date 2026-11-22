@@ -1,9 +1,9 @@
 //! std.tty module — terminal/TTY introspection.
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::Value;
 
 use std::collections::BTreeMap;
 use std::io::IsTerminal;
@@ -11,14 +11,20 @@ use std::io::IsTerminal;
 pub(super) fn module() -> StdModule {
     StdModule {
         name: "tty",
-        functions: &["is_stdin", "is_stdout", "is_stderr", "size", "supports_ansi"],
+        functions: &[
+            "is_stdin",
+            "is_stdout",
+            "is_stderr",
+            "size",
+            "supports_ansi",
+        ],
     }
 }
 
 impl Interpreter {
     pub(crate) fn call_tty(&mut self, func: &str, _args: &[Value]) -> IResult {
         match func {
-            "is_stdin"  => Ok(Value::Bool(std::io::stdin().is_terminal())),
+            "is_stdin" => Ok(Value::Bool(std::io::stdin().is_terminal())),
             "is_stdout" => Ok(Value::Bool(std::io::stdout().is_terminal())),
             "is_stderr" => Ok(Value::Bool(std::io::stderr().is_terminal())),
             "supports_ansi" => Ok(Value::Bool(supports_ansi())),

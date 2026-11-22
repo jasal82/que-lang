@@ -446,7 +446,9 @@ impl Policy {
         self.grants.remove(&cap);
         // Mark the denial explicitly so a policy built only from `--deny`
         // is not mistaken for an empty one.
-        self.grants.entry(cap).or_insert(Grant::Scoped(BTreeSet::new()));
+        self.grants
+            .entry(cap)
+            .or_insert(Grant::Scoped(BTreeSet::new()));
         Ok(())
     }
 
@@ -467,15 +469,11 @@ impl Policy {
                     // Paths match by prefix, on the resolved form, so
                     // `--allow write=./build` cannot be escaped with
                     // `./build/../../etc/passwd`.
-                    Capability::Read | Capability::Write => {
-                        Path::new(&subject).starts_with(item)
-                    }
+                    Capability::Read | Capability::Write => Path::new(&subject).starts_with(item),
                     // Hosts match themselves or any subdomain, so
                     // `--allow net=example.com` covers `api.example.com`
                     // but not `notexample.com`.
-                    Capability::Net => {
-                        subject == *item || subject.ends_with(&format!(".{}", item))
-                    }
+                    Capability::Net => subject == *item || subject.ends_with(&format!(".{}", item)),
                     _ => subject == *item,
                 });
                 if ok {
@@ -835,27 +833,22 @@ pub fn global_effect(name: &str) -> Option<GlobalEffect> {
         "retry" | "timeout" | "run_task" | "tasks" | "compose" => Pure,
 
         // ── pure values and pure transformations ──
-        "Ok" | "Err" | "abs" | "assert" | "bool" | "chr" | "dbg"
-        | "dry_run" | "fail" | "float" | "help" | "int" | "max" | "min"
-        | "ord" | "path" | "quefile_dir" | "range" | "regex"
-        | "script_dir" | "secret" | "semver_parse" | "sleep" | "str"
-        | "strict" | "typeof" => Pure,
+        "Ok" | "Err" | "abs" | "assert" | "bool" | "chr" | "dbg" | "dry_run" | "fail" | "float"
+        | "help" | "int" | "max" | "min" | "ord" | "path" | "quefile_dir" | "range" | "regex"
+        | "script_dir" | "secret" | "semver_parse" | "sleep" | "str" | "strict" | "typeof" => Pure,
 
         // ── removed, but still classified ──
         // A tombstone builtin raises "use X instead" and touches nothing.
         // Leaving these out would mean a sandboxed script got a permission
         // denial instead of the sentence telling it what to write.
-        "Some" | "None" | "assert_eq" | "chars" | "chunk" | "config_delete"
-        | "config_get" | "config_has" | "config_merge" | "config_paths"
-        | "config_read" | "config_set" | "config_write" | "contains"
-        | "each" | "enumerate" | "error" | "fields" | "filter" | "find"
-        | "flat_map" | "flatten" | "fold" | "for_each" | "group_by"
-        | "has_method" | "inspect" | "is_type" | "join" | "keys" | "len"
-        | "map" | "methods" | "modules" | "now" | "partition" | "pop"
-        | "push" | "replace" | "scope_depth" | "skip" | "sort_by"
-        | "split" | "stdin" | "stderr" | "stdout" | "stream"
-        | "stream_of" | "take" | "to_path" | "trim" | "type_info"
-        | "values" | "var_info" | "vars" | "zip" | "all" | "any" => Pure,
+        "Some" | "None" | "assert_eq" | "chars" | "chunk" | "config_delete" | "config_get"
+        | "config_has" | "config_merge" | "config_paths" | "config_read" | "config_set"
+        | "config_write" | "contains" | "each" | "enumerate" | "error" | "fields" | "filter"
+        | "find" | "flat_map" | "flatten" | "fold" | "for_each" | "group_by" | "has_method"
+        | "inspect" | "is_type" | "join" | "keys" | "len" | "map" | "methods" | "modules"
+        | "now" | "partition" | "pop" | "push" | "replace" | "scope_depth" | "skip" | "sort_by"
+        | "split" | "stdin" | "stderr" | "stdout" | "stream" | "stream_of" | "take" | "to_path"
+        | "trim" | "type_info" | "values" | "var_info" | "vars" | "zip" | "all" | "any" => Pure,
 
         _ => return None,
     })
@@ -906,7 +899,10 @@ mod tests {
 
     #[test]
     fn opening_a_file_takes_its_capability_from_the_mode() {
-        assert!(matches!(global_effect("open"), Some(GlobalEffect::OpenPath)));
+        assert!(matches!(
+            global_effect("open"),
+            Some(GlobalEffect::OpenPath)
+        ));
     }
 
     #[test]
@@ -950,7 +946,8 @@ mod tests {
         // the case worth policing.
         let cwd = std::env::current_dir().unwrap();
         let mut p = Policy::default();
-        p.allow(&format!("write={}", cwd.join("build").display())).unwrap();
+        p.allow(&format!("write={}", cwd.join("build").display()))
+            .unwrap();
         assert!(p.check(Capability::Write, "build/out.txt").is_ok());
         assert!(p
             .check(Capability::Write, "build/../../etc/passwd")
@@ -967,7 +964,9 @@ mod tests {
     #[test]
     fn a_host_grant_covers_subdomains_but_not_lookalikes() {
         let p = policy(&["net=example.com"]);
-        assert!(p.check(Capability::Net, "https://api.example.com/v1").is_ok());
+        assert!(p
+            .check(Capability::Net, "https://api.example.com/v1")
+            .is_ok());
         assert!(p.check(Capability::Net, "example.com").is_ok());
         assert!(p.check(Capability::Net, "notexample.com").is_err());
         assert!(p.check(Capability::Net, "example.com.evil.net").is_err());
@@ -1015,7 +1014,10 @@ mod tests {
     fn an_unclassified_std_function_fails_closed() {
         // A newly added module function must be denied until somebody
         // classifies it, not quietly allowed.
-        assert_eq!(std_effect("brand_new", "thing"), Some((Capability::Exec, None)));
+        assert_eq!(
+            std_effect("brand_new", "thing"),
+            Some((Capability::Exec, None))
+        );
     }
 
     #[test]

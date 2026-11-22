@@ -1,10 +1,10 @@
 //! std.template module — Simple template engine with {{ expr }}, conditionals, and loops.
 
-use crate::error::*;
-use crate::value::Value;
-use crate::interpreter::helpers::arg_path_str;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::interpreter::helpers::arg_path_str;
+use crate::value::Value;
 
 use std::collections::BTreeMap;
 
@@ -27,8 +27,7 @@ impl Interpreter {
                     Some(Value::Map(m)) => m.clone(),
                     _ => return Err(sig_type("template.render", "Map for context")),
                 };
-                let result = render_template(&tmpl, &ctx)
-                    .map_err(|e| sig_err(e))?;
+                let result = render_template(&tmpl, &ctx).map_err(|e| sig_err(e))?;
                 Ok(Value::String(result))
             }
             "render_file" => {
@@ -37,10 +36,10 @@ impl Interpreter {
                     Some(Value::Map(m)) => m.clone(),
                     _ => return Err(sig_type("template.render_file", "Map for context")),
                 };
-                let tmpl = std::fs::read_to_string(&path)
-                    .map_err(|e| sig_err(format!("failed to read template file '{}': {}", path, e)))?;
-                let result = render_template(&tmpl, &ctx)
-                    .map_err(|e| sig_err(e))?;
+                let tmpl = std::fs::read_to_string(&path).map_err(|e| {
+                    sig_err(format!("failed to read template file '{}': {}", path, e))
+                })?;
+                let result = render_template(&tmpl, &ctx).map_err(|e| sig_err(e))?;
                 Ok(Value::String(result))
             }
             _ => Err(Signal::Error(QueError::new(
@@ -66,10 +65,7 @@ fn sig_type(name: &str, expected: &str) -> Signal {
 
 // ── Template engine ────────────────────────────────────────────────────────
 
-fn render_template(
-    template: &str,
-    context: &BTreeMap<String, Value>,
-) -> Result<String, String> {
+fn render_template(template: &str, context: &BTreeMap<String, Value>) -> Result<String, String> {
     let tokens = parse_template(template)?;
     render_tokens(&tokens, context)
 }
@@ -115,7 +111,8 @@ fn parse_template(template: &str) -> Result<Vec<TemplateToken>, String> {
                     let (if_token, consumed) = parse_if_directive(rest)?;
                     tokens.push(if_token);
                     rest = consumed;
-                } else if directive_rest.starts_with("for ") || directive_rest.starts_with("for\t") {
+                } else if directive_rest.starts_with("for ") || directive_rest.starts_with("for\t")
+                {
                     let (for_token, consumed) = parse_for_directive(rest)?;
                     tokens.push(for_token);
                     rest = consumed;
@@ -148,7 +145,8 @@ fn parse_template(template: &str) -> Result<Vec<TemplateToken>, String> {
 }
 
 fn find_closing_braces(s: &str) -> Result<usize, String> {
-    s.find("}}").ok_or_else(|| "unclosed template tag: missing `}}`".to_string())
+    s.find("}}")
+        .ok_or_else(|| "unclosed template tag: missing `}}`".to_string())
 }
 
 fn parse_if_directive(rest: &str) -> Result<(TemplateToken, &str), String> {
@@ -172,7 +170,14 @@ fn parse_if_directive(rest: &str) -> Result<(TemplateToken, &str), String> {
     }
 
     let (body, else_body, remaining) = parse_block_body(after_tag, "if")?;
-    Ok((TemplateToken::If { condition, body, else_body }, remaining))
+    Ok((
+        TemplateToken::If {
+            condition,
+            body,
+            else_body,
+        },
+        remaining,
+    ))
 }
 
 fn parse_for_directive(rest: &str) -> Result<(TemplateToken, &str), String> {
@@ -187,7 +192,8 @@ fn parse_for_directive(rest: &str) -> Result<(TemplateToken, &str), String> {
         .ok_or("expected 'for' in template directive")?
         .trim();
 
-    let in_pos = inner.find(" in ")
+    let in_pos = inner
+        .find(" in ")
         .ok_or("expected ' in ' in for directive")?;
     let var = inner[..in_pos].trim().to_string();
     let iterable = inner[in_pos + 4..].trim().to_string();
@@ -200,7 +206,14 @@ fn parse_for_directive(rest: &str) -> Result<(TemplateToken, &str), String> {
     }
 
     let (body, remaining) = parse_for_body(after_tag)?;
-    Ok((TemplateToken::For { var, iterable, body }, remaining))
+    Ok((
+        TemplateToken::For {
+            var,
+            iterable,
+            body,
+        },
+        remaining,
+    ))
 }
 
 fn parse_block_body<'a>(
@@ -216,8 +229,11 @@ fn parse_block_body<'a>(
         if let Some(pos) = rest.find("{{") {
             if pos > 0 {
                 let lit = rest[..pos].to_string();
-                if in_else { else_body.push(TemplateToken::Literal(lit)); }
-                else { body.push(TemplateToken::Literal(lit)); }
+                if in_else {
+                    else_body.push(TemplateToken::Literal(lit));
+                } else {
+                    body.push(TemplateToken::Literal(lit));
+                }
             }
             rest = &rest[pos + 2..];
 
@@ -225,13 +241,18 @@ fn parse_block_body<'a>(
 
             if rest_trimmed.starts_with('/') {
                 let after_slash = rest_trimmed[1..].trim_start();
-                let closing_name = after_slash.split(|c: char| c.is_whitespace() || c == '}' || c == '-')
-                    .next().unwrap_or("");
+                let closing_name = after_slash
+                    .split(|c: char| c.is_whitespace() || c == '}' || c == '-')
+                    .next()
+                    .unwrap_or("");
                 if closing_name == tag_name {
                     let close = find_closing_braces(rest)?;
                     let mut after = &rest[close + 2..];
-                    if after.starts_with('\n') { after = &after[1..]; }
-                    else if after.starts_with("\r\n") { after = &after[2..]; }
+                    if after.starts_with('\n') {
+                        after = &after[1..];
+                    } else if after.starts_with("\r\n") {
+                        after = &after[2..];
+                    }
                     return Ok((body, else_body, after));
                 }
             }
@@ -240,11 +261,17 @@ fn parse_block_body<'a>(
                 let directive_rest = rest_trimmed[1..].trim_start();
                 if directive_rest.starts_with("else") {
                     let after_else = &directive_rest[4..];
-                    if after_else.is_empty() || after_else.starts_with(|c: char| c.is_whitespace() || c == '}' || c == '-') {
+                    if after_else.is_empty()
+                        || after_else
+                            .starts_with(|c: char| c.is_whitespace() || c == '}' || c == '-')
+                    {
                         let close = find_closing_braces(rest)?;
                         rest = &rest[close + 2..];
-                        if rest.starts_with('\n') { rest = &rest[1..]; }
-                        else if rest.starts_with("\r\n") { rest = &rest[2..]; }
+                        if rest.starts_with('\n') {
+                            rest = &rest[1..];
+                        } else if rest.starts_with("\r\n") {
+                            rest = &rest[2..];
+                        }
                         in_else = true;
                         continue;
                     }
@@ -252,13 +279,21 @@ fn parse_block_body<'a>(
 
                 if directive_rest.starts_with("if ") || directive_rest.starts_with("if\t") {
                     let (token, remaining) = parse_if_directive(rest)?;
-                    if in_else { else_body.push(token); } else { body.push(token); }
+                    if in_else {
+                        else_body.push(token);
+                    } else {
+                        body.push(token);
+                    }
                     rest = remaining;
                     continue;
                 }
                 if directive_rest.starts_with("for ") || directive_rest.starts_with("for\t") {
                     let (token, remaining) = parse_for_directive(rest)?;
-                    if in_else { else_body.push(token); } else { body.push(token); }
+                    if in_else {
+                        else_body.push(token);
+                    } else {
+                        body.push(token);
+                    }
                     rest = remaining;
                     continue;
                 }
@@ -268,12 +303,19 @@ fn parse_block_body<'a>(
             let expr_str = rest[..close].trim();
             let expr_str = expr_str.strip_suffix('-').unwrap_or(expr_str).trim();
             let token = TemplateToken::Expr(expr_str.to_string());
-            if in_else { else_body.push(token); } else { body.push(token); }
+            if in_else {
+                else_body.push(token);
+            } else {
+                body.push(token);
+            }
             rest = &rest[close + 2..];
         } else {
             let lit = rest.to_string();
-            if in_else { else_body.push(TemplateToken::Literal(lit)); }
-            else { body.push(TemplateToken::Literal(lit)); }
+            if in_else {
+                else_body.push(TemplateToken::Literal(lit));
+            } else {
+                body.push(TemplateToken::Literal(lit));
+            }
             return Err(format!("unclosed {{{{# {} }}}} block", tag_name));
         }
     }
@@ -297,7 +339,11 @@ fn render_tokens(
                 let value = resolve_expr(expr, context);
                 output.push_str(&value.display_string());
             }
-            TemplateToken::If { condition, body, else_body } => {
+            TemplateToken::If {
+                condition,
+                body,
+                else_body,
+            } => {
                 let val = resolve_expr(condition, context);
                 if is_truthy(&val) {
                     output.push_str(&render_tokens(body, context)?);
@@ -305,15 +351,22 @@ fn render_tokens(
                     output.push_str(&render_tokens(else_body, context)?);
                 }
             }
-            TemplateToken::For { var, iterable, body } => {
+            TemplateToken::For {
+                var,
+                iterable,
+                body,
+            } => {
                 let collection = resolve_expr(iterable, context);
                 let items = match &collection {
                     Value::List(l) => l.clone(),
                     Value::Tuple(t) => t.clone(),
-                    _ => return Err(format!(
-                        "template for-loop: '{}' is not iterable (got {})",
-                        iterable, collection.type_name()
-                    )),
+                    _ => {
+                        return Err(format!(
+                            "template for-loop: '{}' is not iterable (got {})",
+                            iterable,
+                            collection.type_name()
+                        ))
+                    }
                 };
                 for item in &items {
                     let mut inner_ctx = context.clone();
@@ -332,7 +385,7 @@ fn resolve_expr(expr: &str, context: &BTreeMap<String, Value>) -> Value {
     if (expr.starts_with('"') && expr.ends_with('"'))
         || (expr.starts_with('\'') && expr.ends_with('\''))
     {
-        return Value::String(expr[1..expr.len()-1].to_string());
+        return Value::String(expr[1..expr.len() - 1].to_string());
     }
 
     if let Ok(n) = expr.parse::<i64>() {
@@ -341,9 +394,15 @@ fn resolve_expr(expr: &str, context: &BTreeMap<String, Value>) -> Value {
     if let Ok(f) = expr.parse::<f64>() {
         return Value::Float(f);
     }
-    if expr == "true" { return Value::Bool(true); }
-    if expr == "false" { return Value::Bool(false); }
-    if expr == "null" { return Value::Null; }
+    if expr == "true" {
+        return Value::Bool(true);
+    }
+    if expr == "false" {
+        return Value::Bool(false);
+    }
+    if expr == "null" {
+        return Value::Null;
+    }
 
     let parts: Vec<&str> = expr.split('.').collect();
     let mut current = match context.get(parts[0]) {

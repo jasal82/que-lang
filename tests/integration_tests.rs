@@ -3,7 +3,6 @@
 /// Each test feeds source code through the complete pipeline:
 ///   lex → parse → interpret
 /// and asserts on the output and/or result value.
-
 use que_lang::interpreter::{run, run_strict};
 use que_lang::value::Value;
 
@@ -25,7 +24,11 @@ fn assert_result(source: &str, expected: Value) {
 }
 
 fn assert_error(source: &str) {
-    assert!(run(source).is_err(), "expected error for source:\n{}", source);
+    assert!(
+        run(source).is_err(),
+        "expected error for source:\n{}",
+        source
+    );
 }
 
 /// Assert the source fails and that the rendered error message contains `needle`.
@@ -139,10 +142,7 @@ fn hello_world() {
 fn print_concatenates_partial_lines() {
     // print() should NOT add a trailing newline; consecutive prints
     // accumulate on the same line until a println (or '\n') flushes it.
-    assert_output(
-        "print(\"a\"); print(\"b\"); println(\"c\")",
-        &["abc"],
-    );
+    assert_output("print(\"a\"); print(\"b\"); println(\"c\")", &["abc"]);
 }
 
 #[test]
@@ -156,7 +156,10 @@ fn print_then_trailing_flush() {
 fn print_with_embedded_newlines_splits_lines() {
     // Embedded '\n' inside a print() argument should split the buffer
     // at each newline.
-    assert_output("print(\"one\\ntwo\\n\"); print(\"three\")", &["one", "two", "three"]);
+    assert_output(
+        "print(\"one\\ntwo\\n\"); print(\"three\")",
+        &["one", "two", "three"],
+    );
 }
 
 #[test]
@@ -392,14 +395,7 @@ println(head_tail([]))
 println(head_tail([42]))
 println(head_tail([1, 2, 3, 4]))
 "#;
-    assert_output(
-        source,
-        &[
-            "empty",
-            "single: 42",
-            "head: 1, rest len: 3",
-        ],
-    );
+    assert_output(source, &["empty", "single: 42", "head: 1, rest len: 3"]);
 }
 
 #[test]
@@ -702,12 +698,7 @@ println(main.parent())
 "#;
     assert_output(
         source,
-        &[
-            "./project/src/main.rs",
-            "main.rs",
-            "rs",
-            "./project/src",
-        ],
+        &["./project/src/main.rs", "main.rs", "rs", "./project/src"],
     );
 }
 
@@ -1186,7 +1177,10 @@ println(g"/tmp/${
     dir
 }/*.log".pattern())
 "#;
-    assert_output(source, &["hello que", "sum 3", "first 1", "/tmp/x/f", "/tmp/x/*.log"]);
+    assert_output(
+        source,
+        &["hello que", "sum 3", "first 1", "/tmp/x/f", "/tmp/x/*.log"],
+    );
 }
 
 #[test]
@@ -1366,7 +1360,10 @@ fn combinator_map() {
 let nums = [1, 2, 3]
 nums.map(|x| x * 2)
 "#;
-    assert_result(source, Value::List(vec![Value::Int(2), Value::Int(4), Value::Int(6)]));
+    assert_result(
+        source,
+        Value::List(vec![Value::Int(2), Value::Int(4), Value::Int(6)]),
+    );
 }
 
 #[test]
@@ -1384,11 +1381,17 @@ fn combinator_flat_map() {
 let nums = [1, 2, 3]
 nums.flat_map(|x| [x, x * 10])
 "#;
-    assert_result(source, Value::List(vec![
-        Value::Int(1), Value::Int(10),
-        Value::Int(2), Value::Int(20),
-        Value::Int(3), Value::Int(30),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::Int(1),
+            Value::Int(10),
+            Value::Int(2),
+            Value::Int(20),
+            Value::Int(3),
+            Value::Int(30),
+        ]),
+    );
 }
 
 #[test]
@@ -1399,7 +1402,10 @@ let has_big = nums.any(|x| x > 3)
 let all_pos = nums.all(|x| x > 0)
 (has_big, all_pos)
 "#;
-    assert_result(source, Value::Tuple(vec![Value::Bool(true), Value::Bool(true)]));
+    assert_result(
+        source,
+        Value::Tuple(vec![Value::Bool(true), Value::Bool(true)]),
+    );
 }
 
 #[test]
@@ -1418,11 +1424,14 @@ let a = [1, 2, 3]
 let b = ["a", "b", "c"]
 a.zip(b)
 "#;
-    assert_result(source, Value::List(vec![
-        Value::Tuple(vec![Value::Int(1), Value::String("a".into())]),
-        Value::Tuple(vec![Value::Int(2), Value::String("b".into())]),
-        Value::Tuple(vec![Value::Int(3), Value::String("c".into())]),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::Tuple(vec![Value::Int(1), Value::String("a".into())]),
+            Value::Tuple(vec![Value::Int(2), Value::String("b".into())]),
+            Value::Tuple(vec![Value::Int(3), Value::String("c".into())]),
+        ]),
+    );
 }
 
 #[test]
@@ -1431,10 +1440,13 @@ fn combinator_enumerate() {
 let items = ["a", "b"]
 items.enumerate()
 "#;
-    assert_result(source, Value::List(vec![
-        Value::Tuple(vec![Value::Int(0), Value::String("a".into())]),
-        Value::Tuple(vec![Value::Int(1), Value::String("b".into())]),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::Tuple(vec![Value::Int(0), Value::String("a".into())]),
+            Value::Tuple(vec![Value::Int(1), Value::String("b".into())]),
+        ]),
+    );
 }
 
 #[test]
@@ -1445,10 +1457,13 @@ let first3 = nums.take(3)
 let last2 = nums.skip(3)
 (first3, last2)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
-        Value::List(vec![Value::Int(4), Value::Int(5)]),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
+            Value::List(vec![Value::Int(4), Value::Int(5)]),
+        ]),
+    );
 }
 
 #[test]
@@ -1456,11 +1471,14 @@ fn combinator_chunk() {
     let source = r#"
 [1, 2, 3, 4, 5].chunk(2)
 "#;
-    assert_result(source, Value::List(vec![
-        Value::List(vec![Value::Int(1), Value::Int(2)]),
-        Value::List(vec![Value::Int(3), Value::Int(4)]),
-        Value::List(vec![Value::Int(5)]),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::List(vec![Value::Int(1), Value::Int(2)]),
+            Value::List(vec![Value::Int(3), Value::Int(4)]),
+            Value::List(vec![Value::Int(5)]),
+        ]),
+    );
 }
 
 #[test]
@@ -1468,10 +1486,13 @@ fn combinator_partition() {
     let source = r#"
 [1, 2, 3, 4, 5].partition(|x| x % 2 == 0)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::List(vec![Value::Int(2), Value::Int(4)]),
-        Value::List(vec![Value::Int(1), Value::Int(3), Value::Int(5)]),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::List(vec![Value::Int(2), Value::Int(4)]),
+            Value::List(vec![Value::Int(1), Value::Int(3), Value::Int(5)]),
+        ]),
+    );
 }
 
 #[test]
@@ -1479,9 +1500,16 @@ fn combinator_flatten() {
     let source = r#"
 [[1, 2], [3], [4, 5]].flatten()
 "#;
-    assert_result(source, Value::List(vec![
-        Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4), Value::Int(5),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(4),
+            Value::Int(5),
+        ]),
+    );
 }
 
 #[test]
@@ -1507,7 +1535,10 @@ let result = [1, 2, 3, 4, 5]
     |> tenfold
 result
 "#;
-    assert_result(source, Value::List(vec![Value::Int(30), Value::Int(40), Value::Int(50)]));
+    assert_result(
+        source,
+        Value::List(vec![Value::Int(30), Value::Int(40), Value::Int(50)]),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -1523,11 +1554,14 @@ let minor = v.bump_minor()
 let patch = v.bump_patch()
 (str(major), str(minor), str(patch))
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::String("2.0.0".into()),
-        Value::String("1.3.0".into()),
-        Value::String("1.2.4".into()),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::String("2.0.0".into()),
+            Value::String("1.3.0".into()),
+            Value::String("1.2.4".into()),
+        ]),
+    );
 }
 
 #[test]
@@ -1536,9 +1570,10 @@ fn semver_field_access() {
 let v = v"3.2.1"
 (v.major, v.minor, v.patch)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::Int(3), Value::Int(2), Value::Int(1),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![Value::Int(3), Value::Int(2), Value::Int(1)]),
+    );
 }
 
 #[test]
@@ -1550,9 +1585,14 @@ let v2 = constraint.satisfied_by(v"2.0.0")
 let v3 = constraint.satisfied_by(v"1.1.0")
 (v1, v2, v3)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::Bool(true), Value::Bool(false), Value::Bool(false),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::Bool(true),
+            Value::Bool(false),
+            Value::Bool(false),
+        ]),
+    );
 }
 
 #[test]
@@ -1563,10 +1603,10 @@ let pre = v.prerelease()
 let is_pre = v.is_prerelease()
 (pre, is_pre)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::String("beta.1".into()),
-        Value::Bool(true),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![Value::String("beta.1".into()), Value::Bool(true)]),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -1614,7 +1654,9 @@ let tok = secret("hunter2")
     let mut interp = que_lang::interpreter::Interpreter::new();
     interp.dry_run = true;
     let tokens = que_lang::lexer::Lexer::new(source).tokenize().unwrap();
-    let module = que_lang::parser::Parser::new(tokens).parse_module().unwrap();
+    let module = que_lang::parser::Parser::new(tokens)
+        .parse_module()
+        .unwrap();
     interp.exec_module(&module).unwrap();
     let joined = interp.output.join("\n");
     assert!(joined.contains("<redacted>"), "{}", joined);
@@ -1640,10 +1682,7 @@ println("token is " + tok.expose())
 println(`printf 'echoed hunter2'`.out())
 "#;
     let (output, _) = run(source).unwrap();
-    assert_eq!(
-        output,
-        vec!["token is <redacted>", "echoed <redacted>"]
-    );
+    assert_eq!(output, vec!["token is <redacted>", "echoed <redacted>"]);
 }
 
 #[test]
@@ -1703,7 +1742,10 @@ let a = re.test("12345")
 let b = re.test("abc")
 (a, b)
 "#;
-    assert_result(source, Value::Tuple(vec![Value::Bool(true), Value::Bool(false)]));
+    assert_result(
+        source,
+        Value::Tuple(vec![Value::Bool(true), Value::Bool(false)]),
+    );
 }
 
 #[test]
@@ -1721,10 +1763,13 @@ fn regex_find_all() {
 let pattern = re"\d+"
 pattern.find_all("abc123def456")
 "#;
-    assert_result(source, Value::List(vec![
-        Value::String("123".into()),
-        Value::String("456".into()),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::String("123".into()),
+            Value::String("456".into()),
+        ]),
+    );
 }
 
 #[test]
@@ -1742,11 +1787,14 @@ fn regex_split() {
 let pattern = re"\s+"
 pattern.split("hello   world  foo")
 "#;
-    assert_result(source, Value::List(vec![
-        Value::String("hello".into()),
-        Value::String("world".into()),
-        Value::String("foo".into()),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::String("hello".into()),
+            Value::String("world".into()),
+            Value::String("foo".into()),
+        ]),
+    );
 }
 
 #[test]
@@ -1888,12 +1936,18 @@ let a = "hello123".matches("\\d+")
 let b = "hello".matches("\\d+")
 (a, b)
 "#;
-    assert_result(source, Value::Tuple(vec![Value::Bool(true), Value::Bool(false)]));
+    assert_result(
+        source,
+        Value::Tuple(vec![Value::Bool(true), Value::Bool(false)]),
+    );
 }
 
 #[test]
 fn string_bytes() {
-    assert_result(r#""AB".bytes()"#, Value::List(vec![Value::Int(65), Value::Int(66)]));
+    assert_result(
+        r#""AB".bytes()"#,
+        Value::List(vec![Value::Int(65), Value::Int(66)]),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -1905,9 +1959,16 @@ fn list_flatten() {
     let source = r#"
 [[1, 2], [3, 4], [5]].flatten()
 "#;
-    assert_result(source, Value::List(vec![
-        Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4), Value::Int(5),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(4),
+            Value::Int(5),
+        ]),
+    );
 }
 
 #[test]
@@ -1978,9 +2039,10 @@ fn list_index_out_of_bounds_raises() {
 
 #[test]
 fn list_slice() {
-    assert_result("[1,2,3,4,5].slice(1, 4)", Value::List(vec![
-        Value::Int(2), Value::Int(3), Value::Int(4),
-    ]));
+    assert_result(
+        "[1,2,3,4,5].slice(1, 4)",
+        Value::List(vec![Value::Int(2), Value::Int(3), Value::Int(4)]),
+    );
 }
 
 #[test]
@@ -1988,11 +2050,14 @@ fn list_window() {
     let source = r#"
 [1, 2, 3, 4].window(2)
 "#;
-    assert_result(source, Value::List(vec![
-        Value::List(vec![Value::Int(1), Value::Int(2)]),
-        Value::List(vec![Value::Int(2), Value::Int(3)]),
-        Value::List(vec![Value::Int(3), Value::Int(4)]),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::List(vec![Value::Int(1), Value::Int(2)]),
+            Value::List(vec![Value::Int(2), Value::Int(3)]),
+            Value::List(vec![Value::Int(3), Value::Int(4)]),
+        ]),
+    );
 }
 
 #[test]
@@ -2000,11 +2065,17 @@ fn list_flatmap_alias() {
     let source = r#"
 [1, 2, 3].flat_map(|x| [x, x * 10])
 "#;
-    assert_result(source, Value::List(vec![
-        Value::Int(1), Value::Int(10),
-        Value::Int(2), Value::Int(20),
-        Value::Int(3), Value::Int(30),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::Int(1),
+            Value::Int(10),
+            Value::Int(2),
+            Value::Int(20),
+            Value::Int(3),
+            Value::Int(30),
+        ]),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -2307,11 +2378,14 @@ let list = t.to_list()
 let has2 = t.contains(2)
 (len, list, has2)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::Int(3),
-        Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
-        Value::Bool(true),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::Int(3),
+            Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
+            Value::Bool(true),
+        ]),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -2367,9 +2441,15 @@ let c = bool("")
 let d = bool("hello")
 (a, b, c, d)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::Bool(true), Value::Bool(false), Value::Bool(false), Value::Bool(true),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::Bool(true),
+            Value::Bool(false),
+            Value::Bool(false),
+            Value::Bool(true),
+        ]),
+    );
 }
 
 #[test]
@@ -2408,9 +2488,14 @@ let b = g.test("src/nested/lib.rs")
 let c = g.test("README.md")
 (a, b, c)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::Bool(true), Value::Bool(true), Value::Bool(false),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::Bool(true),
+            Value::Bool(true),
+            Value::Bool(false),
+        ]),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -2672,13 +2757,22 @@ println(str(ok.exit_code) + "/" + str(bad.exit_code) + "/[" + ok.stdout + bad.st
 fn cmd_attach_refuses_to_share_stdin() {
     // Both modifiers want the child's stdin; silently letting one win would
     // mean the data is dropped or the terminal never reaches the program.
-    assert_error_contains("`cat`.attach().stdin(\"hi\")", "both claim the child's stdin");
-    assert_error_contains("`cat`.stdin(\"hi\").attach()", "both claim the child's stdin");
+    assert_error_contains(
+        "`cat`.attach().stdin(\"hi\")",
+        "both claim the child's stdin",
+    );
+    assert_error_contains(
+        "`cat`.stdin(\"hi\").attach()",
+        "both claim the child's stdin",
+    );
 }
 
 #[test]
 fn cmd_attach_refuses_a_pipeline() {
-    assert_error_contains("(`echo a` | `cat`.attach()).try()", "cannot be used in a pipeline");
+    assert_error_contains(
+        "(`echo a` | `cat`.attach()).try()",
+        "cannot be used in a pipeline",
+    );
 }
 
 #[test]
@@ -3024,11 +3118,14 @@ with env.scope({ "QUE_LIST_TEST": "a,b,c" }) {
     env.list("QUE_LIST_TEST")
 }
 "#;
-    assert_result(source, Value::List(vec![
-        Value::String("a".into()),
-        Value::String("b".into()),
-        Value::String("c".into()),
-    ]));
+    assert_result(
+        source,
+        Value::List(vec![
+            Value::String("a".into()),
+            Value::String("b".into()),
+            Value::String("c".into()),
+        ]),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -3252,14 +3349,26 @@ fn is_type_method_form() {
 
 #[test]
 fn has_method_checks() {
-    assert_result(r#"import std.reflect
-reflect.has_method("hello", "to_upper")"#, Value::Bool(true));
-    assert_result(r#"import std.reflect
-reflect.has_method("hello", "nonexistent")"#, Value::Bool(false));
-    assert_result(r#"import std.reflect
-reflect.has_method([1, 2], "map")"#, Value::Bool(true));
-    assert_result(r#"import std.reflect
-reflect.has_method([1, 2], "to_upper")"#, Value::Bool(false));
+    assert_result(
+        r#"import std.reflect
+reflect.has_method("hello", "to_upper")"#,
+        Value::Bool(true),
+    );
+    assert_result(
+        r#"import std.reflect
+reflect.has_method("hello", "nonexistent")"#,
+        Value::Bool(false),
+    );
+    assert_result(
+        r#"import std.reflect
+reflect.has_method([1, 2], "map")"#,
+        Value::Bool(true),
+    );
+    assert_result(
+        r#"import std.reflect
+reflect.has_method([1, 2], "to_upper")"#,
+        Value::Bool(false),
+    );
 }
 
 #[test]
@@ -3332,8 +3441,11 @@ info.mutable
 
 #[test]
 fn var_info_undefined_returns_null() {
-    assert_result(r#"import std.reflect
-reflect.var_info("nonexistent")"#, Value::Null);
+    assert_result(
+        r#"import std.reflect
+reflect.var_info("nonexistent")"#,
+        Value::Null,
+    );
 }
 
 #[test]
@@ -3407,10 +3519,7 @@ let data = [1, "hello", [2, 3], {"key": "val"}]
 let types = data.map(|item| typeof(item))
 types.join(", ")
 "#;
-    assert_result(
-        source,
-        Value::String("Int, String, List, Map".into()),
-    );
+    assert_result(source, Value::String("Int, String, List, Map".into()));
 }
 
 #[test]
@@ -3593,11 +3702,20 @@ task package {
 package()
 "#;
     // Dependencies should run in order
-    assert_output(source, &[
-        "[RUN]  compile", "compiling", "[DONE] compile",
-        "[RUN]  link", "linking", "[DONE] link",
-        "[RUN]  package", "packaging", "[DONE] package",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  compile",
+            "compiling",
+            "[DONE] compile",
+            "[RUN]  link",
+            "linking",
+            "[DONE] link",
+            "[RUN]  package",
+            "packaging",
+            "[DONE] package",
+        ],
+    );
 }
 
 #[test]
@@ -3628,10 +3746,17 @@ task package {
 }
 package()
 "#;
-    assert_output(source, &[
-        "[RUN]  compile", "compiling", "[DONE] compile",
-        "[RUN]  package", "packaging", "[DONE] package",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  compile",
+            "compiling",
+            "[DONE] compile",
+            "[RUN]  package",
+            "packaging",
+            "[DONE] package",
+        ],
+    );
 }
 
 #[test]
@@ -3681,7 +3806,8 @@ fn task_unknown_attribute_is_rejected() {
     let err = run("@retries([3])\ntask a { println(\"a\") }")
         .expect_err("an unknown attribute should not parse");
     assert!(
-        err.to_string().contains("unknown task attribute `@retries`"),
+        err.to_string()
+            .contains("unknown task attribute `@retries`"),
         "expected unknown-attribute hint, got: {}",
         err
     );
@@ -3706,11 +3832,10 @@ task build(target, mode = "debug") {
 }
 build("linux")
 "#;
-    assert_output(source, &[
-        "[RUN]  build",
-        "building linux in debug",
-        "[DONE] build",
-    ]);
+    assert_output(
+        source,
+        &["[RUN]  build", "building linux in debug", "[DONE] build"],
+    );
 }
 
 #[test]
@@ -3721,11 +3846,10 @@ task build(target, mode = "debug") {
 }
 build("linux", "release")
 "#;
-    assert_output(source, &[
-        "[RUN]  build",
-        "building linux in release",
-        "[DONE] build",
-    ]);
+    assert_output(
+        source,
+        &["[RUN]  build", "building linux in release", "[DONE] build"],
+    );
 }
 
 #[test]
@@ -3738,12 +3862,10 @@ let after = build.status
 println(before)
 println(after)
 "#;
-    assert_output(source, &[
-        "[RUN]  build",
-        "[DONE] build",
-        "pending",
-        "succeeded",
-    ]);
+    assert_output(
+        source,
+        &["[RUN]  build", "[DONE] build", "pending", "succeeded"],
+    );
 }
 
 #[test]
@@ -3757,13 +3879,16 @@ task install {
 }
 install()
 "#;
-    assert_output(source, &[
-        "[RUN]  get_profiles",
-        "[DONE] get_profiles",
-        "[RUN]  install",
-        "into /tmp/profiles-1",
-        "[DONE] install",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  get_profiles",
+            "[DONE] get_profiles",
+            "[RUN]  install",
+            "into /tmp/profiles-1",
+            "[DONE] install",
+        ],
+    );
 }
 
 #[test]
@@ -3773,11 +3898,7 @@ task build { 42 }
 build()
 println(build.result())
 "#;
-    assert_output(source, &[
-        "[RUN]  build",
-        "[DONE] build",
-        "42",
-    ]);
+    assert_output(source, &["[RUN]  build", "[DONE] build", "42"]);
 }
 
 #[test]
@@ -3805,14 +3926,17 @@ task install {
 }
 install()
 "#;
-    assert_output(source, &[
-        "[RUN]  get_profiles",
-        "fetching",
-        "[DONE] get_profiles",
-        "[RUN]  install",
-        "into /tmp/profiles-1",
-        "[DONE] install",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  get_profiles",
+            "fetching",
+            "[DONE] get_profiles",
+            "[RUN]  install",
+            "into /tmp/profiles-1",
+            "[DONE] install",
+        ],
+    );
 }
 
 #[test]
@@ -3825,14 +3949,17 @@ task greet(name) {
 greet("a")
 run_task("greet", "b")
 "#;
-    assert_output(source, &[
-        "[RUN]  greet",
-        "hello a",
-        "[DONE] greet",
-        "[RUN]  greet",
-        "hello b",
-        "[DONE] greet",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  greet",
+            "hello a",
+            "[DONE] greet",
+            "[RUN]  greet",
+            "hello b",
+            "[DONE] greet",
+        ],
+    );
 }
 
 #[test]
@@ -3845,14 +3972,17 @@ task build {
 build()
 build.run()
 "#;
-    assert_output(source, &[
-        "[RUN]  build",
-        "compiling",
-        "[DONE] build",
-        "[RUN]  build",
-        "compiling",
-        "[DONE] build",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  build",
+            "compiling",
+            "[DONE] build",
+            "[RUN]  build",
+            "compiling",
+            "[DONE] build",
+        ],
+    );
 }
 
 #[test]
@@ -3871,11 +4001,7 @@ println(link.name)
 println(link.description)
 println(link.deps)
 "#;
-    assert_output(source, &[
-        "link",
-        "Link objects",
-        "[\"compile\"]",
-    ]);
+    assert_output(source, &["link", "Link objects", "[\"compile\"]"]);
 }
 
 #[test]
@@ -3939,10 +4065,7 @@ task compile {
 println(compile.env())
 println(compile.env_keys)
 "#;
-    assert_output(source, &[
-        r#"["CC", "CFLAGS"]"#,
-        r#"["CC", "CFLAGS"]"#,
-    ]);
+    assert_output(source, &[r#"["CC", "CFLAGS"]"#, r#"["CC", "CFLAGS"]"#]);
 }
 
 #[test]
@@ -3955,9 +4078,7 @@ task deploy {
 }
 println(deploy.env())
 "#;
-    assert_output(source, &[
-        r#"["DEPLOY_TOKEN", "K8S_NAMESPACE"]"#,
-    ]);
+    assert_output(source, &[r#"["DEPLOY_TOKEN", "K8S_NAMESPACE"]"#]);
 }
 
 #[test]
@@ -3987,12 +4108,15 @@ println(typeof(compile.outputs()[0]))
 println(compile.inputs())
 println(compile.outputs())
 "#;
-    assert_output(source, &[
-        "Path",
-        "Path",
-        "[src/main.que, src/lib.que]",
-        "[./build/app]",
-    ]);
+    assert_output(
+        source,
+        &[
+            "Path",
+            "Path",
+            "[src/main.que, src/lib.que]",
+            "[./build/app]",
+        ],
+    );
 }
 
 #[test]
@@ -4081,11 +4205,7 @@ fn a_dependency_that_is_not_a_name_is_refused_rather_than_ignored() {
     // A dependency is looked up by name when the task runs, so anything else
     // can never resolve. Saying so at the declaration beats a task that
     // quietly runs without the thing it depends on.
-    for deps in [
-        r#"[make_dep("setup")]"#,
-        r#"[1]"#,
-        r#"[tasks()["setup"]]"#,
-    ] {
+    for deps in [r#"[make_dep("setup")]"#, r#"[1]"#, r#"[tasks()["setup"]]"#] {
         let source = format!("@deps({})\ntask build {{\n    null\n}}\n", deps);
         let msg = assert_error_contains(&source, "expected dependency name");
         assert!(msg.contains("line"), "no location in message: {}", msg);
@@ -4117,12 +4237,17 @@ with TempDir {} as dir {
     println(second)
 }
 "#;
-    assert_output(source, &[
-        "[RUN]  compile", "[DONE] compile",
-        "[RUN]  compile", "[DONE] compile",
-        "debug",
-        "release",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  compile",
+            "[DONE] compile",
+            "[RUN]  compile",
+            "[DONE] compile",
+            "debug",
+            "release",
+        ],
+    );
 }
 
 #[test]
@@ -4145,11 +4270,15 @@ with TempDir {} as dir {
     println(out_path.read()?)
 }
 "#;
-    assert_output(source, &[
-        "[RUN]  compile", "[DONE] compile",
-        "[SKIP] compile",
-        "debug",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  compile",
+            "[DONE] compile",
+            "[SKIP] compile",
+            "debug",
+        ],
+    );
 }
 
 #[test]
@@ -4182,12 +4311,17 @@ with TempDir {} as dir {
     println(second)
 }
 "#;
-    assert_output(source, &[
-        "[RUN]  compile", "[DONE] compile",
-        "[RUN]  compile", "[DONE] compile",
-        "gcc",
-        "clang",
-    ]);
+    assert_output(
+        source,
+        &[
+            "[RUN]  compile",
+            "[DONE] compile",
+            "[RUN]  compile",
+            "[DONE] compile",
+            "gcc",
+            "clang",
+        ],
+    );
 }
 
 #[test]
@@ -4214,11 +4348,10 @@ with TempDir {} as dir {
     println(out_path.read()?)
 }
 "#;
-    assert_output(source, &[
-        "[RUN]  compile", "[DONE] compile",
-        "[SKIP] compile",
-        "gcc",
-    ]);
+    assert_output(
+        source,
+        &["[RUN]  compile", "[DONE] compile", "[SKIP] compile", "gcc"],
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -5861,14 +5994,18 @@ fn copy_file_basic() {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("hello.txt"), "hello world").unwrap();
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let src = path("{}/hello.txt")
 let dst = path("{}/hello_copy.txt")
 let result = src.copy_to(dst)
 println(typeof(result))
 let content = dst.read().unwrap()
 println(content)
-"#, dir.display(), dir.display());
+"#,
+        dir.display(),
+        dir.display()
+    );
     let (output, _) = run(&source).unwrap();
     assert_eq!(output, vec!["Ok", "hello world"]);
 
@@ -5884,7 +6021,8 @@ fn copy_dir_recursive() {
     std::fs::write(src.join("a.txt"), "file a").unwrap();
     std::fs::write(src.join("sub/b.txt"), "file b").unwrap();
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let src = path("{}")
 let dst = path("{}")
 let result = src.copy_to(dst)
@@ -5920,7 +6058,8 @@ fn copy_dir_nested_structure() {
     std::fs::write(src.join("a/mid.txt"), "mid").unwrap();
     std::fs::write(src.join("a/b/c/deep.txt"), "deep").unwrap();
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let src = path("{}")
 let dst = path("{}")
 src.copy_to(dst).unwrap()
@@ -5947,14 +6086,18 @@ fn move_file_basic() {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("orig.txt"), "move me").unwrap();
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let src = path("{}/orig.txt")
 let dst = path("{}/moved.txt")
 let result = src.move_to(dst)
 println(typeof(result))
 println(dst.read().unwrap())
 println(src.exists())
-"#, dir.display(), dir.display());
+"#,
+        dir.display(),
+        dir.display()
+    );
     let (output, _) = run(&source).unwrap();
     assert_eq!(output, vec!["Ok", "move me", "false"]);
 
@@ -5970,7 +6113,8 @@ fn move_dir_basic() {
     std::fs::write(src.join("file.txt"), "contents").unwrap();
     std::fs::write(src.join("child/nested.txt"), "nested").unwrap();
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let src = path("{}")
 let dst = path("{}")
 src.move_to(dst).unwrap()
@@ -5998,7 +6142,8 @@ fn copy_dir_with_path_arg() {
     std::fs::create_dir_all(&src).unwrap();
     std::fs::write(src.join("x.txt"), "hello").unwrap();
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let src = path("{}")
 let dst = path("{}")
 src.copy_to(dst).unwrap()
@@ -6628,10 +6773,13 @@ println(typeof(url_encode))
 println(typeof(url_decode))
 println(typeof(query_string))
 "#;
-    assert_output(source, &[
-        "Function", "Function", "Function", "Function", "Function",
-        "Function", "Function", "Function", "Function", "Function",
-    ]);
+    assert_output(
+        source,
+        &[
+            "Function", "Function", "Function", "Function", "Function", "Function", "Function",
+            "Function", "Function", "Function",
+        ],
+    );
 }
 
 // ── http TLS / CA-bundle ─────────────────────────────────────────────
@@ -6872,9 +7020,7 @@ fn a_dry_run_announces_a_pipeline_as_one_line() {
     let dir = dry_project("pipe", "let r = (`echo hi` | `tr a-z A-Z`).out()\n");
     let output = run_dry_in(&dir, "main.que");
     assert!(
-        output
-            .iter()
-            .any(|l| l == "[dry-run] echo hi | tr a-z A-Z"),
+        output.iter().any(|l| l == "[dry-run] echo hi | tr a-z A-Z"),
         "expected one line for the whole pipeline: {:?}",
         output
     );
@@ -6900,10 +7046,7 @@ fn a_dry_run_does_not_write_files() {
 fn a_dry_run_still_reads() {
     // A script that cannot read cannot reach the decisions the dry run is
     // meant to show, so reads are never suppressed.
-    let dir = dry_project(
-        "read",
-        "println((script_dir() / \"data.txt\").read()?)\n",
-    );
+    let dir = dry_project("read", "println((script_dir() / \"data.txt\").read()?)\n");
     std::fs::write(dir.join("data.txt"), "real contents").unwrap();
     assert_eq!(
         run_dry_in(&dir, "main.que"),
@@ -6928,14 +7071,18 @@ fn a_dry_run_does_not_open_a_file_for_writing() {
         "the dry run truncated the file"
     );
     assert!(
-        output.iter().any(|l| l.contains("[dry-run] open") && l.contains("truncate")),
+        output
+            .iter()
+            .any(|l| l.contains("[dry-run] open") && l.contains("truncate")),
         "expected the open to be announced: {:?}",
         output
     );
     // Each write is announced too. A dry run that reported the open and then
     // went quiet would understate what the script does.
     assert!(
-        output.iter().any(|l| l.starts_with("[dry-run] write ") && l.ends_with("(7 bytes)")),
+        output
+            .iter()
+            .any(|l| l.starts_with("[dry-run] write ") && l.ends_with("(7 bytes)")),
         "expected the discarded write to be announced: {:?}",
         output
     );
@@ -6956,9 +7103,14 @@ fn a_dry_run_does_not_create_a_file_opened_for_appending() {
         "let f = open(script_dir() / \"log.txt\", \"a\")?\nf.writeln(\"entry\")\nf.flush()\nprintln(\"done\")\n",
     );
     let output = run_dry_in(&dir, "main.que");
-    assert!(!dir.join("log.txt").exists(), "the dry run created the file");
     assert!(
-        output.iter().any(|l| l.starts_with("[dry-run] write ") && l.ends_with("(6 bytes)")),
+        !dir.join("log.txt").exists(),
+        "the dry run created the file"
+    );
+    assert!(
+        output
+            .iter()
+            .any(|l| l.starts_with("[dry-run] write ") && l.ends_with("(6 bytes)")),
         "writeln should announce the newline it would have written: {:?}",
         output
     );
@@ -6991,7 +7143,9 @@ fn a_dry_run_announces_a_stream_write_with_the_size_it_would_have_written() {
     let output = run_dry_in(&dir, "main.que");
     assert!(!dir.join("out.txt").exists(), "the dry run wrote the file");
     assert!(
-        output.iter().any(|l| l.starts_with("[dry-run] write ") && l.ends_with("(4 bytes)")),
+        output
+            .iter()
+            .any(|l| l.starts_with("[dry-run] write ") && l.ends_with("(4 bytes)")),
         "expected a measured byte count: {:?}",
         output
     );
@@ -7021,7 +7175,9 @@ fn a_dry_run_announces_a_stream_piped_into_a_file_handle() {
     let output = run_dry_in(&dir, "main.que");
     assert!(!dir.join("out.txt").exists(), "the dry run wrote the file");
     assert!(
-        output.iter().any(|l| l.starts_with("[dry-run] write ") && l.ends_with("(4 bytes)")),
+        output
+            .iter()
+            .any(|l| l.starts_with("[dry-run] write ") && l.ends_with("(4 bytes)")),
         "expected the piped write to be announced: {:?}",
         output
     );
@@ -7099,7 +7255,10 @@ fn install_fetches_a_git_dependency_and_the_import_finds_it() {
     std::fs::create_dir_all(&app).unwrap();
     std::fs::write(
         app.join("que.toml"),
-        format!("[dependencies]\nshouty = {{ git = \"{}\", tag = \"v1\" }}\n", url),
+        format!(
+            "[dependencies]\nshouty = {{ git = \"{}\", tag = \"v1\" }}\n",
+            url
+        ),
     )
     .unwrap();
 
@@ -7123,7 +7282,10 @@ fn install_writes_a_lockfile_pinning_the_resolved_commit() {
     std::fs::create_dir_all(&app).unwrap();
     std::fs::write(
         app.join("que.toml"),
-        format!("[dependencies]\np = {{ git = \"{}\", tag = \"v1\" }}\n", url),
+        format!(
+            "[dependencies]\np = {{ git = \"{}\", tag = \"v1\" }}\n",
+            url
+        ),
     )
     .unwrap();
 
@@ -7152,7 +7314,10 @@ fn a_moved_tag_does_not_change_what_a_locked_install_gets() {
     std::fs::create_dir_all(&app).unwrap();
     std::fs::write(
         app.join("que.toml"),
-        format!("[dependencies]\np = {{ git = \"{}\", tag = \"v1\" }}\n", url),
+        format!(
+            "[dependencies]\np = {{ git = \"{}\", tag = \"v1\" }}\n",
+            url
+        ),
     )
     .unwrap();
     que_lang::install::install(&app, false).unwrap();
@@ -7189,7 +7354,12 @@ fn changing_the_requirement_re_resolves() {
     let url = git_package(&dir.join("upstream"), "pub fn v() { 1 }\n");
     let app = dir.join("app");
     std::fs::create_dir_all(&app).unwrap();
-    let manifest = |req: &str| format!("[dependencies]\np = {{ git = \"{}\", tag = \"{}\" }}\n", url, req);
+    let manifest = |req: &str| {
+        format!(
+            "[dependencies]\np = {{ git = \"{}\", tag = \"{}\" }}\n",
+            url, req
+        )
+    };
 
     std::fs::write(app.join("que.toml"), manifest("v1")).unwrap();
     que_lang::install::install(&app, false).unwrap();
@@ -7210,7 +7380,10 @@ fn dropping_a_dependency_drops_its_pin() {
     std::fs::create_dir_all(&app).unwrap();
     std::fs::write(
         app.join("que.toml"),
-        format!("[dependencies]\np = {{ git = \"{}\", tag = \"v1\" }}\n", url),
+        format!(
+            "[dependencies]\np = {{ git = \"{}\", tag = \"v1\" }}\n",
+            url
+        ),
     )
     .unwrap();
     que_lang::install::install(&app, false).unwrap();
@@ -7365,8 +7538,16 @@ fn test_cannot_see_the_other_local() { local }
         )],
     );
     let report = que_lang::test_runner::run_file(&dir.join("scope_test.que"), None);
-    assert!(report.outcomes[0].passed(), "{:?}", report.outcomes[0].failure);
-    assert!(report.outcomes[1].passed(), "{:?}", report.outcomes[1].failure);
+    assert!(
+        report.outcomes[0].passed(),
+        "{:?}",
+        report.outcomes[0].failure
+    );
+    assert!(
+        report.outcomes[1].passed(),
+        "{:?}",
+        report.outcomes[1].failure
+    );
     assert!(
         report.outcomes[2]
             .failure
@@ -7416,7 +7597,10 @@ fn test_runner_discovers_by_name_and_by_directory() {
 
 #[test]
 fn test_runner_uses_an_explicitly_named_file_whatever_it_is_called() {
-    let dir = test_project("explicit", &[("helper.que", "fn test_x() { assert(true) }\n")]);
+    let dir = test_project(
+        "explicit",
+        &[("helper.que", "fn test_x() { assert(true) }\n")],
+    );
     let found = que_lang::test_runner::discover(&[dir.join("helper.que")]);
     assert_eq!(found.len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
@@ -7428,11 +7612,13 @@ fn test_runner_uses_an_explicitly_named_file_whatever_it_is_called() {
 
 /// Helper: run a .que file with the module loader enabled.
 /// Creates a temp directory, writes files, runs the main file.
-fn run_module_project(files: &[(&str, &str)]) -> Result<(Vec<String>, Value), que_lang::error::QueError> {
+fn run_module_project(
+    files: &[(&str, &str)],
+) -> Result<(Vec<String>, Value), que_lang::error::QueError> {
+    use que_lang::error::Signal;
     use que_lang::interpreter::Interpreter;
     use que_lang::lexer::Lexer;
     use que_lang::parser::Parser;
-    use que_lang::error::Signal;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -7470,8 +7656,13 @@ fn run_module_project(files: &[(&str, &str)]) -> Result<(Vec<String>, Value), qu
         Err(Signal::Error(e)) => Err(e),
         Err(Signal::Return(v)) => Ok((interp.output, v)),
         Err(Signal::Break(_)) => Err(que_lang::error::QueError::runtime("break outside of loop")),
-        Err(Signal::Continue) => Err(que_lang::error::QueError::runtime("continue outside of loop")),
-        Err(Signal::Exit(code)) => Err(que_lang::error::QueError::runtime(format!("exit({})", code))),
+        Err(Signal::Continue) => Err(que_lang::error::QueError::runtime(
+            "continue outside of loop",
+        )),
+        Err(Signal::Exit(code)) => Err(que_lang::error::QueError::runtime(format!(
+            "exit({})",
+            code
+        ))),
         Err(Signal::Interrupted(sig)) => Err(que_lang::error::QueError::runtime(format!(
             "interrupted by signal {}",
             sig
@@ -7483,8 +7674,8 @@ fn run_module_project(files: &[(&str, &str)]) -> Result<(Vec<String>, Value), qu
 }
 
 fn assert_module_output(files: &[(&str, &str)], expected: &[&str]) {
-    let (output, _) = run_module_project(files)
-        .unwrap_or_else(|e| panic!("module execution failed: {}", e));
+    let (output, _) =
+        run_module_project(files).unwrap_or_else(|e| panic!("module execution failed: {}", e));
     assert_eq!(
         output,
         expected.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
@@ -7505,15 +7696,21 @@ fn assert_module_error(files: &[(&str, &str)]) {
 fn module_local_import_basic() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils
 println(utils.greet("World"))
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) {
     "Hello, " + name + "!"
 }
-"#),
+"#,
+            ),
         ],
         &["Hello, World!"],
     );
@@ -7523,13 +7720,19 @@ pub fn greet(name) {
 fn module_local_import_nested_path() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .lib.math
 println(math.add(2, 3))
-"#),
-            ("lib/math.que", r#"
+"#,
+            ),
+            (
+                "lib/math.que",
+                r#"
 pub fn add(a, b) { a + b }
-"#),
+"#,
+            ),
         ],
         &["5"],
     );
@@ -7539,15 +7742,21 @@ pub fn add(a, b) { a + b }
 fn module_local_import_with_alias() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils as u
 println(u.greet("Que"))
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) {
     "Hello, " + name + "!"
 }
-"#),
+"#,
+            ),
         ],
         &["Hello, Que!"],
     );
@@ -7557,16 +7766,22 @@ pub fn greet(name) {
 fn module_local_import_selective() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils { greet, farewell }
 println(greet("Que"))
 println(farewell("Que"))
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) { "Hello, " + name }
 pub fn farewell(name) { "Goodbye, " + name }
 fn private_fn() { "secret" }
-"#),
+"#,
+            ),
         ],
         &["Hello, Que", "Goodbye, Que"],
     );
@@ -7577,17 +7792,26 @@ fn module_local_import_multi_shorthand() {
     // import .{utils, config} — loads two modules at once
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .{utils, config}
 println(utils.greet("Que"))
 println(config.version())
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) { "Hello, " + name }
-"#),
-            ("config.que", r#"
+"#,
+            ),
+            (
+                "config.que",
+                r#"
 pub fn version() { "1.0.0" }
-"#),
+"#,
+            ),
         ],
         &["Hello, Que", "1.0.0"],
     );
@@ -7598,13 +7822,19 @@ fn module_local_directory_mod_que() {
     // import .lib → resolves to lib/mod.que
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .lib
 println(lib.hello())
-"#),
-            ("lib/mod.que", r#"
+"#,
+            ),
+            (
+                "lib/mod.que",
+                r#"
 pub fn hello() { "from mod.que" }
-"#),
+"#,
+            ),
         ],
         &["from mod.que"],
     );
@@ -7616,18 +7846,27 @@ fn module_local_directory_sub_module() {
     // import .lib → resolves to lib/mod.que
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .lib
 import .lib.build
 println(lib.version())
 println(build.compile())
-"#),
-            ("lib/mod.que", r#"
+"#,
+            ),
+            (
+                "lib/mod.que",
+                r#"
 pub fn version() { "2.0" }
-"#),
-            ("lib/build.que", r#"
+"#,
+            ),
+            (
+                "lib/build.que",
+                r#"
 pub fn compile() { "compiled!" }
-"#),
+"#,
+            ),
         ],
         &["2.0", "compiled!"],
     );
@@ -7643,17 +7882,26 @@ fn module_dot_import_relative_to_file_not_root() {
     // lib/'s own directory, giving lib/math.que, NOT <root>/math.que.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .lib
 println(lib.add(2, 3))
-"#),
-            ("lib/mod.que", r#"
+"#,
+            ),
+            (
+                "lib/mod.que",
+                r#"
 pub import .math
 pub fn add(a, b) { math.add(a, b) }
-"#),
-            ("lib/math.que", r#"
+"#,
+            ),
+            (
+                "lib/math.que",
+                r#"
 pub fn add(a, b) { a + b }
-"#),
+"#,
+            ),
         ],
         &["5"],
     );
@@ -7665,17 +7913,26 @@ fn module_pkg_internal_dot_import_relative_to_pkg_dir() {
     // The dot should resolve to que_packages/mypkg/utils.que, not <root>/utils.que.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import mypkg
 println(mypkg.greet("World"))
-"#),
-            ("que_packages/mypkg/mod.que", r#"
+"#,
+            ),
+            (
+                "que_packages/mypkg/mod.que",
+                r#"
 pub import .utils
 pub fn greet(name) { utils.hello(name) }
-"#),
-            ("que_packages/mypkg/utils.que", r#"
+"#,
+            ),
+            (
+                "que_packages/mypkg/utils.que",
+                r#"
 pub fn hello(name) { "Hello, " + name + "!" }
-"#),
+"#,
+            ),
         ],
         &["Hello, World!"],
     );
@@ -7687,18 +7944,27 @@ fn module_dot_import_does_not_escape_to_root_utils() {
     // a root-level utils.que — it must stay relative to lib/.
     // Without a lib/utils.que, this should fail with "module not found".
     assert_module_error(&[
-        ("main.que", r#"
+        (
+            "main.que",
+            r#"
 import .lib
 println(lib.x())
-"#),
+"#,
+        ),
         // Root-level utils.que exists but must NOT be found by lib/mod.que
-        ("utils.que", r#"
+        (
+            "utils.que",
+            r#"
 pub fn x() { "root utils" }
-"#),
-        ("lib/mod.que", r#"
+"#,
+        ),
+        (
+            "lib/mod.que",
+            r#"
 pub import .utils
 pub fn x() { utils.x() }
-"#),
+"#,
+        ),
         // lib/utils.que intentionally absent
     ]);
 }
@@ -7708,14 +7974,20 @@ fn module_private_fn_not_exported() {
     // Private functions should NOT be accessible from outside
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils
 println(utils.keys())
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn public_fn() { "public" }
 fn private_fn() { "private" }
-"#),
+"#,
+            ),
         ],
         &["[\"public_fn\"]"],
     );
@@ -7725,12 +7997,18 @@ fn private_fn() { "private" }
 fn module_selective_import_nonexistent_errors() {
     // Importing a name that doesn't exist in the module should error
     assert_module_error(&[
-        ("main.que", r#"
+        (
+            "main.que",
+            r#"
 import .utils { nonexistent }
-"#),
-        ("utils.que", r#"
+"#,
+        ),
+        (
+            "utils.que",
+            r#"
 pub fn greet() { "hi" }
-"#),
+"#,
+        ),
     ]);
 }
 
@@ -7741,16 +8019,22 @@ fn module_wildcard_import_basic() {
     // import .utils { * } brings all exports directly into scope
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils { * }
 println(greet("Que"))
 println(farewell("Que"))
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) { "Hello, " + name }
 pub fn farewell(name) { "Goodbye, " + name }
 fn private_fn() { "secret" }
-"#),
+"#,
+            ),
         ],
         &["Hello, Que", "Goodbye, Que"],
     );
@@ -7761,14 +8045,20 @@ fn module_wildcard_import_private_not_imported() {
     // Wildcard only imports pub exports, not private functions
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils { * }
 println(typeof(greet))
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) { "Hi, " + name }
 fn internal() { "hidden" }
-"#),
+"#,
+            ),
         ],
         &["Function"],
     );
@@ -7807,21 +8097,30 @@ fn module_loaded_once_cached() {
     // The module's top-level code runs only once, even when imported twice
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .counter
 import .other
 println(counter.value())
-"#),
-            ("counter.que", r#"
+"#,
+            ),
+            (
+                "counter.que",
+                r#"
 // This println runs at module load time — should only run once
 println("loading counter")
 mut state = 0
 pub fn value() { state }
-"#),
-            ("other.que", r#"
+"#,
+            ),
+            (
+                "other.que",
+                r#"
 import .counter
 // just importing counter again
-"#),
+"#,
+            ),
         ],
         &["loading counter", "0"],
     );
@@ -7832,17 +8131,26 @@ import .counter
 #[test]
 fn module_circular_import_error() {
     assert_module_error(&[
-        ("main.que", r#"
+        (
+            "main.que",
+            r#"
 import .a
-"#),
-        ("a.que", r#"
+"#,
+        ),
+        (
+            "a.que",
+            r#"
 import .b
 pub fn from_a() { "a" }
-"#),
-        ("b.que", r#"
+"#,
+        ),
+        (
+            "b.que",
+            r#"
 import .a
 pub fn from_b() { "b" }
-"#),
+"#,
+        ),
     ]);
 }
 
@@ -7850,11 +8158,12 @@ pub fn from_b() { "b" }
 
 #[test]
 fn module_not_found_error() {
-    assert_module_error(&[
-        ("main.que", r#"
+    assert_module_error(&[(
+        "main.que",
+        r#"
 import .nonexistent
-"#),
-    ]);
+"#,
+    )]);
 }
 
 // ── Error locations across files ─────────────────────────────────────
@@ -7886,10 +8195,7 @@ fn an_error_after_an_imported_call_returns_to_the_calling_file() {
             "main.que",
             "import .helper\nhelper.go()\nundefined_thing()\n",
         ),
-        (
-            "helper.que",
-            "pub fn go() {\n    let a = 1\n    a\n}\n",
-        ),
+        ("helper.que", "pub fn go() {\n    let a = 1\n    a\n}\n"),
     ])
     .expect_err("expected a runtime error");
     assert_eq!(err.file.as_deref(), Some("main.que"));
@@ -7902,13 +8208,19 @@ fn an_error_after_an_imported_call_returns_to_the_calling_file() {
 fn module_is_map_typeof() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils
 println(typeof(utils))
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn hello() { "hi" }
-"#),
+"#,
+            ),
         ],
         &["Map"],
     );
@@ -7918,17 +8230,23 @@ pub fn hello() { "hi" }
 fn module_map_keys() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils
 let k = utils.keys()
 println(k.contains("add"))
 println(k.contains("sub"))
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn add(a, b) { a + b }
 pub fn sub(a, b) { a - b }
 fn private_helper() { 0 }
-"#),
+"#,
+            ),
         ],
         &["true", "true"],
     );
@@ -7940,19 +8258,28 @@ fn private_helper() { 0 }
 fn module_chained_imports() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .app
 println(app.run())
-"#),
-            ("app.que", r#"
+"#,
+            ),
+            (
+                "app.que",
+                r#"
 import .utils
 pub fn run() {
     utils.greet("chain")
 }
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) { "Hello, " + name }
-"#),
+"#,
+            ),
         ],
         &["Hello, chain"],
     );
@@ -7965,16 +8292,25 @@ fn module_pub_import_reexport_namespace() {
     // pub import .utils → re-exports the utils namespace
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .facade
 println(facade.utils.greet("re-export"))
-"#),
-            ("facade.que", r#"
+"#,
+            ),
+            (
+                "facade.que",
+                r#"
 pub import .utils
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) { "Hello, " + name }
-"#),
+"#,
+            ),
         ],
         &["Hello, re-export"],
     );
@@ -7985,16 +8321,25 @@ fn module_pub_import_reexport_selective() {
     // pub import .utils { greet } → re-exports greet directly
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .facade
 println(facade.greet("selective"))
-"#),
-            ("facade.que", r#"
+"#,
+            ),
+            (
+                "facade.que",
+                r#"
 pub import .utils { greet }
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) { "Hello, " + name }
-"#),
+"#,
+            ),
         ],
         &["Hello, selective"],
     );
@@ -8007,16 +8352,24 @@ fn module_pub_import_reexports_a_type_with_its_methods() {
     // or the importer receives a type it cannot construct or call.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .facade
 let b = facade.shapes.Box.new(3)
 println(b.area())
 println(facade.shapes.Kind.Round.label())
-"#),
-            ("facade.que", r#"
+"#,
+            ),
+            (
+                "facade.que",
+                r#"
 pub import .shapes
-"#),
-            ("shapes.que", r#"
+"#,
+            ),
+            (
+                "shapes.que",
+                r#"
 pub struct Box { side: Int }
 pub enum Kind { Round, Square }
 pub impl Box {
@@ -8026,7 +8379,8 @@ pub impl Box {
 pub impl Kind {
     fn label(self) { match self { Round => "round", Square => "square" } }
 }
-"#),
+"#,
+            ),
         ],
         &["9", "round"],
     );
@@ -8038,23 +8392,35 @@ fn module_pub_import_reexports_a_type_through_two_levels() {
     // only true for the depth someone happened to test.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .outer { Box }
 println(Box.new(4).area())
-"#),
-            ("outer.que", r#"
+"#,
+            ),
+            (
+                "outer.que",
+                r#"
 pub import .inner { Box }
-"#),
-            ("inner.que", r#"
+"#,
+            ),
+            (
+                "inner.que",
+                r#"
 pub import .shapes { Box }
-"#),
-            ("shapes.que", r#"
+"#,
+            ),
+            (
+                "shapes.que",
+                r#"
 pub struct Box { side: Int }
 pub impl Box {
     fn new(side) -> Box { Box { side: side } }
     fn area(self) { self.side * self.side }
 }
-"#),
+"#,
+            ),
         ],
         &["16"],
     );
@@ -8068,20 +8434,29 @@ fn an_exported_function_can_still_build_a_privately_imported_type() {
     // name them itself.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .facade
 println(facade.make().side)
-"#),
-            ("facade.que", r#"
+"#,
+            ),
+            (
+                "facade.que",
+                r#"
 import .shapes
 pub fn make() { shapes.Box.new(2) }
-"#),
-            ("shapes.que", r#"
+"#,
+            ),
+            (
+                "shapes.que",
+                r#"
 pub struct Box { side: Int }
 pub impl Box {
     fn new(side) -> Box { Box { side: side } }
 }
-"#),
+"#,
+            ),
         ],
         &["2"],
     );
@@ -8093,20 +8468,29 @@ fn a_plain_import_does_not_leak_the_types_it_pulled_in() {
     // implementation detail, and a type it brought in must not become
     // constructible in whoever imports the module that used it.
     assert_module_error(&[
-        ("main.que", r#"
+        (
+            "main.que",
+            r#"
 import .facade
 println(Box { side: 1 }.side)
-"#),
-        ("facade.que", r#"
+"#,
+        ),
+        (
+            "facade.que",
+            r#"
 import .shapes
 pub fn make() { shapes.Box.new(2) }
-"#),
-        ("shapes.que", r#"
+"#,
+        ),
+        (
+            "shapes.que",
+            r#"
 pub struct Box { side: Int }
 pub impl Box {
     fn new(side) -> Box { Box { side: side } }
 }
-"#),
+"#,
+        ),
     ]);
 }
 
@@ -8183,16 +8567,22 @@ fn module_std_nonexistent_errors() {
 fn module_exports_tasks() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .build_mod
 println(typeof(build_mod.compile))
-"#),
-            ("build_mod.que", r#"
+"#,
+            ),
+            (
+                "build_mod.que",
+                r#"
 @description("Compile the project")
 task compile {
     println("compiling...")
 }
-"#),
+"#,
+            ),
         ],
         &["Task"],
     );
@@ -8239,13 +8629,17 @@ import std.{fs, path}
     let module = parser.parse_module().unwrap();
 
     // Verify the parsed AST
-    let imports: Vec<_> = module.items.iter().filter_map(|(_, item)| {
-        if let que_lang::ast::Item::Import(decl) = item {
-            Some(decl)
-        } else {
-            None
-        }
-    }).collect();
+    let imports: Vec<_> = module
+        .items
+        .iter()
+        .filter_map(|(_, item)| {
+            if let que_lang::ast::Item::Import(decl) = item {
+                Some(decl)
+            } else {
+                None
+            }
+        })
+        .collect();
 
     assert_eq!(imports.len(), 5);
 
@@ -8269,7 +8663,10 @@ import std.{fs, path}
 
     // import std.{fs, path}
     assert_eq!(imports[4].path, vec!["std"]);
-    assert_eq!(imports[4].items, Some(vec!["fs".to_string(), "path".to_string()]));
+    assert_eq!(
+        imports[4].items,
+        Some(vec!["fs".to_string(), "path".to_string()])
+    );
 }
 
 #[test]
@@ -8289,13 +8686,17 @@ import .{utils, config}
     let mut parser = Parser::new(tokens);
     let module = parser.parse_module().unwrap();
 
-    let imports: Vec<_> = module.items.iter().filter_map(|(_, item)| {
-        if let que_lang::ast::Item::Import(decl) = item {
-            Some(decl)
-        } else {
-            None
-        }
-    }).collect();
+    let imports: Vec<_> = module
+        .items
+        .iter()
+        .filter_map(|(_, item)| {
+            if let que_lang::ast::Item::Import(decl) = item {
+                Some(decl)
+            } else {
+                None
+            }
+        })
+        .collect();
 
     assert_eq!(imports.len(), 5);
 
@@ -8320,7 +8721,10 @@ import .{utils, config}
     // import .{utils, config}
     assert_eq!(imports[4].path, Vec::<String>::new());
     assert!(imports[4].is_local);
-    assert_eq!(imports[4].items, Some(vec!["utils".to_string(), "config".to_string()]));
+    assert_eq!(
+        imports[4].items,
+        Some(vec!["utils".to_string(), "config".to_string()])
+    );
 }
 
 #[test]
@@ -8334,7 +8738,9 @@ fn parse_pub_import() {
     let mut parser = Parser::new(tokens);
     let module = parser.parse_module().unwrap();
 
-    let item = module.items.iter()
+    let item = module
+        .items
+        .iter()
         .map(|(_, i)| i)
         .next()
         .expect("no items");
@@ -8353,18 +8759,24 @@ fn parse_pub_import() {
 fn module_multiple_functions_exported() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .math
 println(math.add(1, 2))
 println(math.mul(3, 4))
 println(math.neg(5))
-"#),
-            ("math.que", r#"
+"#,
+            ),
+            (
+                "math.que",
+                r#"
 pub fn add(a, b) { a + b }
 pub fn mul(a, b) { a * b }
 pub fn neg(x) { -x }
 fn internal_helper() { 0 }
-"#),
+"#,
+            ),
         ],
         &["3", "12", "-5"],
     );
@@ -8375,7 +8787,9 @@ fn module_import_passes_first_class_module() {
     // Modules are maps, so they can be passed as arguments
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .utils
 
 fn use_module(mod) {
@@ -8383,10 +8797,14 @@ fn use_module(mod) {
 }
 
 println(use_module(utils))
-"#),
-            ("utils.que", r#"
+"#,
+            ),
+            (
+                "utils.que",
+                r#"
 pub fn greet(name) { "Hi, " + name }
-"#),
+"#,
+            ),
         ],
         &["Hi, passed"],
     );
@@ -8396,13 +8814,19 @@ pub fn greet(name) { "Hi, " + name }
 fn module_deeply_nested_path() {
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .a.b.c
 println(c.deep())
-"#),
-            ("a/b/c.que", r#"
+"#,
+            ),
+            (
+                "a/b/c.que",
+                r#"
 pub fn deep() { "deep nested" }
-"#),
+"#,
+            ),
         ],
         &["deep nested"],
     );
@@ -8600,10 +9024,7 @@ println(result.len())
 
 #[test]
 fn println_multi_arg_strings() {
-    assert_output(
-        r#"println("hello", "world")"#,
-        &["hello world"],
-    );
+    assert_output(r#"println("hello", "world")"#, &["hello world"]);
 }
 
 #[test]
@@ -8660,7 +9081,11 @@ check()"#;
     let err = que_lang::interpreter::run(src).unwrap_err();
     assert!(err.span.is_some(), "expected span in error, got: {}", err);
     let span = err.span.unwrap();
-    assert_eq!(span.line, 3, "expected error on line 3, got line {}", span.line);
+    assert_eq!(
+        span.line, 3,
+        "expected error on line 3, got line {}",
+        span.line
+    );
 }
 
 #[test]
@@ -8697,7 +9122,8 @@ fn which_finds_existing_command() {
     let (output, _) = run(r#"
 let p = which("true")
 println(typeof(p))
-"#).unwrap();
+"#)
+    .unwrap();
     // Should find the command and return a Path.
     assert_eq!(output, &["Path"]);
 }
@@ -8752,7 +9178,8 @@ fn os_exit_flushes_output_before_exiting() {
 println("output before exit")
 os.exit(2)
 println("output after exit")
-"#).unwrap_err();
+"#)
+    .unwrap_err();
     assert!(err.message.contains("exit(2)"), "got: {}", err.message);
 }
 
@@ -8767,8 +9194,11 @@ fn os_exit_wrong_type_is_error() {
     // Passing a string should be a type error, not an exit signal.
     let err = run(r#"os.exit("bad")"#).unwrap_err();
     // The error should mention the type mismatch, not be "exit(N)".
-    assert!(err.message.contains("expects") || err.message.contains("Int"),
-        "expected type error, got: {}", err.message);
+    assert!(
+        err.message.contains("expects") || err.message.contains("Int"),
+        "expected type error, got: {}",
+        err.message
+    );
 }
 
 #[test]
@@ -8792,7 +9222,8 @@ fn timestamp_plus_duration_is_greater_than_timestamp() {
     let result = run("import std.time
 let t = time.timestamp()
 let deadline = t + 1000ms
-deadline > t").unwrap();
+deadline > t")
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -8807,7 +9238,8 @@ fn timestamp_minus_duration_is_less_than_timestamp() {
     let result = run("import std.time
 let t = time.timestamp()
 let past = t - 1000ms
-past < t").unwrap();
+past < t")
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -8823,7 +9255,8 @@ fn deadline_comparison_works() {
     // Typical deadline pattern: timestamp + duration, compare with timestamp
     let result = run("import std.time
 let deadline = time.timestamp() + 24h
-time.timestamp() < deadline").unwrap();
+time.timestamp() < deadline")
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -8838,7 +9271,8 @@ fn path_home_returns_path_type() {
 #[test]
 fn path_home_is_non_empty() {
     let result = run("let h = path.home()
-str(h).len() > 0").unwrap();
+str(h).len() > 0")
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -8846,7 +9280,8 @@ str(h).len() > 0").unwrap();
 fn path_home_slash_join() {
     // path.home() / "subdir" should give a Path ending in /subdir
     let result = run(r#"let p = path.home() / "subdir"
-typeof(p)"#).unwrap();
+typeof(p)"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("Path".to_string()));
 }
 
@@ -8854,7 +9289,8 @@ typeof(p)"#).unwrap();
 fn path_home_slash_join_contains_home() {
     let result = run(r#"let home = path.home()
 let p = home / ".ssh"
-str(p).starts_with(str(home))"#).unwrap();
+str(p).starts_with(str(home))"#)
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -8863,7 +9299,8 @@ str(p).starts_with(str(home))"#).unwrap();
 #[test]
 fn env_set_makes_variable_readable() {
     let result = run(r#"env.set("QUE_TEST_QW9", "hello_que")
-env.get("QUE_TEST_QW9")"#).unwrap();
+env.get("QUE_TEST_QW9")"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("hello_que".to_string()));
 }
 
@@ -8877,7 +9314,8 @@ fn env_set_returns_null() {
 fn env_set_overrides_existing() {
     let result = run(r#"env.set("QUE_TEST_QW9_OVER", "first")
 env.set("QUE_TEST_QW9_OVER", "second")
-env.get("QUE_TEST_QW9_OVER")"#).unwrap();
+env.get("QUE_TEST_QW9_OVER")"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("second".to_string()));
 }
 
@@ -8891,7 +9329,8 @@ fn env_set_no_key_is_error() {
 #[test]
 fn env_all_returns_map() {
     let result = run(r#"let all = env.all()
-typeof(all)"#).unwrap();
+typeof(all)"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("Map".to_string()));
 }
 
@@ -8899,7 +9338,8 @@ typeof(all)"#).unwrap();
 fn env_all_contains_path() {
     // PATH should be in the env on any system
     let result = run(r#"let all = env.all()
-all.contains("PATH")"#).unwrap();
+all.contains("PATH")"#)
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -8908,7 +9348,8 @@ fn env_require_existing_var() {
     std::env::set_var("QUE_REQUIRE_TEST", "value123");
     let result = run(r#"env.set("QUE_REQUIRE_TEST", "value123")
 let vars = env.require("QUE_REQUIRE_TEST")
-vars["QUE_REQUIRE_TEST"]"#).unwrap();
+vars["QUE_REQUIRE_TEST"]"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("value123".to_string()));
 }
 
@@ -8926,7 +9367,8 @@ fn env_require_list_of_vars() {
     let result = run(r#"env.set("QUE_REQ_A", "foo")
 env.set("QUE_REQ_B", "bar")
 let vars = env.require(["QUE_REQ_A", "QUE_REQ_B"])
-vars["QUE_REQ_A"]"#).unwrap();
+vars["QUE_REQ_A"]"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("foo".to_string()));
 }
 
@@ -8960,7 +9402,8 @@ fn context_on_ok_is_passthrough() {
 fn context_on_err_wraps_message() {
     let result = run(r#"
 let e = Err("file not found").context("reading service config")
-e.unwrap_err()"#).unwrap();
+e.unwrap_err()"#)
+    .unwrap();
     assert_eq!(
         result.1,
         Value::String("reading service config: file not found".to_string())
@@ -8973,22 +9416,27 @@ fn context_chain_error_message() {
 let r = Err("permission denied")
     .context("reading config.yaml")
     .context("loading service configuration")
-r.unwrap_err()"#).unwrap();
+r.unwrap_err()"#)
+    .unwrap();
     assert_eq!(
         result.1,
-        Value::String("loading service configuration: reading config.yaml: permission denied".to_string())
+        Value::String(
+            "loading service configuration: reading config.yaml: permission denied".to_string()
+        )
     );
 }
 
 #[test]
 fn err_with_context_and_try_operator() {
     // .context() followed by ? should propagate the wrapped error
-    assert_error(r#"
+    assert_error(
+        r#"
 fn load() {
     Err("not found").context("reading config")?
     "ok"
 }
-load()"#);
+load()"#,
+    );
 }
 
 #[test]
@@ -9011,7 +9459,8 @@ import std.fs
 import std.time
 let tmp_path = "/tmp/que_atomic_test_" + str(time.timestamp())
 fs.atomic_write(path(tmp_path), "hello atomic")
-"#).unwrap();
+"#)
+    .unwrap();
     assert_eq!(result.1, Value::Ok(Box::new(Value::Null)));
 }
 
@@ -9020,7 +9469,8 @@ fn fs_temp_file_creates_a_path() {
     let result = run(r#"
 import std.fs
 let p = fs.temp_file()
-typeof(p)"#).unwrap();
+typeof(p)"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("Ok".to_string()));
 }
 
@@ -9029,7 +9479,8 @@ fn fs_temp_file_ok_is_path() {
     let result = run(r#"
 import std.fs
 let p = fs.temp_file().unwrap()
-typeof(p)"#).unwrap();
+typeof(p)"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("Path".to_string()));
 }
 
@@ -9038,7 +9489,8 @@ fn fs_temp_dir_creates_directory() {
     let result = run(r#"
 import std.fs
 let d = fs.temp_dir("que_test_").unwrap()
-path(d).is_dir()"#).unwrap();
+path(d).is_dir()"#)
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -9049,7 +9501,8 @@ fn fs_remove_dir_removes_directory() {
 import std.fs
 let d = fs.temp_dir("que_rmtest_").unwrap()
 let r = fs.remove_dir(path(d))
-r"#).unwrap();
+r"#)
+    .unwrap();
     assert_eq!(result.1, Value::Ok(Box::new(Value::Null)));
 }
 
@@ -9066,9 +9519,13 @@ fn fs_copy_dir_copies_contents() {
     drop(f);
     let src_str = src.to_str().unwrap();
     let dest_str = dest.to_str().unwrap();
-    let result = run(&format!(r#"
+    let result = run(&format!(
+        r#"
 import std.fs
-fs.copy_dir("{}", "{}")"#, src_str, dest_str)).unwrap();
+fs.copy_dir("{}", "{}")"#,
+        src_str, dest_str
+    ))
+    .unwrap();
     assert_eq!(result.1, Value::Ok(Box::new(Value::Null)));
     assert!(dest.join("hello.txt").exists());
 }
@@ -9081,9 +9538,13 @@ fn fs_find_returns_list() {
     let _ = std::fs::write(dir.join("a.txt"), "a");
     let _ = std::fs::write(dir.join("b.txt"), "b");
     let dir_str = dir.to_str().unwrap();
-    let result = run(&format!(r#"
+    let result = run(&format!(
+        r#"
 import std.fs
-fs.find("{}")"#, dir_str)).unwrap();
+fs.find("{}")"#,
+        dir_str
+    ))
+    .unwrap();
     assert!(matches!(result.1, Value::List(_)));
 }
 
@@ -9095,7 +9556,8 @@ let tmp = fs.temp_file("que_lines_", ".txt").unwrap()
 let lines = ["line1", "line2", "line3"]
 fs.write_lines(lines, path(tmp))
 let read_back = fs.read_lines(path(tmp)).unwrap()
-read_back.len()"#).unwrap();
+read_back.len()"#)
+    .unwrap();
     assert_eq!(result.1, Value::Int(3));
 }
 
@@ -9105,7 +9567,8 @@ read_back.len()"#).unwrap();
 fn spawn_returns_process_handle() {
     let result = run(r#"
 let handle = spawn `sleep 100`
-typeof(handle)"#).unwrap();
+typeof(handle)"#)
+    .unwrap();
     // Kill the process after check
     assert_eq!(result.1, Value::String("ProcessHandle".to_string()));
 }
@@ -9116,7 +9579,8 @@ fn spawn_pid_is_nonzero() {
 let handle = spawn `sleep 100`
 let pid = handle.pid()
 handle.kill()
-pid > 0"#).unwrap();
+pid > 0"#)
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -9126,7 +9590,8 @@ fn spawn_is_alive_true_while_running() {
 let handle = spawn `sleep 100`
 let alive = handle.is_alive()
 handle.kill()
-alive"#).unwrap();
+alive"#)
+    .unwrap();
     assert_eq!(result.1, Value::Bool(true));
 }
 
@@ -9134,7 +9599,8 @@ alive"#).unwrap();
 fn spawn_wait_returns_exit_code() {
     let result = run(r#"
 let handle = spawn `true`
-handle.wait()"#).unwrap();
+handle.wait()"#)
+    .unwrap();
     assert_eq!(result.1, Value::Int(0));
 }
 
@@ -9144,7 +9610,8 @@ fn spawn_kill_stops_process() {
 let handle = spawn `sleep 100`
 handle.kill()
 handle.wait()
-handle.is_alive()"#).unwrap();
+handle.is_alive()"#)
+    .unwrap();
     assert_eq!(result.1, Value::Bool(false));
 }
 
@@ -9163,10 +9630,15 @@ parallel {
     1 + 1,
     "hello",
     true
-}"#).unwrap();
+}"#)
+    .unwrap();
     assert_eq!(
         result.1,
-        Value::Tuple(vec![Value::Int(2), Value::String("hello".to_string()), Value::Bool(true)])
+        Value::Tuple(vec![
+            Value::Int(2),
+            Value::String("hello".to_string()),
+            Value::Bool(true)
+        ])
     );
 }
 
@@ -9178,7 +9650,8 @@ let r = parallel {
     b: "world",
     c: 3 * 3
 }
-r["b"]"#).unwrap();
+r["b"]"#)
+    .unwrap();
     assert_eq!(result.1, Value::String("world".to_string()));
 }
 
@@ -9189,7 +9662,8 @@ let r = parallel {
     x: 10,
     y: 20
 }
-r["x"] + r["y"]"#).unwrap();
+r["x"] + r["y"]"#)
+    .unwrap();
     assert_eq!(result.1, Value::Int(30));
 }
 
@@ -9200,7 +9674,8 @@ let (a, b) = parallel {
     2 * 3,
     10 + 5
 }
-a + b"#).unwrap();
+a + b"#)
+    .unwrap();
     assert_eq!(result.1, Value::Int(21));
 }
 
@@ -9218,7 +9693,8 @@ fn triple(x) { x * 3 }
 parallel {
     a: double(5),
     b: triple(5)
-}"#).unwrap();
+}"#)
+    .unwrap();
     use std::collections::BTreeMap;
     let mut expected = BTreeMap::new();
     expected.insert("a".to_string(), Value::Int(10));
@@ -9250,11 +9726,8 @@ fn parallel_branches_read_outer_variables() {
     let result = run(r#"
 let base = 10
 parallel { base + 1, base + 2 }"#)
-        .unwrap();
-    assert_eq!(
-        result.1,
-        Value::Tuple(vec![Value::Int(11), Value::Int(12)])
-    );
+    .unwrap();
+    assert_eq!(result.1, Value::Tuple(vec![Value::Int(11), Value::Int(12)]));
 }
 
 #[test]
@@ -9288,112 +9761,140 @@ fn parallel_reports_the_first_failing_branch() {
 
 #[test]
 fn struct_basic_construction() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Point { x: Float, y: Float }
 let p = Point { x: 1.0, y: 2.0 }
 p.x
-"#, Value::Float(1.0));
+"#,
+        Value::Float(1.0),
+    );
 }
 
 #[test]
 fn struct_field_defaults() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Config {
     host: String = "localhost"
     port: Int = 8080
 }
 let c = Config {}
 c.port
-"#, Value::Int(8080));
+"#,
+        Value::Int(8080),
+    );
 }
 
 #[test]
 fn struct_partial_defaults() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Config {
     host: String = "localhost"
     port: Int = 8080
 }
 let c = Config { port: 9000 }
 c.port
-"#, Value::Int(9000));
+"#,
+        Value::Int(9000),
+    );
 }
 
 #[test]
 fn struct_field_shorthand() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Point { x: Float, y: Float }
 let x = 3.0
 let y = 4.0
 let p = Point { x, y }
 p.x
-"#, Value::Float(3.0));
+"#,
+        Value::Float(3.0),
+    );
 }
 
 #[test]
 fn struct_unknown_field_error() {
-    assert_error(r#"
+    assert_error(
+        r#"
 struct Point { x: Float, y: Float }
 let p = Point { x: 1.0, z: 99.0 }
-"#);
+"#,
+    );
 }
 
 #[test]
 fn struct_missing_required_field_error() {
-    assert_error(r#"
+    assert_error(
+        r#"
 struct Point { x: Float, y: Float }
 let p = Point { x: 1.0 }
-"#);
+"#,
+    );
 }
 
 #[test]
 fn struct_static_method() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Point { x: Float, y: Float }
 impl Point {
     fn new(x, y) -> Point { Point { x, y } }
 }
 let p = Point.new(1.0, 2.0)
 p.y
-"#, Value::Float(2.0));
+"#,
+        Value::Float(2.0),
+    );
 }
 
 #[test]
 fn struct_callable_as_constructor() {
     // TypeName(args) should be sugar for TypeName.new(args)
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Point { x: Float, y: Float }
 impl Point {
     fn new(x, y) -> Point { Point { x, y } }
 }
 let p = Point(3.0, 4.0)
 p.x
-"#, Value::Float(3.0));
+"#,
+        Value::Float(3.0),
+    );
 }
 
 #[test]
 fn struct_callable_constructor_chained() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Counter { value: Int }
 impl Counter {
     fn new(v) -> Counter { Counter { value: v } }
     fn inc(self) -> Counter { Counter { value: self.value + 1 } }
 }
 Counter(10).inc().inc().value
-"#, Value::Int(12));
+"#,
+        Value::Int(12),
+    );
 }
 
 #[test]
 fn struct_callable_no_new_error() {
-    assert_error(r#"
+    assert_error(
+        r#"
 struct Point { x: Float, y: Float }
 Point(1.0, 2.0)
-"#);
+"#,
+    );
 }
 
 #[test]
 fn struct_instance_method() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Point { x: Float, y: Float }
 impl Point {
     fn new(x, y) -> Point { Point { x, y } }
@@ -9404,34 +9905,43 @@ impl Point {
 let p = Point.new(2.0, 3.0)
 let q = p.scale(2.0)
 q.x
-"#, Value::Float(4.0));
+"#,
+        Value::Float(4.0),
+    );
 }
 
 #[test]
 fn struct_instance_method_returns_field() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Rectangle { width: Float, height: Float }
 impl Rectangle {
     fn area(self) -> Float { self.width * self.height }
 }
 let r = Rectangle { width: 5.0, height: 3.0 }
 r.area()
-"#, Value::Float(15.0));
+"#,
+        Value::Float(15.0),
+    );
 }
 
 #[test]
 fn struct_mut_field_assignment() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Counter { value: Int = 0 }
 mut c = Counter {}
 c.value = 42
 c.value
-"#, Value::Int(42));
+"#,
+        Value::Int(42),
+    );
 }
 
 #[test]
 fn a_mut_self_method_updates_the_value_it_was_called_on() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Counter { n: Int = 0 }
 impl Counter {
     fn bump(mut self) { self.n = self.n + 1 }
@@ -9440,12 +9950,15 @@ mut c = Counter {}
 c.bump()
 c.bump()
 c.n
-"#, Value::Int(2));
+"#,
+        Value::Int(2),
+    );
 }
 
 #[test]
 fn a_mut_self_method_still_returns_a_value() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Counter { n: Int = 0 }
 impl Counter {
     fn add(mut self, k) -> Int { self.n = self.n + k; self.n }
@@ -9453,12 +9966,15 @@ impl Counter {
 mut c = Counter {}
 let doubled = c.add(4) + c.add(0)
 [c.n, doubled]
-"#, Value::List(vec![Value::Int(4), Value::Int(8)]));
+"#,
+        Value::List(vec![Value::Int(4), Value::Int(8)]),
+    );
 }
 
 #[test]
 fn a_mut_self_method_reaches_through_a_field_path() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Counter { n: Int = 0 }
 struct Box { inner }
 impl Counter {
@@ -9467,7 +9983,9 @@ impl Counter {
 mut b = Box { inner: Counter {} }
 b.inner.bump()
 b.inner.n
-"#, Value::Int(1));
+"#,
+        Value::Int(1),
+    );
 }
 
 #[test]
@@ -9475,53 +9993,60 @@ fn a_mut_self_method_needs_a_mut_binding() {
     // The write-back is an assignment, so `let` refuses it — and says why,
     // rather than reporting a bare "immutable variable" for a line that
     // contains no assignment.
-    assert_error_contains(r#"
+    assert_error_contains(
+        r#"
 struct Counter { n: Int = 0 }
 impl Counter {
     fn bump(mut self) { self.n = self.n + 1 }
 }
 let c = Counter {}
 c.bump()
-"#, "bump() takes `mut self`");
+"#,
+        "bump() takes `mut self`",
+    );
 }
 
 #[test]
 fn a_mut_self_method_refuses_a_receiver_nobody_can_see_again() {
-    assert_error_contains(r#"
+    assert_error_contains(
+        r#"
 struct Counter { n: Int = 0 }
 impl Counter {
     fn new() -> Counter { Counter {} }
     fn bump(mut self) { self.n = self.n + 1 }
 }
 Counter().bump()
-"#, "call it on a variable, not on a temporary");
+"#,
+        "call it on a variable, not on a temporary",
+    );
 }
 
 #[test]
 fn a_plain_self_is_still_a_copy_the_method_cannot_write_to() {
-    assert_error_contains(r#"
+    assert_error_contains(
+        r#"
 struct Counter { n: Int = 0 }
 impl Counter {
     fn bump(self) { self.n = self.n + 1 }
 }
 mut c = Counter {}
 c.bump()
-"#, "cannot assign to immutable variable 'self'");
+"#,
+        "cannot assign to immutable variable 'self'",
+    );
 }
 
 #[test]
 fn only_the_receiver_can_be_declared_mut() {
-    assert_error_contains(
-        "fn f(mut a) { a }",
-        "only `self` can be declared `mut`",
-    );
+    assert_error_contains("fn f(mut a) { a }", "only `self` can be declared `mut`");
 }
 
 #[test]
 fn a_mut_self_enter_is_visible_to_exit() {
     // `with Dir(...)` has no variable to write the manager back to, so the
     // `with` itself carries what enter() changed through to exit().
-    assert_output(r#"
+    assert_output(
+        r#"
 struct Trace { mark }
 impl Trace {
     fn new() -> Trace { Trace { mark: "unset" } }
@@ -9533,54 +10058,69 @@ impl Contextual for Trace {
 with Trace() {
     println("body")
 }
-"#, &["body", "exit saw entered"]);
+"#,
+        &["body", "exit saw entered"],
+    );
 }
 
 #[test]
 fn struct_typeof() {
-    assert_output(r#"
+    assert_output(
+        r#"
 struct Dog { name: String }
 let d = Dog { name: "Rex" }
 println(typeof(d))
-"#, &["Dog"]);
+"#,
+        &["Dog"],
+    );
 }
 
 #[test]
 fn struct_display() {
     // Display shows TypeName { field: val, ... }
-    assert_output(r#"
+    assert_output(
+        r#"
 struct Point { x: Float, y: Float }
 let p = Point { x: 1.0, y: 2.0 }
 println(str(p))
-"#, &["Point {x: 1, y: 2}"]);
+"#,
+        &["Point {x: 1, y: 2}"],
+    );
 }
 
 #[test]
 fn struct_match_instance_pattern() {
-    assert_output(r#"
+    assert_output(
+        r#"
 struct Point { x: Float, y: Float }
 let p = Point { x: 0.0, y: 5.0 }
 match p {
     Point { x: 0.0, y } => println("on y-axis at ${y}")
     Point { x, y } => println("at (${x}, ${y})")
 }
-"#, &["on y-axis at 5"]);
+"#,
+        &["on y-axis at 5"],
+    );
 }
 
 #[test]
 fn struct_match_binds_fields() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Pair { a: Int, b: Int }
 let p = Pair { a: 10, b: 20 }
 match p {
     Pair { a, b } => a + b
 }
-"#, Value::Int(30));
+"#,
+        Value::Int(30),
+    );
 }
 
 #[test]
 fn trait_basic_definition_and_impl() {
-    assert_output(r#"
+    assert_output(
+        r#"
 struct Dog { name: String }
 trait Greet {
     fn greet(self) -> String
@@ -9590,12 +10130,15 @@ impl Greet for Dog {
 }
 let d = Dog { name: "Rex" }
 println(d.greet())
-"#, &["Woof, I'm Rex!"]);
+"#,
+        &["Woof, I'm Rex!"],
+    );
 }
 
 #[test]
 fn trait_default_method() {
-    assert_output(r#"
+    assert_output(
+        r#"
 struct Point { x: Float, y: Float }
 trait Show {
     fn label(self) -> String
@@ -9608,23 +10151,28 @@ impl Show for Point {
 }
 let p = Point { x: 3.0, y: 4.0 }
 p.show()
-"#, &["(3, 4)"]);
+"#,
+        &["(3, 4)"],
+    );
 }
 
 #[test]
 fn trait_missing_required_method_error() {
-    assert_error(r#"
+    assert_error(
+        r#"
 struct Foo { x: Int }
 trait Required { fn must_implement(self) -> Int }
 impl Required for Foo {
     // missing must_implement
 }
-"#);
+"#,
+    );
 }
 
 #[test]
 fn trait_override_default_method() {
-    assert_output(r#"
+    assert_output(
+        r#"
 struct Foo {}
 trait Greet {
     fn name(self) -> String { "default" }
@@ -9635,12 +10183,15 @@ impl Greet for Foo {
 }
 let f = Foo {}
 f.greet()
-"#, &["Hello, Foo"]);
+"#,
+        &["Hello, Foo"],
+    );
 }
 
 #[test]
 fn impl_multiple_methods() {
-    assert_result(r#"
+    assert_result(
+        r#"
 struct Counter { n: Int = 0 }
 impl Counter {
     fn new() -> Counter { Counter { n: 0 } }
@@ -9649,7 +10200,9 @@ impl Counter {
 }
 let c = Counter.new().inc().inc().inc()
 c.value()
-"#, Value::Int(3));
+"#,
+        Value::Int(3),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -9663,10 +10216,13 @@ fn open_returns_file_handle() {
     let path = dir.join("que_test_open_basic.txt");
     std::fs::write(&path, "hello").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 typeof(f)
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::String("FileHandle".into()));
 }
 
@@ -9685,10 +10241,13 @@ fn open_invalid_mode_returns_err() {
     let path = dir.join("que_test_bad_mode.txt");
     std::fs::write(&path, "hi").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}", "x")
 typeof(f)
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::String("Err".into()));
 }
 
@@ -9698,11 +10257,14 @@ fn file_handle_path_method() {
     let path = dir.join("que_test_fh_path.txt");
     std::fs::write(&path, "data").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 f.close()
 typeof(f.path())
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::String("Path".into()));
 }
 
@@ -9712,10 +10274,13 @@ fn file_handle_is_open_true_before_close() {
     let path = dir.join("que_test_is_open_true.txt");
     std::fs::write(&path, "x").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 f.is_open()
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Bool(true));
 }
 
@@ -9725,11 +10290,14 @@ fn file_handle_is_open_false_after_close() {
     let path = dir.join("que_test_is_open_false.txt");
     std::fs::write(&path, "x").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 f.close()
 f.is_open()
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Bool(false));
 }
 
@@ -9739,13 +10307,19 @@ fn file_handle_read_returns_content() {
     let path = dir.join("que_test_fh_read.txt");
     std::fs::write(&path, "hello world").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 let content = f.read()
 f.close()
 content
-"#, p = p);
-    assert_result(&source, Value::Ok(Box::new(Value::String("hello world".into()))));
+"#,
+        p = p
+    );
+    assert_result(
+        &source,
+        Value::Ok(Box::new(Value::String("hello world".into()))),
+    );
 }
 
 #[test]
@@ -9754,7 +10328,8 @@ fn file_handle_read_line_iterates() {
     let path = dir.join("que_test_fh_readline.txt");
     std::fs::write(&path, "line1\nline2\nline3\n").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 let a = f.read_line()
 let b = f.read_line()
@@ -9765,7 +10340,9 @@ println(a)
 println(b)
 println(c)
 println(typeof(eof))
-"#, p = p);
+"#,
+        p = p
+    );
     assert_output(&source, &["line1", "line2", "line3", "Null"]);
 }
 
@@ -9775,17 +10352,23 @@ fn file_handle_lines_returns_list() {
     let path = dir.join("que_test_fh_lines.txt");
     std::fs::write(&path, "a\nb\nc\n").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 let ls = f.lines()
 f.close()
 ls
-"#, p = p);
-    assert_result(&source, Value::List(vec![
-        Value::String("a".into()),
-        Value::String("b".into()),
-        Value::String("c".into()),
-    ]));
+"#,
+        p = p
+    );
+    assert_result(
+        &source,
+        Value::List(vec![
+            Value::String("a".into()),
+            Value::String("b".into()),
+            Value::String("c".into()),
+        ]),
+    );
 }
 
 #[test]
@@ -9793,7 +10376,8 @@ fn file_handle_write_and_read() {
     let dir = std::env::temp_dir();
     let path = dir.join("que_test_fh_write_read.txt");
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let out = open("{p}", "w")
 out.write("written content")
 out.close()
@@ -9801,8 +10385,13 @@ let inp = open("{p}")
 let content = inp.read()
 inp.close()
 content
-"#, p = p);
-    assert_result(&source, Value::Ok(Box::new(Value::String("written content".into()))));
+"#,
+        p = p
+    );
+    assert_result(
+        &source,
+        Value::Ok(Box::new(Value::String("written content".into()))),
+    );
 }
 
 #[test]
@@ -9811,7 +10400,8 @@ fn file_handle_append_mode() {
     let path = dir.join("que_test_fh_append.txt");
     std::fs::write(&path, "first\n").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let out = open("{p}", "a")
 out.writeln("second")
 out.close()
@@ -9819,11 +10409,16 @@ let inp = open("{p}")
 let lines = inp.lines()
 inp.close()
 lines
-"#, p = p);
-    assert_result(&source, Value::List(vec![
-        Value::String("first".into()),
-        Value::String("second".into()),
-    ]));
+"#,
+        p = p
+    );
+    assert_result(
+        &source,
+        Value::List(vec![
+            Value::String("first".into()),
+            Value::String("second".into()),
+        ]),
+    );
 }
 
 #[test]
@@ -9832,12 +10427,15 @@ fn file_handle_write_on_read_handle_returns_err() {
     let path = dir.join("que_test_fh_wrong_mode.txt");
     std::fs::write(&path, "data").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}", "r")
 let result = f.write("oops")
 f.close()
 typeof(result)
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::String("Err".into()));
 }
 
@@ -9847,7 +10445,8 @@ fn file_handle_with_defer() {
     let path = dir.join("que_test_fh_defer.txt");
     let p = path.to_string_lossy();
     // Write content, then use defer to close while reading
-    let source = format!(r#"
+    let source = format!(
+        r#"
 fn read_file(path) {{
     let f = open(path, "w")
     defer f.close()
@@ -9858,8 +10457,13 @@ let inp = open("{p}")
 let content = inp.read()
 inp.close()
 content
-"#, p = p);
-    assert_result(&source, Value::Ok(Box::new(Value::String("deferred close".into()))));
+"#,
+        p = p
+    );
+    assert_result(
+        &source,
+        Value::Ok(Box::new(Value::String("deferred close".into()))),
+    );
 }
 
 #[test]
@@ -9868,15 +10472,21 @@ fn file_handle_seek_start() {
     let path = dir.join("que_test_fh_seek.txt");
     std::fs::write(&path, "abcdefghij").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 f.read_line()
 f.seek(3)
 let content = f.read()
 f.close()
 content
-"#, p = p);
-    assert_result(&source, Value::Ok(Box::new(Value::String("defghij".into()))));
+"#,
+        p = p
+    );
+    assert_result(
+        &source,
+        Value::Ok(Box::new(Value::String("defghij".into()))),
+    );
 }
 
 #[test]
@@ -9885,12 +10495,15 @@ fn file_handle_seek_returns_position() {
     let path = dir.join("que_test_fh_seek_pos.txt");
     std::fs::write(&path, "abcdefghij").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 let pos = f.seek(5)
 f.close()
 pos
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Int(5));
 }
 
@@ -9900,13 +10513,16 @@ fn file_handle_seek_end() {
     let path = dir.join("que_test_fh_seek_end.txt");
     std::fs::write(&path, "abcdefghij").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 f.seek(-3, "end")
 let content = f.read()
 f.close()
 content
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Ok(Box::new(Value::String("hij".into()))));
 }
 
@@ -9916,14 +10532,17 @@ fn file_handle_seek_current() {
     let path = dir.join("que_test_fh_seek_cur.txt");
     std::fs::write(&path, "abcdefghij").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let f = open("{p}")
 f.seek(2)
 f.seek(3, "current")
 let content = f.read()
 f.close()
 content
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Ok(Box::new(Value::String("fghij".into()))));
 }
 
@@ -9936,7 +10555,10 @@ fn hash_sha256_string() {
 import std.hash
 hash.sha256("")
 "#;
-    assert_result(source, Value::String("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".into()));
+    assert_result(
+        source,
+        Value::String("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".into()),
+    );
 }
 
 #[test]
@@ -9945,7 +10567,10 @@ fn hash_sha256_content() {
 import std.hash
 hash.sha256("hello")
 "#;
-    assert_result(source, Value::String("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".into()));
+    assert_result(
+        source,
+        Value::String("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".into()),
+    );
 }
 
 #[test]
@@ -9954,7 +10579,10 @@ fn hash_md5_string() {
 import std.hash
 hash.md5("")
 "#;
-    assert_result(source, Value::String("d41d8cd98f00b204e9800998ecf8427e".into()));
+    assert_result(
+        source,
+        Value::String("d41d8cd98f00b204e9800998ecf8427e".into()),
+    );
 }
 
 #[test]
@@ -9974,11 +10602,17 @@ fn hash_sha256_file() {
     std::fs::write(&path, "hello").unwrap();
     let p = path.to_string_lossy();
     // path() value → reads the file
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.hash
 hash.sha256(path("{p}"))
-"#, p = p);
-    assert_result(&source, Value::String("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".into()));
+"#,
+        p = p
+    );
+    assert_result(
+        &source,
+        Value::String("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".into()),
+    );
 }
 
 #[test]
@@ -9989,14 +10623,17 @@ fn hash_sha256_string_does_not_read_file() {
     let path = dir.join("que_hash_str_vs_file.txt");
     std::fs::write(&path, "different content").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.hash
 // String literal → hash of the string "que_hash_str_vs_file.txt" (filename chars)
 let str_hash  = hash.sha256("{p}")
 // path() → hash of the file contents
 let file_hash = hash.sha256(path("{p}"))
 str_hash != file_hash
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Bool(true));
 }
 
@@ -10006,10 +10643,13 @@ fn hash_integrity_verify() {
     let path = dir.join("que_integrity_test.txt");
     std::fs::write(&path, "hello").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.hash
 hash.verify("{p}", "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824")
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Bool(true));
 }
 
@@ -10019,10 +10659,13 @@ fn hash_integrity_verify_fail() {
     let path = dir.join("que_integrity_test_fail.txt");
     std::fs::write(&path, "hello").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.hash
 hash.verify("{p}", "sha256:0000000000000000000000000000000000000000000000000000000000000000")
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Bool(false));
 }
 
@@ -10037,11 +10680,16 @@ fn hash_write_and_verify_checksums() {
     let p1 = file1.to_string_lossy();
     let p2 = file2.to_string_lossy();
     let pchk = checksums.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.hash
 hash.write_checksums(["{p1}", "{p2}"], "{pchk}")
 hash.verify_checksums("{pchk}")
-"#, p1=p1, p2=p2, pchk=pchk);
+"#,
+        p1 = p1,
+        p2 = p2,
+        pchk = pchk
+    );
     assert_result(&source, Value::Bool(true));
 }
 
@@ -10086,7 +10734,8 @@ fn csv_write_and_reparse() {
     let dir = std::env::temp_dir();
     let path = dir.join("que_csv_test.csv");
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.csv
 let rows = [
     {{ "name": "Alice", "score": "100" }},
@@ -10095,7 +10744,9 @@ let rows = [
 csv.write(rows, "{p}")
 let back = csv.parse("{p}")
 back.len()
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::Int(2));
 }
 
@@ -10119,11 +10770,14 @@ fn dotenv_parse_file() {
     let path = dir.join("que_test.env");
     std::fs::write(&path, "FOO=bar\nBAZ=qux\n# comment\n").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.dotenv
 let vars = dotenv.parse("{p}")
 vars["FOO"]
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::String("bar".into()));
 }
 
@@ -10133,11 +10787,14 @@ fn dotenv_parse_quoted_values() {
     let path = dir.join("que_test_quoted.env");
     std::fs::write(&path, "MSG=\"hello world\"\n").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.dotenv
 let vars = dotenv.parse("{p}")
 vars["MSG"]
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::String("hello world".into()));
 }
 
@@ -10146,12 +10803,15 @@ fn dotenv_write_and_parse() {
     let dir = std::env::temp_dir();
     let path = dir.join("que_written.env");
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.dotenv
 dotenv.write({{ "PORT": "8080", "ENV": "test" }}, "{p}")
 let vars = dotenv.parse("{p}")
 vars["PORT"]
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::String("8080".into()));
 }
 
@@ -10161,11 +10821,14 @@ fn dotenv_load_into_env() {
     let path = dir.join("que_load_test.env");
     std::fs::write(&path, "QUE_TEST_DOTENV_KEY=loaded_value\n").unwrap();
     let p = path.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.dotenv
 dotenv.load("{p}")
 env.get("QUE_TEST_DOTENV_KEY")
-"#, p = p);
+"#,
+        p = p
+    );
     assert_result(&source, Value::String("loaded_value".into()));
 }
 
@@ -10303,11 +10966,14 @@ fn log_add_file_sink_basic() {
     let log_path = dir.join("test.log");
     let _ = std::fs::remove_file(&log_path); // clean slate
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.log
 log.add_file_sink("{}")
 log.info("file log test")
-"#, log_path.display());
+"#,
+        log_path.display()
+    );
     let (output, _) = que_lang::interpreter::run(&source).unwrap();
     // Console output still works (default sink + file sink)
     assert!(output.iter().any(|l| l.contains("file log test")));
@@ -10325,12 +10991,15 @@ fn log_file_sink_with_level_override() {
     let log_path = dir.join("errors.log");
     let _ = std::fs::remove_file(&log_path);
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.log
 log.add_file_sink("{}", {{ level: "error" }})
 log.info("info line")
 log.error("error line")
-"#, log_path.display());
+"#,
+        log_path.display()
+    );
     let (output, _) = que_lang::interpreter::run(&source).unwrap();
     // Both appear on console
     assert_eq!(output.len(), 2);
@@ -10348,12 +11017,15 @@ fn log_file_sink_with_field_filter() {
     let log_path = dir.join("prod.log");
     let _ = std::fs::remove_file(&log_path);
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.log
 log.add_file_sink("{}", {{ filter: {{ env: "prod" }} }})
 log.info("dev deploy", {{ env: "dev" }})
 log.info("prod deploy", {{ env: "prod" }})
-"#, log_path.display());
+"#,
+        log_path.display()
+    );
     let (_output, _) = que_lang::interpreter::run(&source).unwrap();
     let content = std::fs::read_to_string(&log_path).unwrap();
     assert!(!content.contains("dev deploy"));
@@ -10368,13 +11040,16 @@ fn log_remove_sinks_resets() {
     let log_path = dir.join("removed.log");
     let _ = std::fs::remove_file(&log_path);
 
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.log
 log.add_file_sink("{}")
 log.info("before remove")
 log.remove_sinks()
 log.info("after remove")
-"#, log_path.display());
+"#,
+        log_path.display()
+    );
     let (output, _) = que_lang::interpreter::run(&source).unwrap();
     // Both should appear in console output (remove_sinks restores default console)
     assert_eq!(output.len(), 2);
@@ -10654,12 +11329,16 @@ fn archive_tar_gz_create_and_list() {
     std::fs::write(&src_file, "archive content").unwrap();
     let src = src_file.to_string_lossy();
     let arc = archive.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{arc}", ["{src}"])
 let entries = archive.list("{arc}")
 entries.len() > 0
-"#, arc=arc, src=src);
+"#,
+        arc = arc,
+        src = src
+    );
     assert_result(&source, Value::Bool(true));
 }
 
@@ -10673,11 +11352,16 @@ fn archive_tar_gz_extract() {
     let src = src_file.to_string_lossy();
     let arc = archive.to_string_lossy();
     let out = out_dir.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{arc}", ["{src}"])
 archive.extract("{arc}", "{out}")
-"#, arc=arc, src=src, out=out);
+"#,
+        arc = arc,
+        src = src,
+        out = out
+    );
     let (_, result) = que_lang::interpreter::run(&source).unwrap();
     assert_eq!(result, Value::Null);
     assert!(out_dir.exists());
@@ -10691,12 +11375,16 @@ fn archive_zip_create_and_list() {
     std::fs::write(&src_file, "zip content").unwrap();
     let src = src_file.to_string_lossy();
     let arc = archive.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.zip("{arc}", ["{src}"])
 let entries = archive.list("{arc}")
 entries.len() > 0
-"#, arc=arc, src=src);
+"#,
+        arc = arc,
+        src = src
+    );
     assert_result(&source, Value::Bool(true));
 }
 
@@ -10706,16 +11394,20 @@ entries.len() > 0
 fn archive_tar_gz_with_prefix() {
     let dir = std::env::temp_dir();
     let src_file = dir.join("que_pfx_src.txt");
-    let archive  = dir.join("que_pfx.tar.gz");
+    let archive = dir.join("que_pfx.tar.gz");
     std::fs::write(&src_file, "prefixed").unwrap();
     let src = src_file.to_string_lossy();
     let arc = archive.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{arc}", ["{src}"], "myapp-v1.0")
 let entries = archive.list("{arc}")
 entries[0]
-"#, arc=arc, src=src);
+"#,
+        arc = arc,
+        src = src
+    );
     // Entry should be "myapp-v1.0/que_pfx_src.txt"
     assert_result(&source, Value::String("myapp-v1.0/que_pfx_src.txt".into()));
 }
@@ -10724,16 +11416,20 @@ entries[0]
 fn archive_zip_with_prefix() {
     let dir = std::env::temp_dir();
     let src_file = dir.join("que_zpfx_src.txt");
-    let archive  = dir.join("que_zpfx.zip");
+    let archive = dir.join("que_zpfx.zip");
     std::fs::write(&src_file, "zip prefixed").unwrap();
     let src = src_file.to_string_lossy();
     let arc = archive.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.zip("{arc}", ["{src}"], "release")
 let entries = archive.list("{arc}")
 entries[0]
-"#, arc=arc, src=src);
+"#,
+        arc = arc,
+        src = src
+    );
     assert_result(&source, Value::String("release/que_zpfx_src.txt".into()));
 }
 
@@ -10741,18 +11437,22 @@ entries[0]
 fn archive_tar_gz_src_dest_mapping() {
     let dir = std::env::temp_dir();
     let src_file = dir.join("que_map_src.txt");
-    let archive  = dir.join("que_map.tar.gz");
+    let archive = dir.join("que_map.tar.gz");
     std::fs::write(&src_file, "mapped").unwrap();
     let src = src_file.to_string_lossy();
     let arc = archive.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{arc}", [
     {{ src: "{src}", dest: "bin/tool" }}
 ])
 let entries = archive.list("{arc}")
 entries[0]
-"#, arc=arc, src=src);
+"#,
+        arc = arc,
+        src = src
+    );
     assert_result(&source, Value::String("bin/tool".into()));
 }
 
@@ -10760,18 +11460,22 @@ entries[0]
 fn archive_tar_gz_src_dest_with_prefix() {
     let dir = std::env::temp_dir();
     let src_file = dir.join("que_mappfx_src.txt");
-    let archive  = dir.join("que_mappfx.tar.gz");
+    let archive = dir.join("que_mappfx.tar.gz");
     std::fs::write(&src_file, "mapped+prefix").unwrap();
     let src = src_file.to_string_lossy();
     let arc = archive.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{arc}", [
     {{ src: "{src}", dest: "bin/tool" }}
 ], "myapp-v2.0")
 let entries = archive.list("{arc}")
 entries[0]
-"#, arc=arc, src=src);
+"#,
+        arc = arc,
+        src = src
+    );
     assert_result(&source, Value::String("myapp-v2.0/bin/tool".into()));
 }
 
@@ -10781,17 +11485,21 @@ fn archive_tar_gz_dest_dot_archives_contents_at_root() {
     // archive root, producing "file.txt" not "./file.txt".
     let dir = std::env::temp_dir();
     let src_dir = dir.join("que_dest_dot_src");
-    let archive  = dir.join("que_dest_dot.tar.gz");
+    let archive = dir.join("que_dest_dot.tar.gz");
     std::fs::create_dir_all(&src_dir).unwrap();
     std::fs::write(src_dir.join("hello.txt"), "hi").unwrap();
     let sd = src_dir.to_string_lossy();
     let arc = archive.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{arc}", [{{ src: "{sd}", dest: "." }}])
 let entries = archive.list("{arc}")
 entries[0]
-"#, arc=arc, sd=sd);
+"#,
+        arc = arc,
+        sd = sd
+    );
     assert_result(&source, Value::String("hello.txt".into()));
 }
 
@@ -10800,17 +11508,21 @@ fn archive_tar_gz_dest_prefix_archives_contents_under_prefix() {
     // { src: dir, dest: "myapp-1.0" } archives directory contents under that prefix.
     let dir = std::env::temp_dir();
     let src_dir = dir.join("que_dest_pfx_src");
-    let archive  = dir.join("que_dest_pfx.tar.gz");
+    let archive = dir.join("que_dest_pfx.tar.gz");
     std::fs::create_dir_all(&src_dir).unwrap();
     std::fs::write(src_dir.join("binary"), "exec").unwrap();
     let sd = src_dir.to_string_lossy();
     let arc = archive.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{arc}", [{{ src: "{sd}", dest: "myapp-1.0" }}])
 let entries = archive.list("{arc}")
 entries[0]
-"#, arc=arc, sd=sd);
+"#,
+        arc = arc,
+        sd = sd
+    );
     assert_result(&source, Value::String("myapp-1.0/binary".into()));
 }
 
@@ -10827,7 +11539,8 @@ fn archive_zip_dir_basename_consistent_with_tar() {
     let sd = src_dir.to_string_lossy();
     let ta = tar_arc.to_string_lossy();
     let za = zip_arc.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{ta}", ["{sd}"])
 archive.zip("{za}", ["{sd}"])
@@ -10837,7 +11550,11 @@ let zip_entries = archive.list("{za}")
 let tar_has_basename = tar_entries[0].starts_with("que_arc_dir_test")
 let zip_has_basename = zip_entries[0].starts_with("que_arc_dir_test")
 tar_has_basename && zip_has_basename
-"#, ta=ta, za=za, sd=sd);
+"#,
+        ta = ta,
+        za = za,
+        sd = sd
+    );
     assert_result(&source, Value::Bool(true));
 }
 
@@ -10867,7 +11584,11 @@ fn fmt_let_binding() {
 #[test]
 fn fmt_keeps_the_prologue() {
     let out = format_source("#!/usr/bin/env que\n#!strict\nlet x = 1\n");
-    assert!(out.starts_with("#!/usr/bin/env que\n#!strict\n\n"), "{}", out);
+    assert!(
+        out.starts_with("#!/usr/bin/env que\n#!strict\n\n"),
+        "{}",
+        out
+    );
 }
 
 #[test]
@@ -11008,11 +11729,7 @@ fn fmt_keeps_a_wrapped_command_wrapped() {
 #[test]
 fn fmt_indents_continuation_lines_relative_to_the_statement() {
     let out = format_source("fn f() {\n`echo one \\\ntwo`\n}");
-    assert!(
-        out.contains("    `echo one \\\n        two`"),
-        "{}",
-        out
-    );
+    assert!(out.contains("    `echo one \\\n        two`"), "{}", out);
 }
 
 #[test]
@@ -11133,7 +11850,10 @@ fn fmt_method_call_on_binary_expr_keeps_parens() {
     // (basedir / "folder").mkdir() — parens are semantically required
     let src = r#"(basedir / "folder").mkdir()"#;
     let out = format_source(src);
-    assert!(out.contains(r#"(basedir / "folder").mkdir()"#), "got: {out}");
+    assert!(
+        out.contains(r#"(basedir / "folder").mkdir()"#),
+        "got: {out}"
+    );
 }
 
 #[test]
@@ -11198,7 +11918,10 @@ fn fmt_is_idempotent_with_comments() {
     let src = "// header\n\nimport std.fs\n\n// about f\nfn f(x) {\n    // step one\n    let a = 1  // why\n\n    // step two\n    a + 1\n}\n";
     let once = format_source(src);
     let twice = format_source(&once);
-    assert_eq!(once, twice, "formatting is not stable:\n{once}\n---\n{twice}");
+    assert_eq!(
+        once, twice,
+        "formatting is not stable:\n{once}\n---\n{twice}"
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -11208,83 +11931,110 @@ fn fmt_is_idempotent_with_comments() {
 #[test]
 fn strict_param_type_check_int() {
     // Correct type should work
-    let (_, val) = run_strict(r#"
+    let (_, val) = run_strict(
+        r#"
 fn add(a: Int, b: Int) -> Int { a + b }
 add(1, 2)
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(val, Value::Int(3));
 }
 
 #[test]
 fn strict_param_type_check_string() {
-    let (_, val) = run_strict(r#"
+    let (_, val) = run_strict(
+        r#"
 fn greet(name: String) -> String { "Hello, " + name }
 greet("world")
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(val, Value::String("Hello, world".to_string()));
 }
 
 #[test]
 fn strict_param_type_mismatch() {
     // Wrong type should fail in strict mode
-    assert!(run_strict(r#"
+    assert!(run_strict(
+        r#"
 fn add(a: Int, b: Int) -> Int { a + b }
 add("hello", 2)
-"#).is_err());
+"#
+    )
+    .is_err());
 }
 
 #[test]
 fn strict_return_type_mismatch() {
     // Return type mismatch should fail
-    assert!(run_strict(r#"
+    assert!(run_strict(
+        r#"
 fn get_num() -> Int { "not a number" }
 get_num()
-"#).is_err());
+"#
+    )
+    .is_err());
 }
 
 #[test]
 fn strict_no_annotation_no_check() {
     // Without type annotations, strict mode should not interfere
-    let (_, val) = run_strict(r#"
+    let (_, val) = run_strict(
+        r#"
 fn add(a, b) { a + b }
 add("hello", " world")
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(val, Value::String("hello world".to_string()));
 }
 
 #[test]
 fn strict_bool_param() {
-    assert!(run_strict(r#"
+    assert!(run_strict(
+        r#"
 fn check(flag: Bool) { flag }
 check(42)
-"#).is_err());
+"#
+    )
+    .is_err());
 }
 
 #[test]
 fn strict_list_type() {
-    let (_, val) = run_strict(r#"
+    let (_, val) = run_strict(
+        r#"
 fn first(items: List) { items[0] }
 first([1, 2, 3])
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(val, Value::Int(1));
 }
 
 #[test]
 fn strict_map_type() {
-    let (_, val) = run_strict(r#"
+    let (_, val) = run_strict(
+        r#"
 fn get_key(m: Map) { m.keys() }
 get_key({ a: 1 })
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(val, Value::List(vec![Value::String("a".to_string())]));
 }
 
 #[test]
 fn strict_any_type() {
     // Any type should accept anything
-    let (_, val) = run_strict(r#"
+    let (_, val) = run_strict(
+        r#"
 fn identity(x: Any) -> Any { x }
 identity(42)
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(val, Value::Int(42));
 }
 
@@ -11293,7 +12043,8 @@ fn strict_enabled_via_pragma() {
     assert!(run(r#"#!strict
 fn add(a: Int, b: Int) -> Int { a + b }
 add("hello", 2)
-"#).is_err());
+"#)
+    .is_err());
 }
 
 #[test]
@@ -11302,7 +12053,8 @@ fn strict_pragma_may_follow_a_shebang() {
 #!strict
 fn add(a: Int, b: Int) -> Int { a + b }
 add("hello", 2)
-"#).is_err());
+"#)
+    .is_err());
 }
 
 #[test]
@@ -11310,7 +12062,8 @@ fn shebang_alone_does_not_enable_strict() {
     let (_, val) = run(r#"#!/usr/bin/env que
 fn add(a: Int, b: Int) -> Int { a + b }
 add("hello", " world")
-"#).unwrap();
+"#)
+    .unwrap();
     assert_eq!(val, Value::String("hello world".to_string()));
 }
 
@@ -11331,7 +12084,8 @@ fn strict_disabled_by_default() {
     let (_, val) = run(r#"
 fn add(a: Int, b: Int) -> Int { a + b }
 add("hello", " world")
-"#).unwrap();
+"#)
+    .unwrap();
     assert_eq!(val, Value::String("hello world".to_string()));
 }
 
@@ -11344,20 +12098,28 @@ fn strict_query() {
 
 #[test]
 fn strict_path_type() {
-    let result = run_strict(r#"
+    let result = run_strict(
+        r#"
 fn process(p: Path) { str(p) }
 process(42)
-"#);
+"#,
+    );
     assert!(result.is_err());
 }
 
 #[test]
 fn strict_return_type_correct() {
-    let (_, val) = run_strict(r#"
+    let (_, val) = run_strict(
+        r#"
 fn make_list() -> List { [1, 2, 3] }
 make_list()
-"#).unwrap();
-    assert_eq!(val, Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+"#,
+    )
+    .unwrap();
+    assert_eq!(
+        val,
+        Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -11377,45 +12139,53 @@ fn lint_source(source: &str) -> Vec<que_lang::linter::LintDiagnostic> {
 
 #[test]
 fn lint_unreachable_after_return() {
-    let diags = lint_source(r#"
+    let diags = lint_source(
+        r#"
 fn foo() {
     return 1
     println("unreachable")
 }
-"#);
+"#,
+    );
     assert!(diags.iter().any(|d| d.rule == "unreachable-code"));
 }
 
 #[test]
 fn lint_unreachable_after_break() {
-    let diags = lint_source(r#"
+    let diags = lint_source(
+        r#"
 for x in [1, 2, 3] {
     break
     println("unreachable")
 }
-"#);
+"#,
+    );
     assert!(diags.iter().any(|d| d.rule == "unreachable-code"));
 }
 
 #[test]
 fn lint_unreachable_after_continue() {
-    let diags = lint_source(r#"
+    let diags = lint_source(
+        r#"
 for x in [1, 2, 3] {
     continue
     println("unreachable")
 }
-"#);
+"#,
+    );
     assert!(diags.iter().any(|d| d.rule == "unreachable-code"));
 }
 
 #[test]
 fn lint_no_unreachable_without_terminator() {
-    let diags = lint_source(r#"
+    let diags = lint_source(
+        r#"
 fn foo() {
     let x = 1
     println(x)
 }
-"#);
+"#,
+    );
     assert!(diags.iter().all(|d| d.rule != "unreachable-code"));
 }
 
@@ -11491,13 +12261,15 @@ fn lint_no_secret_warning_normal() {
 
 #[test]
 fn lint_clean_code_no_warnings() {
-    let diags = lint_source(r#"
+    let diags = lint_source(
+        r#"
 fn greet(name) {
     let msg = "Hello, ${name}!"
     println(msg)
 }
 greet("world")
-"#);
+"#,
+    );
     assert!(diags.is_empty(), "Expected no warnings, got: {:?}", diags);
 }
 
@@ -11505,86 +12277,111 @@ greet("world")
 
 #[test]
 fn template_simple_substitution() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let result = template.render("Hello, {{ name }}!", { "name": "World" })
 println(result)
-"#, &["Hello, World!"]);
+"#,
+        &["Hello, World!"],
+    );
 }
 
 #[test]
 fn template_multiple_vars() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let result = template.render("{{ greeting }}, {{ name }}!", { "greeting": "Hi", "name": "Alice" })
 println(result)
-"#, &["Hi, Alice!"]);
+"#,
+        &["Hi, Alice!"],
+    );
 }
 
 #[test]
 fn template_dotted_path() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let ctx = { "server": { "host": "localhost", "port": 8080 } }
 let result = template.render("{{ server.host }}:{{ server.port }}", ctx)
 println(result)
-"#, &["localhost:8080"]);
+"#,
+        &["localhost:8080"],
+    );
 }
 
 #[test]
 fn template_if_true() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let tmpl = "start{{# if show }}visible{{/ if }}end"
 let result = template.render(tmpl, { "show": true })
 println(result)
-"#, &["startvisibleend"]);
+"#,
+        &["startvisibleend"],
+    );
 }
 
 #[test]
 fn template_if_false() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let tmpl = "start{{# if show }}visible{{/ if }}end"
 let result = template.render(tmpl, { "show": false })
 println(result)
-"#, &["startend"]);
+"#,
+        &["startend"],
+    );
 }
 
 #[test]
 fn template_if_else() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let tmpl = "{{# if active }}ON{{# else }}OFF{{/ if }}"
 let result = template.render(tmpl, { "active": false })
 println(result)
-"#, &["OFF"]);
+"#,
+        &["OFF"],
+    );
 }
 
 #[test]
 fn template_for_loop() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let tmpl = "{{# for item in items }}[{{ item }}]{{/ for }}"
 let result = template.render(tmpl, { "items": ["a", "b", "c"] })
 println(result)
-"#, &["[a][b][c]"]);
+"#,
+        &["[a][b][c]"],
+    );
 }
 
 #[test]
 fn template_for_with_map_items() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let tmpl = "{{# for svc in services }}{{ svc.name }}:{{ svc.port }} {{/ for }}"
 let ctx = { "services": [{ "name": "api", "port": 8080 }, { "name": "web", "port": 3000 }] }
 let result = template.render(tmpl, ctx)
 println(result)
-"#, &["api:8080 web:3000 "]);
+"#,
+        &["api:8080 web:3000 "],
+    );
 }
 
 #[test]
 fn template_nested_if_in_for() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let tmpl = "{{# for item in items }}{{# if item.active }}{{ item.name }} {{/ if }}{{/ for }}"
 let ctx = { "items": [
@@ -11594,129 +12391,170 @@ let ctx = { "items": [
 ] }
 let result = template.render(tmpl, ctx)
 println(result)
-"#, &["a c "]);
+"#,
+        &["a c "],
+    );
 }
 
 #[test]
 fn template_missing_var_is_null() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let result = template.render("Hello, {{ name }}!", {})
 println(result)
-"#, &["Hello, null!"]);
+"#,
+        &["Hello, null!"],
+    );
 }
 
 #[test]
 fn template_integer_value() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let result = template.render("Count: {{ n }}", { "n": 42 })
 println(result)
-"#, &["Count: 42"]);
+"#,
+        &["Count: 42"],
+    );
 }
 
 #[test]
 fn template_multiline() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let tmpl = "name: {{ name }}\nreplicas: {{ replicas }}"
 let result = template.render(tmpl, { "name": "myapp", "replicas": 3 })
 println(result)
-"#, &["name: myapp\nreplicas: 3"]);
+"#,
+        &["name: myapp\nreplicas: 3"],
+    );
 }
 
 #[test]
 fn template_empty_for_loop() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.template
 let tmpl = "before{{# for x in items }}[{{ x }}]{{/ for }}after"
 let result = template.render(tmpl, { "items": [] })
 println(result)
-"#, &["beforeafter"]);
+"#,
+        &["beforeafter"],
+    );
 }
 
 #[test]
 fn template_render_result_type() {
-    assert_result(r#"
+    assert_result(
+        r#"
 import std.template
 typeof(template.render("hello", {}))
-"#, Value::String("String".to_string()));
+"#,
+        Value::String("String".to_string()),
+    );
 }
 
 // ── Net utilities tests ────────────────────────────────────────────────────
 
 #[test]
 fn net_resolve_localhost() {
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.net
 let addrs = net.resolve("localhost")
 println(typeof(addrs))
 println(addrs.len() > 0)
-"#, &["List", "true"]);
+"#,
+        &["List", "true"],
+    );
 }
 
 #[test]
 fn net_resolve_returns_list() {
-    assert_result(r#"
+    assert_result(
+        r#"
 import std.net
 typeof(net.resolve("localhost"))
-"#, Value::String("List".to_string()));
+"#,
+        Value::String("List".to_string()),
+    );
 }
 
 #[test]
 fn net_port_open_closed_port() {
     // Port 19999 should not be open on localhost
-    assert_result(r#"
+    assert_result(
+        r#"
 import std.net
 net.port_open("127.0.0.1", 19999, 100)
-"#, Value::Bool(false));
+"#,
+        Value::Bool(false),
+    );
 }
 
 #[test]
 fn net_port_open_returns_bool() {
-    assert_result(r#"
+    assert_result(
+        r#"
 import std.net
 typeof(net.port_open("127.0.0.1", 19999, 100))
-"#, Value::String("Bool".to_string()));
+"#,
+        Value::String("Bool".to_string()),
+    );
 }
 
 #[test]
 fn net_ping_returns_bool() {
-    assert_result(r#"
+    assert_result(
+        r#"
 import std.net
 typeof(net.ping("127.0.0.1", 100))
-"#, Value::String("Bool".to_string()));
+"#,
+        Value::String("Bool".to_string()),
+    );
 }
 
 #[test]
 fn net_wait_for_port_timeout() {
     // Should return false quickly since port 19999 isn't open
-    assert_result(r#"
+    assert_result(
+        r#"
 import std.net
 net.wait_for_port("127.0.0.1", 19999, 200, 100)
-"#, Value::Bool(false));
+"#,
+        Value::Bool(false),
+    );
 }
 
 #[test]
 fn net_wait_for_port_with_duration() {
     // Test that Duration values work for timeout/interval args
-    assert_result(r#"
+    assert_result(
+        r#"
 import std.net
 net.wait_for_port("127.0.0.1", 19999, 200ms, 100ms)
-"#, Value::Bool(false));
+"#,
+        Value::Bool(false),
+    );
 }
 
 #[test]
 fn net_module_import() {
     // Verify the module imports correctly and has expected functions
-    assert_output(r#"
+    assert_output(
+        r#"
 import std.net
 println(typeof(net.ping))
 println(typeof(net.port_open))
 println(typeof(net.resolve))
 println(typeof(net.wait_for_port))
 println(typeof(net.wait_for_url))
-"#, &["Function", "Function", "Function", "Function", "Function"]);
+"#,
+        &["Function", "Function", "Function", "Function", "Function"],
+    );
 }
 
 // ── Path iteration, walk, and API consistency ────────────────────────
@@ -12292,18 +13130,24 @@ fn module_pub_struct_export_basic() {
     // Export a pub struct, import it, construct an instance, access fields.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .types { Config }
 let c = Config { host: "localhost", port: 8080 }
 println(c.host)
 println(c.port)
-"#),
-            ("types.que", r#"
+"#,
+            ),
+            (
+                "types.que",
+                r#"
 pub struct Config {
     host
     port
 }
-"#),
+"#,
+            ),
         ],
         &["localhost", "8080"],
     );
@@ -12314,18 +13158,24 @@ fn module_pub_struct_with_defaults() {
     // Struct with default field values should work across modules.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .types { Config }
 let c = Config {}
 println(c.host)
 println(c.port)
-"#),
-            ("types.que", r#"
+"#,
+            ),
+            (
+                "types.que",
+                r#"
 pub struct Config {
     host = "127.0.0.1"
     port = 3000
 }
-"#),
+"#,
+            ),
         ],
         &["127.0.0.1", "3000"],
     );
@@ -12336,13 +13186,18 @@ fn module_pub_struct_with_impl_methods() {
     // Export a struct with impl methods, call methods on imported instances.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .types { Point }
 let p = Point { x: 3, y: 4 }
 println(p.magnitude())
 println(p.to_string())
-"#),
-            ("types.que", r#"
+"#,
+            ),
+            (
+                "types.que",
+                r#"
 pub struct Point {
     x
     y
@@ -12359,7 +13214,8 @@ impl Point {
         "(" + str(self.x) + ", " + str(self.y) + ")"
     }
 }
-"#),
+"#,
+            ),
         ],
         &["5", "(3, 4)"],
     );
@@ -12370,18 +13226,24 @@ fn module_pub_struct_wildcard_import() {
     // Wildcard import brings struct into scope for construction.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .types { * }
 let c = Config { host: "example.com", port: 443 }
 println(c.host)
 println(c.port)
-"#),
-            ("types.que", r#"
+"#,
+            ),
+            (
+                "types.que",
+                r#"
 pub struct Config {
     host
     port
 }
-"#),
+"#,
+            ),
         ],
         &["example.com", "443"],
     );
@@ -12390,21 +13252,25 @@ pub struct Config {
 #[test]
 fn module_non_pub_struct_not_exported() {
     // A struct without `pub` should NOT be accessible to importers.
-    assert_module_error(
-        &[
-            ("main.que", r#"
+    assert_module_error(&[
+        (
+            "main.que",
+            r#"
 import .types { Internal }
 let i = Internal { value: 42 }
 println(i.value)
-"#),
-            ("types.que", r#"
+"#,
+        ),
+        (
+            "types.que",
+            r#"
 struct Internal {
     value
 }
 pub fn make() { Internal { value: 1 } }
-"#),
-        ],
-    );
+"#,
+        ),
+    ]);
 }
 
 // ── pub let export ───────────────────────────────────────────────────
@@ -12414,15 +13280,21 @@ fn module_pub_let_simple() {
     // Export a constant via pub let, import and use it.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .constants { VERSION, MAX_RETRIES }
 println(VERSION)
 println(MAX_RETRIES)
-"#),
-            ("constants.que", r#"
+"#,
+            ),
+            (
+                "constants.que",
+                r#"
 pub let VERSION = "1.0.0"
 pub let MAX_RETRIES = 3
-"#),
+"#,
+            ),
         ],
         &["1.0.0", "3"],
     );
@@ -12433,14 +13305,20 @@ fn module_pub_let_destructuring() {
     // Export multiple names via destructuring pub let.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .constants { WIDTH, HEIGHT }
 println(WIDTH)
 println(HEIGHT)
-"#),
-            ("constants.que", r#"
+"#,
+            ),
+            (
+                "constants.que",
+                r#"
 pub let (WIDTH, HEIGHT) = (1920, 1080)
-"#),
+"#,
+            ),
         ],
         &["1920", "1080"],
     );
@@ -12451,13 +13329,19 @@ fn module_pub_let_whole_module() {
     // Import as module namespace and access pub let values as fields.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .constants
 println(constants.PI)
-"#),
-            ("constants.que", r#"
+"#,
+            ),
+            (
+                "constants.que",
+                r#"
 pub let PI = 3.14159
-"#),
+"#,
+            ),
         ],
         &["3.14159"],
     );
@@ -12468,16 +13352,22 @@ fn module_pub_let_with_pub_fn() {
     // Mix pub let and pub fn in the same module.
     assert_module_output(
         &[
-            ("main.que", r#"
+            (
+                "main.que",
+                r#"
 import .config { DEFAULT_PORT, make_url }
 println(make_url("localhost", DEFAULT_PORT))
-"#),
-            ("config.que", r#"
+"#,
+            ),
+            (
+                "config.que",
+                r#"
 pub let DEFAULT_PORT = 8080
 pub fn make_url(host, port) {
     "http://" + host + ":" + str(port)
 }
-"#),
+"#,
+            ),
         ],
         &["http://localhost:8080"],
     );
@@ -12868,13 +13758,20 @@ print(fs.read(tmp).unwrap())
 #[test]
 fn path_ls_with_glob_pattern() {
     use std::fs;
-    let tmp = std::env::temp_dir().join(format!("que_ls_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos()));
+    let tmp = std::env::temp_dir().join(format!(
+        "que_ls_test_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .subsec_nanos()
+    ));
     fs::create_dir_all(&tmp).unwrap();
     fs::write(tmp.join("a.txt"), "").unwrap();
     fs::write(tmp.join("b.txt"), "").unwrap();
     fs::write(tmp.join("c.log"), "").unwrap();
     let tmp_str = tmp.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.fs
 let d = path("{}")
 let txt_files = d.ls("*.txt")
@@ -12883,7 +13780,9 @@ let log_files = d.ls("*.log")
 println(log_files.len())
 let all_files = d.ls()
 println(all_files.len())
-"#, tmp_str);
+"#,
+        tmp_str
+    );
     assert_output(&source, &["2", "1", "3"]);
     fs::remove_dir_all(&tmp).unwrap();
 }
@@ -12909,20 +13808,29 @@ println(p)
 #[test]
 fn path_symlink_creates_link() {
     use std::fs;
-    let tmp = std::env::temp_dir().join(format!("que_sym_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos()));
+    let tmp = std::env::temp_dir().join(format!(
+        "que_sym_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .subsec_nanos()
+    ));
     fs::create_dir_all(&tmp).unwrap();
     let target = tmp.join("target.txt");
     let link = tmp.join("link.txt");
     fs::write(&target, "hello").unwrap();
     let target_str = target.to_string_lossy();
     let link_str = link.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 let target = path("{}")
 let link_path = path("{}")
 let result = link_path.symlink(str(target))
 println(result.is_ok())
 println(link_path.exists())
-"#, target_str, link_str);
+"#,
+        target_str, link_str
+    );
     assert_output(&source, &["true", "true"]);
     fs::remove_dir_all(&tmp).unwrap();
 }
@@ -13035,7 +13943,10 @@ os.exit(0)
 #[test]
 fn fs_copy_dir_merges_into_existing_dest() {
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos();
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos();
     let src = std::env::temp_dir().join(format!("que_cp_src_{}", ts));
     let dst = std::env::temp_dir().join(format!("que_cp_dst_{}", ts));
     fs::create_dir_all(&src).unwrap();
@@ -13046,13 +13957,16 @@ fn fs_copy_dir_merges_into_existing_dest() {
     let dst_s = dst.to_string_lossy();
     // `dest` names the tree, so the contents land in it directly and files
     // already there survive -- unlike `src.copy_to(dest)`, which would nest.
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.fs
 let r = fs.copy_dir("{}", "{}")
 println(r.is_ok())
 println(fs.exists("{}/new.txt"))
 println(fs.exists("{}/existing.txt"))
-"#, src_s, dst_s, dst_s, dst_s);
+"#,
+        src_s, dst_s, dst_s, dst_s
+    );
     assert_output(&source, &["true", "true", "true"]);
     fs::remove_dir_all(&src).unwrap();
     fs::remove_dir_all(&dst).unwrap();
@@ -13061,7 +13975,11 @@ println(fs.exists("{}/existing.txt"))
 #[test]
 fn archive_tar_gz_per_entry_mode() {
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 100;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 100;
     let work = std::env::temp_dir().join(format!("que_mode_{}", ts));
     let src = work.join("src");
     let out = work.join("out");
@@ -13074,12 +13992,15 @@ fn archive_tar_gz_per_entry_mode() {
     let script_s = script.to_string_lossy();
     let out_s = out.to_string_lossy();
     // Archive with explicit mode 0o755 on the entry map
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{}", [{{ src: path("{}"), dest: "script.sh", mode: 493 }}])
 archive.extract("{}", "{}")
 println(path("{}/script.sh").exists())
-"#, tar_s, script_s, tar_s, out_s, out_s);
+"#,
+        tar_s, script_s, tar_s, out_s, out_s
+    );
     // 493 == 0o755
     assert_output(&source, &["true"]);
     #[cfg(unix)]
@@ -13087,7 +14008,11 @@ println(path("{}/script.sh").exists())
         use std::os::unix::fs::PermissionsExt;
         // Asserting only that the file exists let the mode be silently
         // dropped, which is the whole reason the option is there.
-        let mode = fs::metadata(out.join("script.sh")).unwrap().permissions().mode() & 0o777;
+        let mode = fs::metadata(out.join("script.sh"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
         assert_eq!(mode, 0o755, "mode was {:o}", mode);
     }
     fs::remove_dir_all(&work).unwrap();
@@ -13096,7 +14021,11 @@ println(path("{}/script.sh").exists())
 #[test]
 fn archive_zip_preserves_empty_dirs() {
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 300;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 300;
     let work = std::env::temp_dir().join(format!("que_zipdir_{}", ts));
     let src = work.join("src");
     let out = work.join("out");
@@ -13129,7 +14058,11 @@ fn archive_zip_preserves_the_executable_bit() {
     // zipped build script came back out unable to run.
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 400;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 400;
     let work = std::env::temp_dir().join(format!("que_zipmode_{}", ts));
     let src = work.join("src");
     let out = work.join("out");
@@ -13153,7 +14086,11 @@ println(path("{}/src/run.sh").exists())
         out.to_string_lossy()
     );
     assert_output(&source, &["true"]);
-    let mode = fs::metadata(out.join("src").join("run.sh")).unwrap().permissions().mode() & 0o777;
+    let mode = fs::metadata(out.join("src").join("run.sh"))
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
     assert_eq!(mode, 0o755, "mode was {:o}", mode);
     fs::remove_dir_all(&work).unwrap();
 }
@@ -13163,7 +14100,11 @@ println(path("{}/src/run.sh").exists())
 fn archive_zip_honours_an_explicit_entry_mode() {
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 500;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 500;
     let work = std::env::temp_dir().join(format!("que_zipmode2_{}", ts));
     let src = work.join("src");
     let out = work.join("out");
@@ -13185,7 +14126,11 @@ println(path("{}/script.sh").exists())
         out.to_string_lossy()
     );
     assert_output(&source, &["true"]);
-    let mode = fs::metadata(out.join("script.sh")).unwrap().permissions().mode() & 0o777;
+    let mode = fs::metadata(out.join("script.sh"))
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
     assert_eq!(mode, 0o755, "mode was {:o}", mode);
     fs::remove_dir_all(&work).unwrap();
 }
@@ -13194,7 +14139,11 @@ println(path("{}/script.sh").exists())
 fn archive_zip_records_the_source_mtime() {
     // Stamping every entry "now" defeats every downstream mtime comparison.
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 600;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 600;
     let work = std::env::temp_dir().join(format!("que_zipmtime_{}", ts));
     let src = work.join("src");
     let out = work.join("out");
@@ -13204,10 +14153,7 @@ fn archive_zip_records_the_source_mtime() {
     fs::write(&file, "hello").unwrap();
     // 2001-02-03 04:05:06 local time.
     let stamp = std::time::UNIX_EPOCH + std::time::Duration::from_secs(981_173_106);
-    fs::File::open(&file)
-        .unwrap()
-        .set_modified(stamp)
-        .unwrap();
+    fs::File::open(&file).unwrap().set_modified(stamp).unwrap();
     let zip = out.join("test.zip");
     let source = format!(
         r#"
@@ -13231,7 +14177,11 @@ fn path_symlink_makes_the_receiver_the_link() {
     // The docs had the arguments the other way round. The receiver is the
     // link, the same way `.write_text()`'s receiver is the file written.
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 700;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 700;
     let work = std::env::temp_dir().join(format!("que_symlink_{}", ts));
     fs::create_dir_all(&work).unwrap();
     let target = work.join("real.txt");
@@ -13255,7 +14205,10 @@ println(path("{}").read().unwrap())
 #[test]
 fn archive_tar_gz_preserves_empty_dirs() {
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos();
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos();
     let work = std::env::temp_dir().join(format!("que_arch_{}", ts));
     let src = work.join("src");
     let out = work.join("out");
@@ -13268,14 +14221,17 @@ fn archive_tar_gz_preserves_empty_dirs() {
     let src_s = src.to_string_lossy();
     let tar_s = tar.to_string_lossy();
     let out_s = out.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.archive
 archive.tar_gz("{}", [path("{}")])
 // Extract and verify the empty dir is present
 archive.extract("{}", "{}")
 println(path("{}/src/empty_dir").exists())
 println(path("{}/src/empty_dir").is_dir())
-"#, tar_s, src_s, tar_s, out_s, out_s, out_s);
+"#,
+        tar_s, src_s, tar_s, out_s, out_s, out_s
+    );
     assert_output(&source, &["true", "true"]);
     fs::remove_dir_all(&work).unwrap();
 }
@@ -13303,18 +14259,24 @@ with TempDir {} as stage {
 #[test]
 fn tempdir_with_custom_parent_dir() {
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos();
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos();
     let parent = std::env::temp_dir().join(format!("que_parent_{}", ts));
     fs::create_dir_all(&parent).unwrap();
     let parent_str = parent.to_string_lossy().to_string();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.fs
 with TempDir {{ dir: path("{}") }} as stage {{
     // The temp dir should be created inside the custom parent
     let parent = stage.parent()
     println(str(parent) == "{}")
 }}
-"#, parent_str, parent_str);
+"#,
+        parent_str, parent_str
+    );
     assert_output(&source, &["true"]);
     fs::remove_dir_all(&parent).unwrap();
 }
@@ -13322,7 +14284,11 @@ with TempDir {{ dir: path("{}") }} as stage {{
 #[test]
 fn tempfile_with_custom_parent_dir() {
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 11;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 11;
     let parent = std::env::temp_dir().join(format!("que_tfparent_{}", ts));
     let parent_str = parent.to_string_lossy().to_string();
     let source = format!(
@@ -13344,7 +14310,11 @@ fn fs_temp_dir_and_temp_file_accept_a_base_dir() {
     // or on a different filesystem than the destination, which turns the
     // atomic rename a temp file exists for into a copy.
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 12;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 12;
     let base = std::env::temp_dir().join(format!("que_tbase_{}", ts));
     let base_str = base.to_string_lossy().to_string();
     let source = format!(
@@ -13368,7 +14338,11 @@ fn temp_names_are_not_predictable() {
     // A nanosecond timestamp in a world-writable directory is a name an
     // attacker can create first, as a symlink pointing wherever they like.
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 13;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 13;
     let base = std::env::temp_dir().join(format!("que_tuniq_{}", ts));
     let base_str = base.to_string_lossy().to_string();
     let source = format!(
@@ -13469,19 +14443,26 @@ println(`echo`.flag("--flag-that-doesnt-exist-just-testing").arg("text").out())
 #[test]
 fn fs_copy_dir_creates_missing_dest() {
     use std::fs;
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() + 1;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        + 1;
     let src = std::env::temp_dir().join(format!("que_cp2_src_{}", ts));
     let dst = std::env::temp_dir().join(format!("que_cp2_dst_{}", ts));
     fs::create_dir_all(&src).unwrap();
     fs::write(src.join("file.txt"), "hello").unwrap();
     let src_s = src.to_string_lossy();
     let dst_s = dst.to_string_lossy();
-    let source = format!(r#"
+    let source = format!(
+        r#"
 import std.fs
 let r = fs.copy_dir("{}", "{}")
 println(r.is_ok())
 println(fs.exists("{}/file.txt"))
-"#, src_s, dst_s, dst_s);
+"#,
+        src_s, dst_s, dst_s
+    );
     assert_output(&source, &["true", "true"]);
     fs::remove_dir_all(&src).unwrap();
     fs::remove_dir_all(&dst).unwrap();
@@ -13564,7 +14545,10 @@ fn glob_literal_basic() {
 
 #[test]
 fn glob_literal_recursive() {
-    assert_result(r#"g"/var/log/**/*.log""#, Value::Glob("/var/log/**/*.log".into()));
+    assert_result(
+        r#"g"/var/log/**/*.log""#,
+        Value::Glob("/var/log/**/*.log".into()),
+    );
 }
 
 #[test]
@@ -13622,19 +14606,13 @@ fn path_div_chain() {
 #[test]
 fn path_div_absolute_path_right_wins() {
     // Absolute Path on right side replaces left
-    assert_result(
-        r#"p"/a/b" / p"/etc""#,
-        Value::Path("/etc".into()),
-    );
+    assert_result(r#"p"/a/b" / p"/etc""#, Value::Path("/etc".into()));
 }
 
 #[test]
 fn path_div_string_never_absolute() {
     // String on the right is NEVER absolute — leading slash is stripped
-    assert_result(
-        r#"p"/a/b" / "/etc""#,
-        Value::Path("/a/b/etc".into()),
-    );
+    assert_result(r#"p"/a/b" / "/etc""#, Value::Path("/a/b/etc".into()));
 }
 
 #[test]
@@ -13727,7 +14705,10 @@ fn path_method_root_relative() {
 
 #[test]
 fn path_method_to_string() {
-    assert_result(r#"p"/usr/local/bin".to_string()"#, Value::String("/usr/local/bin".into()));
+    assert_result(
+        r#"p"/usr/local/bin".to_string()"#,
+        Value::String("/usr/local/bin".into()),
+    );
 }
 
 #[test]
@@ -13786,10 +14767,7 @@ fn path_method_parent_normal() {
 #[test]
 fn path_method_is_link_nonexistent() {
     // Non-existent path is not a symlink
-    assert_result(
-        r#"p"/this/does/not/exist".is_link()"#,
-        Value::Bool(false),
-    );
+    assert_result(r#"p"/this/does/not/exist".is_link()"#, Value::Bool(false));
 }
 
 #[test]
@@ -13805,10 +14783,7 @@ fn path_arg_accepts_path_and_string_alike() {
         r#"path("~/src").relative_to(p"~") == path("~/src").relative_to("~")"#,
         Value::Bool(true),
     );
-    assert_result(
-        r#"p"/a".join(p"b") == p"/a".join("b")"#,
-        Value::Bool(true),
-    );
+    assert_result(r#"p"/a".join(p"b") == p"/a".join("b")"#, Value::Bool(true));
 }
 
 #[test]
@@ -13993,9 +14968,14 @@ let b = g.test("app.ts")
 let c = g.test("app.py")
 (a, b, c)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::Bool(true), Value::Bool(true), Value::Bool(false),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::Bool(true),
+            Value::Bool(true),
+            Value::Bool(false),
+        ]),
+    );
 }
 
 #[test]
@@ -14008,9 +14988,14 @@ let b = g.test("lib/util.rs")
 let c = g.test("tests/foo.rs")
 (a, b, c)
 "#;
-    assert_result(source, Value::Tuple(vec![
-        Value::Bool(true), Value::Bool(true), Value::Bool(false),
-    ]));
+    assert_result(
+        source,
+        Value::Tuple(vec![
+            Value::Bool(true),
+            Value::Bool(true),
+            Value::Bool(false),
+        ]),
+    );
 }
 
 #[test]
@@ -14029,114 +15014,142 @@ g.test(home + "/readme.txt")
 
 #[test]
 fn enum_unit_variant_value() {
-    assert_result(r#"
+    assert_result(
+        r#"
 enum Direction { North, South, East, West }
 Direction.North
-"#, Value::Enum {
-        enum_name: "Direction".into(),
-        variant: "North".into(),
-        fields: std::collections::BTreeMap::new(),
-    });
+"#,
+        Value::Enum {
+            enum_name: "Direction".into(),
+            variant: "North".into(),
+            fields: std::collections::BTreeMap::new(),
+        },
+    );
 }
 
 #[test]
 fn enum_unit_variant_bound_directly() {
-    assert_result(r#"
+    assert_result(
+        r#"
 enum Direction { North, South, East, West }
 North
-"#, Value::Enum {
-        enum_name: "Direction".into(),
-        variant: "North".into(),
-        fields: std::collections::BTreeMap::new(),
-    });
+"#,
+        Value::Enum {
+            enum_name: "Direction".into(),
+            variant: "North".into(),
+            fields: std::collections::BTreeMap::new(),
+        },
+    );
 }
 
 #[test]
 fn enum_data_variant_named_args() {
     let mut fields = std::collections::BTreeMap::new();
     fields.insert("radius".into(), Value::Float(5.0));
-    assert_result(r#"
+    assert_result(
+        r#"
 enum Shape { Circle { radius: Float }, Rect { width: Float, height: Float } }
 Shape.Circle(radius: 5.0)
-"#, Value::Enum {
-        enum_name: "Shape".into(),
-        variant: "Circle".into(),
-        fields,
-    });
+"#,
+        Value::Enum {
+            enum_name: "Shape".into(),
+            variant: "Circle".into(),
+            fields,
+        },
+    );
 }
 
 #[test]
 fn enum_data_variant_positional_args() {
     let mut fields = std::collections::BTreeMap::new();
     fields.insert("radius".into(), Value::Float(3.0));
-    assert_result(r#"
+    assert_result(
+        r#"
 enum Shape { Circle { radius: Float }, Rect { width: Float, height: Float } }
 Shape.Circle(3.0)
-"#, Value::Enum {
-        enum_name: "Shape".into(),
-        variant: "Circle".into(),
-        fields,
-    });
+"#,
+        Value::Enum {
+            enum_name: "Shape".into(),
+            variant: "Circle".into(),
+            fields,
+        },
+    );
 }
 
 #[test]
 fn enum_data_variant_brace_construction() {
     let mut fields = std::collections::BTreeMap::new();
     fields.insert("radius".into(), Value::Float(5.0));
-    assert_result(r#"
+    assert_result(
+        r#"
 enum Shape { Circle { radius: Float }, Rect { width: Float, height: Float } }
 Shape.Circle { radius: 5.0 }
-"#, Value::Enum {
-        enum_name: "Shape".into(),
-        variant: "Circle".into(),
-        fields,
-    });
+"#,
+        Value::Enum {
+            enum_name: "Shape".into(),
+            variant: "Circle".into(),
+            fields,
+        },
+    );
 }
 
 #[test]
 fn enum_brace_and_paren_construction_are_equal() {
-    assert_output(r#"
+    assert_output(
+        r#"
 enum Shape { Rect { width: Float, height: Float } }
 let a = Shape.Rect { width: 2.0, height: 3.0 }
 let b = Shape.Rect(width: 2.0, height: 3.0)
 println(a == b)
-"#, &["true"]);
+"#,
+        &["true"],
+    );
 }
 
 #[test]
 fn enum_paren_declaration_form() {
-    assert_output(r#"
+    assert_output(
+        r#"
 enum State { Idle, Failed(code: Int, msg: String) }
 let f = State.Failed { code: 2, msg: "boom" }
 println(f.code, f.msg)
-"#, &["2 boom"]);
+"#,
+        &["2 boom"],
+    );
 }
 
 #[test]
 fn enum_brace_literal_does_not_shadow_block() {
     // `State.Idle { ... }` must still parse as a unit variant followed by a block.
-    assert_output(r#"
+    assert_output(
+        r#"
 enum State { Idle, Running { pid: Int } }
 let s = State.Idle
 if s == State.Idle { println("block") }
-"#, &["block"]);
+"#,
+        &["block"],
+    );
 }
 
 #[test]
 fn enum_brace_literal_multiline() {
-    assert_output(r#"
+    assert_output(
+        r#"
 enum Service { Http { host: String, port: Int } }
 let s = Service.Http {
     host: "localhost",
     port: 8080,
 }
 println(s.host, s.port)
-"#, &["localhost 8080"]);
+"#,
+        &["localhost 8080"],
+    );
 }
 
 #[test]
 fn enum_match_unit_variant() {
-    assert_output(r#"
+    assert_output(
+        r#"
 enum Direction { North, South, East, West }
 let d = Direction.North
 match d {
@@ -14144,12 +15157,15 @@ match d {
     South {} => println("south")
     _ => println("other")
 }
-"#, &["north"]);
+"#,
+        &["north"],
+    );
 }
 
 #[test]
 fn enum_match_data_variant_named_fields() {
-    assert_output(r#"
+    assert_output(
+        r#"
 enum Shape { Circle { radius: Float }, Rect { width: Float, height: Float }, Point }
 let s = Shape.Circle(radius: 2.5)
 match s {
@@ -14157,12 +15173,15 @@ match s {
     Rect { width, height } => println("rect")
     Point {} => println("point")
 }
-"#, &["circle r=2.5"]);
+"#,
+        &["circle r=2.5"],
+    );
 }
 
 #[test]
 fn enum_match_multiple_variants() {
-    assert_output(r#"
+    assert_output(
+        r#"
 enum Msg { Quit, Move { x: Int, y: Int }, Write { text: String } }
 let msgs = [Msg.Quit, Msg.Move(x: 10, y: 20), Msg.Write(text: "hello")]
 for msg in msgs {
@@ -14172,30 +15191,39 @@ for msg in msgs {
         Write { text } => println("write ${text}")
     }
 }
-"#, &["quit", "move 10 20", "write hello"]);
+"#,
+        &["quit", "move 10 20", "write hello"],
+    );
 }
 
 #[test]
 fn enum_method_variant() {
-    assert_result(r#"
+    assert_result(
+        r#"
 enum Color { Red, Green, Blue }
 let c = Color.Green
 c.variant()
-"#, Value::String("Green".into()));
+"#,
+        Value::String("Green".into()),
+    );
 }
 
 #[test]
 fn enum_method_is_variant() {
-    assert_result(r#"
+    assert_result(
+        r#"
 enum Color { Red, Green, Blue }
 let c = Color.Blue
 c.is_variant("Blue")
-"#, Value::Bool(true));
+"#,
+        Value::Bool(true),
+    );
 }
 
 #[test]
 fn enum_impl_method() {
-    assert_output(r#"
+    assert_output(
+        r#"
 enum Shape { Circle { radius: Float }, Rect { width: Float, height: Float } }
 impl Shape {
     fn area(self) {
@@ -14207,18 +15235,23 @@ impl Shape {
 }
 let c = Shape.Circle(radius: 2.0)
 println(c.area())
-"#, &["12.56636"]);
+"#,
+        &["12.56636"],
+    );
 }
 
 #[test]
 fn enum_display() {
-    assert_output(r#"
+    assert_output(
+        r#"
 enum Status { Active, Inactive { reason: String } }
 let a = Status.Active
 let i = Status.Inactive(reason: "maintenance")
 println(a)
 println(i)
-"#, &["Status.Active", "Status.Inactive {reason: maintenance}"]);
+"#,
+        &["Status.Active", "Status.Inactive {reason: maintenance}"],
+    );
 }
 
 // ── std.container ────────────────────────────────────────────────────
@@ -14315,11 +15348,7 @@ container.run({ image: "postgres:16", env: { "POSTGRES_PASSWORD": pw } })"#,
 #[test]
 fn container_run_can_stay_in_the_foreground() {
     let out = container_dry(r#"container.run({ image: "alpine", detach: false, remove: false })"#);
-    assert!(
-        !out.iter().any(|l| l.contains(" run -d")),
-        "{:?}",
-        out
-    );
+    assert!(!out.iter().any(|l| l.contains(" run -d")), "{:?}", out);
     assert!(!out.iter().any(|l| l.contains("--rm")), "{:?}", out);
 }
 
@@ -14363,9 +15392,7 @@ fn container_exec_takes_a_list_as_an_argv() {
 
 #[test]
 fn container_login_never_puts_the_password_on_the_command_line() {
-    let out = container_dry(
-        r#"container.login("ghcr.io", "me", secret("tok-not-for-ps"))"#,
-    );
+    let out = container_dry(r#"container.login("ghcr.io", "me", secret("tok-not-for-ps"))"#);
     assert_dry_contains(&out, "--password-stdin");
     assert!(
         !out.iter().any(|l| l.contains("tok-not-for-ps")),
@@ -14376,9 +15403,8 @@ fn container_login_never_puts_the_password_on_the_command_line() {
 
 #[test]
 fn container_volume_paths_with_spaces_are_escaped() {
-    let out = container_dry(
-        r#"container.run({ image: "alpine", volumes: { "/my dir": "/data" } })"#,
-    );
+    let out =
+        container_dry(r#"container.run({ image: "alpine", volumes: { "/my dir": "/data" } })"#);
     assert_dry_contains(&out, "'/my dir:/data'");
 }
 
@@ -14439,13 +15465,11 @@ fn ssh_cmd_builds_a_safe_default_invocation() {
 #[test]
 fn ssh_cmd_is_a_real_cmd_and_composes_with_modifiers() {
     // The whole reason ssh.cmd returns a Cmd: everything else already works.
-    let (output, _) = run(
-        r#"
+    let (output, _) = run(r#"
 import std.ssh
 let c = ssh.cmd("web-1", "uptime").timeout(5s).silent()
 println(c.to_string().starts_with("ssh "))
-"#,
-    )
+"#)
     .unwrap();
     assert_eq!(output, vec!["true"]);
 }
@@ -14486,9 +15510,8 @@ fn ssh_can_opt_into_interactive_and_agent_forwarding() {
 fn ssh_disabling_host_key_checking_also_detaches_known_hosts() {
     // Otherwise the real known_hosts is poisoned with an unverified key that
     // every later connection silently trusts.
-    let s = ssh_render(
-        r#"ssh.cmd("web-1", "id", { strict_host_key_checking: false }).to_string()"#,
-    );
+    let s =
+        ssh_render(r#"ssh.cmd("web-1", "id", { strict_host_key_checking: false }).to_string()"#);
     assert!(s.contains("StrictHostKeyChecking=no"), "{}", s);
     assert!(s.contains("UserKnownHostsFile=/dev/null"), "{}", s);
 }
@@ -14513,12 +15536,10 @@ fn ssh_jump_host_becomes_proxy_jump() {
 
 #[test]
 fn ssh_upload_reports_a_missing_local_file_before_connecting() {
-    let (output, _) = run(
-        r#"
+    let (output, _) = run(r#"
 import std.ssh
 println(ssh.upload(p"/nonexistent/que/file", "web-1", p"/tmp/x").is_err())
-"#,
-    )
+"#)
     .unwrap();
     assert_eq!(output, vec!["true"]);
 }
@@ -14614,7 +15635,7 @@ fn sudo_is_a_no_op_when_already_root() {
     // `sudo` is.
     let (output, _) = run(r#"println(env.is_root())
 println(`whoami`.sudo().to_string())"#)
-        .unwrap();
+    .unwrap();
     if output[0] == "true" {
         assert_eq!(output[1], "whoami");
     } else {
@@ -14846,8 +15867,6 @@ println("done")
     std::fs::remove_dir_all(&proj).ok();
 }
 
-
-
 // ── Permissions ──────────────────────────────────────────────────────
 
 /// Run a source string under a capability policy built from `--allow`/`--deny`
@@ -14913,11 +15932,7 @@ fn a_scoped_exec_grant_matches_the_rendered_command() {
 fn every_stage_of_a_pipeline_is_checked() {
     // The first stage is allowed, the second is not; the pipeline must still
     // be refused rather than partially executed.
-    assert_denied(
-        &["exec=echo hi"],
-        "(`echo hi` | `grep hi`).run()",
-        "exec",
-    );
+    assert_denied(&["exec=echo hi"], "(`echo hi` | `grep hi`).run()", "exec");
 }
 
 #[test]
@@ -15106,7 +16121,10 @@ fn opening_a_file_for_reading_needs_only_the_read_capability() {
     std::fs::write(&target, "hello\n").unwrap();
     let out = run_with_policy(
         &[&format!("read={}", dir)],
-        &format!("let f = open(\"{}\")?\nprintln(f.read().unwrap().trim())", target),
+        &format!(
+            "let f = open(\"{}\")?\nprintln(f.read().unwrap().trim())",
+            target
+        ),
     )
     .unwrap();
     assert_eq!(out, vec!["hello".to_string()]);
@@ -15144,7 +16162,10 @@ fn streaming_a_path_reads_but_streaming_a_string_does_not() {
     std::fs::write(&target, "a\nb\n").unwrap();
     assert_denied(
         &["!read"],
-        &format!("import std.stream\nstream.file(p\"{}\").count_lines()", target),
+        &format!(
+            "import std.stream\nstream.file(p\"{}\").count_lines()",
+            target
+        ),
         "read",
     );
     // An in-memory pipeline touches nothing, and it now says so in its name.
@@ -15197,7 +16218,10 @@ fn a_temporary_directory_is_scoped_to_where_it_will_be_created() {
     let base = scratch("tempbase");
     let out = run_with_policy(
         &[&format!("write={}", base)],
-        &format!("with TempDir {{ dir: p\"{}\" }} as t {{ println(t != \"\") }}", base),
+        &format!(
+            "with TempDir {{ dir: p\"{}\" }} as t {{ println(t != \"\") }}",
+            base
+        ),
     )
     .unwrap();
     assert_eq!(out, vec!["true".to_string()]);
@@ -15340,7 +16364,10 @@ fn string_reverse_chars_and_secret_len_agree_on_characters() {
 
 #[test]
 fn list_slice_with_inverted_range_is_empty() {
-    assert_output("println([1, 2, 3].slice(2, 1))\nprintln([1, 2, 3].slice(1))", &["[]", "[2, 3]"]);
+    assert_output(
+        "println([1, 2, 3].slice(2, 1))\nprintln([1, 2, 3].slice(1))",
+        &["[]", "[2, 3]"],
+    );
 }
 
 #[test]

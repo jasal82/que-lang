@@ -163,16 +163,10 @@ impl QueError {
 impl fmt::Display for QueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (&self.span, &self.file) {
-            (Some(span), Some(file)) => write!(
-                f,
-                "{}:{}:{}: {}",
-                file, span.line, span.col, self.message
-            )?,
-            (Some(span), None) => write!(
-                f,
-                "line {}:{}: {}",
-                span.line, span.col, self.message
-            )?,
+            (Some(span), Some(file)) => {
+                write!(f, "{}:{}:{}: {}", file, span.line, span.col, self.message)?
+            }
+            (Some(span), None) => write!(f, "line {}:{}: {}", span.line, span.col, self.message)?,
             (None, _) => write!(f, "{}", self.message)?,
         }
         if !self.backtrace.is_empty() && std::env::var("QUE_BACKTRACE").is_ok() {
@@ -180,11 +174,13 @@ impl fmt::Display for QueError {
             for frame in self.backtrace.iter().rev() {
                 match (&frame.call_span, &frame.call_file) {
                     (Some(span), Some(file)) => write!(
-                        f, "\n  in {} (called from {}:{}:{})",
+                        f,
+                        "\n  in {} (called from {}:{}:{})",
                         frame.name, file, span.line, span.col
                     )?,
                     (Some(span), None) => write!(
-                        f, "\n  in {} (called from line {}:{})",
+                        f,
+                        "\n  in {} (called from line {}:{})",
                         frame.name, span.line, span.col
                     )?,
                     _ => write!(f, "\n  in {}", frame.name)?,

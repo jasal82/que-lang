@@ -1,3 +1,4 @@
+use crate::ast::AstStringPart;
 /// Source code formatter for the Que language.
 ///
 /// Parses source → AST → re-emits with consistent style:
@@ -13,9 +14,7 @@
 /// back where it was written in every ordinary case. A comment buried inside
 /// a multi-line expression (say, between the arms of a `match`) moves to the
 /// nearest following boundary — it is never dropped, but it may shift.
-
 use crate::ast::*;
-use crate::ast::AstStringPart;
 use crate::lexer::Comment;
 
 pub struct Formatter {
@@ -67,7 +66,6 @@ impl Formatter {
         }
 
         for (span, item) in &module.items {
-
             let is_decl = matches!(
                 item,
                 Item::FnDecl(_)
@@ -122,7 +120,11 @@ impl Formatter {
             Item::ImplDecl(i) => self.format_impl_decl(i),
             Item::TraitDecl(t) => self.format_trait_decl(t),
             Item::TraitImplDecl(t) => self.format_trait_impl_decl(t),
-            Item::PubLet { pattern, type_ann, value } => {
+            Item::PubLet {
+                pattern,
+                type_ann,
+                value,
+            } => {
                 self.format_pub_let(pattern, type_ann, value);
             }
         }
@@ -806,9 +808,13 @@ impl Formatter {
                 args,
             } => {
                 let parens = needs_parens_for_postfix(object);
-                if parens { self.push_str("("); }
+                if parens {
+                    self.push_str("(");
+                }
                 self.format_expr(object);
-                if parens { self.push_str(")"); }
+                if parens {
+                    self.push_str(")");
+                }
                 self.push_str(".");
                 self.push_str(method);
                 self.push_str("(");
@@ -817,17 +823,29 @@ impl Formatter {
             }
             Expr::FieldAccess { object, field } => {
                 let parens = needs_parens_for_postfix(object);
-                if parens { self.push_str("("); }
+                if parens {
+                    self.push_str("(");
+                }
                 self.format_expr(object);
-                if parens { self.push_str(")"); }
+                if parens {
+                    self.push_str(")");
+                }
                 self.push_str(".");
                 self.push_str(field);
             }
-            Expr::OptionalAccess { object, field, args } => {
+            Expr::OptionalAccess {
+                object,
+                field,
+                args,
+            } => {
                 let parens = needs_parens_for_postfix(object);
-                if parens { self.push_str("("); }
+                if parens {
+                    self.push_str("(");
+                }
                 self.format_expr(object);
-                if parens { self.push_str(")"); }
+                if parens {
+                    self.push_str(")");
+                }
                 self.push_str("?.");
                 self.push_str(field);
                 if let Some(args) = args {
@@ -838,9 +856,13 @@ impl Formatter {
             }
             Expr::Index { object, index } => {
                 let parens = needs_parens_for_postfix(object);
-                if parens { self.push_str("("); }
+                if parens {
+                    self.push_str("(");
+                }
                 self.format_expr(object);
-                if parens { self.push_str(")"); }
+                if parens {
+                    self.push_str(")");
+                }
                 self.push_str("[");
                 self.format_expr(index);
                 self.push_str("]");

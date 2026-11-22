@@ -4,7 +4,9 @@ use super::helpers::*;
 use super::Interpreter;
 use crate::error::*;
 use crate::token::DurationUnit;
-use crate::value::{CmdModifiers, CmdPart, FileHandleInner, Stream, StreamOp, StreamSink, StreamSource, Value};
+use crate::value::{
+    CmdModifiers, CmdPart, FileHandleInner, Stream, StreamOp, StreamSink, StreamSource, Value,
+};
 use std::sync::{Arc, Mutex};
 
 use std::collections::BTreeMap;
@@ -13,12 +15,7 @@ use std::io::{BufRead, Write};
 impl Interpreter {
     // ── Method calls ─────────────────────────────────────────────────
 
-    pub(crate) fn call_method(
-        &mut self,
-        obj: &Value,
-        method: &str,
-        args: Vec<Value>,
-    ) -> IResult {
+    pub(crate) fn call_method(&mut self, obj: &Value, method: &str, args: Vec<Value>) -> IResult {
         // ── Universal methods available on all types ──
         if method == "inspect" {
             return Ok(Value::Map(obj.inspect_map()));
@@ -37,10 +34,12 @@ impl Interpreter {
         if method == "is_type" {
             let type_name = match args.first() {
                 Some(Value::String(s)) => s.clone(),
-                _ => return Err(Signal::Error(QueError::new(
-                    ErrorKind::TypeMismatch,
-                    "is_type() requires a string argument",
-                ))),
+                _ => {
+                    return Err(Signal::Error(QueError::new(
+                        ErrorKind::TypeMismatch,
+                        "is_type() requires a string argument",
+                    )))
+                }
             };
             // Only the capitalised spelling. `type_name()` reports "Int", the
             // annotation syntax writes `Int`, so `is_type("int")` was a third
@@ -125,9 +124,7 @@ impl Interpreter {
                 "is_ok" => Ok(Value::Bool(false)),
                 "is_err" => Ok(Value::Bool(true)),
                 "map" => Ok(Value::Err(inner.clone())),
-                "unwrap_or" => {
-                    Ok(args.first().cloned().unwrap_or(Value::Null))
-                }
+                "unwrap_or" => Ok(args.first().cloned().unwrap_or(Value::Null)),
                 "and_then" => Ok(Value::Err(inner.clone())),
                 "map_err" => {
                     if let Some(func) = args.first() {
@@ -178,9 +175,7 @@ impl Interpreter {
             // ── Cmd methods ──
             Value::Cmd(parts, mods) => self.cmd_method(parts, &mods, method, &args),
             // ── Task methods ──
-            Value::Task(t) => {
-                self.task_method(&t, method, args)
-            }
+            Value::Task(t) => self.task_method(&t, method, args),
             // ── ProcessHandle methods ──
             Value::ProcessHandle(handle) => {
                 let handle = handle.clone();
@@ -188,7 +183,10 @@ impl Interpreter {
                     "pid" => Ok(Value::Int(handle.pid as i64)),
                     "is_alive" => {
                         let mut child = handle.child.lock().map_err(|_| {
-                            Signal::Error(QueError::new(ErrorKind::Runtime, "process handle lock poisoned"))
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "process handle lock poisoned",
+                            ))
                         })?;
                         // Try_wait returns None if process is still running
                         match child.try_wait() {
@@ -199,29 +197,47 @@ impl Interpreter {
                     }
                     "wait" => {
                         let mut child = handle.child.lock().map_err(|_| {
-                            Signal::Error(QueError::new(ErrorKind::Runtime, "process handle lock poisoned"))
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "process handle lock poisoned",
+                            ))
                         })?;
                         let status = child.wait().map_err(|e| {
-                            Signal::Error(QueError::new(ErrorKind::Runtime, format!("wait failed: {}", e)))
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                format!("wait failed: {}", e),
+                            ))
                         })?;
                         Ok(Value::Int(status.code().unwrap_or(-1) as i64))
                     }
                     "kill" => {
                         let mut child = handle.child.lock().map_err(|_| {
-                            Signal::Error(QueError::new(ErrorKind::Runtime, "process handle lock poisoned"))
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "process handle lock poisoned",
+                            ))
                         })?;
                         child.kill().map_err(|e| {
-                            Signal::Error(QueError::new(ErrorKind::Runtime, format!("kill failed: {}", e)))
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                format!("kill failed: {}", e),
+                            ))
                         })?;
                         Ok(Value::Null)
                     }
                     "kill_force" => {
                         // On Unix, kill_force sends SIGKILL; on other platforms same as kill
                         let mut child = handle.child.lock().map_err(|_| {
-                            Signal::Error(QueError::new(ErrorKind::Runtime, "process handle lock poisoned"))
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "process handle lock poisoned",
+                            ))
                         })?;
                         child.kill().map_err(|e| {
-                            Signal::Error(QueError::new(ErrorKind::Runtime, format!("kill_force failed: {}", e)))
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                format!("kill_force failed: {}", e),
+                            ))
                         })?;
                         Ok(Value::Null)
                     }
@@ -236,21 +252,30 @@ impl Interpreter {
                 let fh = fh.clone();
                 match method {
                     "path" => {
-                        let inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         Ok(Value::Path(inner.path.clone()))
                     }
                     "is_open" => {
-                        let inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         Ok(Value::Bool(inner.open))
                     }
                     "close" => {
-                        let mut inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let mut inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         if inner.open {
                             if let Some(mut w) = inner.writer.take() {
                                 let _ = w.flush();
@@ -261,11 +286,16 @@ impl Interpreter {
                         Ok(Value::Null)
                     }
                     "flush" => {
-                        let mut inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let mut inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         if !inner.open {
-                            return Ok(Value::Err(Box::new(Value::String("file is closed".into()))));
+                            return Ok(Value::Err(Box::new(Value::String(
+                                "file is closed".into(),
+                            ))));
                         }
                         if inner.discard {
                             return Ok(Value::Null);
@@ -273,36 +303,56 @@ impl Interpreter {
                         match inner.writer.as_mut() {
                             Some(w) => match w.flush() {
                                 Ok(_) => Ok(Value::Null),
-                                Err(e) => Ok(Value::Err(Box::new(Value::String(format!("flush failed: {}", e))))),
+                                Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                    "flush failed: {}",
+                                    e
+                                ))))),
                             },
-                            None => Ok(Value::Err(Box::new(Value::String("file not open for writing".into())))),
+                            None => Ok(Value::Err(Box::new(Value::String(
+                                "file not open for writing".into(),
+                            )))),
                         }
                     }
                     "read" => {
                         use std::io::Read;
-                        let mut inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let mut inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         if !inner.open {
-                            return Ok(Value::Err(Box::new(Value::String("file is closed".into()))));
+                            return Ok(Value::Err(Box::new(Value::String(
+                                "file is closed".into(),
+                            ))));
                         }
                         match inner.reader.as_mut() {
                             Some(r) => {
                                 let mut buf = String::new();
                                 match r.read_to_string(&mut buf) {
                                     Ok(_) => Ok(Value::Ok(Box::new(Value::String(buf)))),
-                                    Err(e) => Ok(Value::Err(Box::new(Value::String(format!("read failed: {}", e))))),
+                                    Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                        "read failed: {}",
+                                        e
+                                    ))))),
                                 }
                             }
-                            None => Ok(Value::Err(Box::new(Value::String("file not open for reading".into())))),
+                            None => Ok(Value::Err(Box::new(Value::String(
+                                "file not open for reading".into(),
+                            )))),
                         }
                     }
                     "read_line" => {
-                        let mut inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let mut inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         if !inner.open {
-                            return Ok(Value::Err(Box::new(Value::String("file is closed".into()))));
+                            return Ok(Value::Err(Box::new(Value::String(
+                                "file is closed".into(),
+                            ))));
                         }
                         match inner.reader.as_mut() {
                             Some(r) => {
@@ -310,21 +360,34 @@ impl Interpreter {
                                 match r.read_line(&mut line) {
                                     Ok(0) => Ok(Value::Null), // EOF
                                     Ok(_) => {
-                                        let stripped = line.trim_end_matches('\n').trim_end_matches('\r').to_string();
+                                        let stripped = line
+                                            .trim_end_matches('\n')
+                                            .trim_end_matches('\r')
+                                            .to_string();
                                         Ok(Value::String(stripped))
                                     }
-                                    Err(e) => Ok(Value::Err(Box::new(Value::String(format!("read_line failed: {}", e))))),
+                                    Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                        "read_line failed: {}",
+                                        e
+                                    ))))),
                                 }
                             }
-                            None => Ok(Value::Err(Box::new(Value::String("file not open for reading".into())))),
+                            None => Ok(Value::Err(Box::new(Value::String(
+                                "file not open for reading".into(),
+                            )))),
                         }
                     }
                     "lines" => {
-                        let mut inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let mut inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         if !inner.open {
-                            return Ok(Value::Err(Box::new(Value::String("file is closed".into()))));
+                            return Ok(Value::Err(Box::new(Value::String(
+                                "file is closed".into(),
+                            ))));
                         }
                         match inner.reader.as_mut() {
                             Some(r) => {
@@ -335,46 +398,64 @@ impl Interpreter {
                                     match r.read_line(&mut line) {
                                         Ok(0) => break,
                                         Ok(_) => {
-                                            let stripped = line.trim_end_matches('\n').trim_end_matches('\r').to_string();
+                                            let stripped = line
+                                                .trim_end_matches('\n')
+                                                .trim_end_matches('\r')
+                                                .to_string();
                                             result.push(Value::String(stripped));
                                         }
-                                        Err(e) => return Ok(Value::Err(Box::new(Value::String(format!("lines failed: {}", e))))),
+                                        Err(e) => {
+                                            return Ok(Value::Err(Box::new(Value::String(
+                                                format!("lines failed: {}", e),
+                                            ))))
+                                        }
                                     }
                                 }
                                 Ok(Value::List(result))
                             }
-                            None => Ok(Value::Err(Box::new(Value::String("file not open for reading".into())))),
+                            None => Ok(Value::Err(Box::new(Value::String(
+                                "file not open for reading".into(),
+                            )))),
                         }
                     }
                     "write" => {
                         let data = match args.first() {
                             Some(v) => v.display_string(),
-                            None => return Err(Signal::Error(QueError::new(
-                                ErrorKind::ArityMismatch, "write() requires a string argument",
-                            ))),
+                            None => {
+                                return Err(Signal::Error(QueError::new(
+                                    ErrorKind::ArityMismatch,
+                                    "write() requires a string argument",
+                                )))
+                            }
                         };
-                        let mut inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let mut inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         if !inner.open {
-                            return Ok(Value::Err(Box::new(Value::String("file is closed".into()))));
+                            return Ok(Value::Err(Box::new(Value::String(
+                                "file is closed".into(),
+                            ))));
                         }
                         if inner.discard {
                             let path = inner.path.clone();
                             drop(inner);
-                            self.dry_run_skip(format!(
-                                "write {} ({} bytes)",
-                                path,
-                                data.len()
-                            ));
+                            self.dry_run_skip(format!("write {} ({} bytes)", path, data.len()));
                             return Ok(Value::Null);
                         }
                         match inner.writer.as_mut() {
                             Some(w) => match w.write_all(data.as_bytes()) {
                                 Ok(_) => Ok(Value::Null),
-                                Err(e) => Ok(Value::Err(Box::new(Value::String(format!("write failed: {}", e))))),
+                                Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                    "write failed: {}",
+                                    e
+                                ))))),
                             },
-                            None => Ok(Value::Err(Box::new(Value::String("file not open for writing".into())))),
+                            None => Ok(Value::Err(Box::new(Value::String(
+                                "file not open for writing".into(),
+                            )))),
                         }
                     }
                     "writeln" => {
@@ -382,21 +463,22 @@ impl Interpreter {
                             Some(v) => v.display_string(),
                             None => String::new(),
                         };
-                        let mut inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let mut inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         if !inner.open {
-                            return Ok(Value::Err(Box::new(Value::String("file is closed".into()))));
+                            return Ok(Value::Err(Box::new(Value::String(
+                                "file is closed".into(),
+                            ))));
                         }
                         if inner.discard {
                             let path = inner.path.clone();
                             drop(inner);
                             // The newline is counted because it is written.
-                            self.dry_run_skip(format!(
-                                "write {} ({} bytes)",
-                                path,
-                                data.len() + 1
-                            ));
+                            self.dry_run_skip(format!("write {} ({} bytes)", path, data.len() + 1));
                             return Ok(Value::Null);
                         }
                         match inner.writer.as_mut() {
@@ -404,27 +486,38 @@ impl Interpreter {
                                 let line = format!("{}\n", data);
                                 match w.write_all(line.as_bytes()) {
                                     Ok(_) => Ok(Value::Null),
-                                    Err(e) => Ok(Value::Err(Box::new(Value::String(format!("writeln failed: {}", e))))),
+                                    Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                        "writeln failed: {}",
+                                        e
+                                    ))))),
                                 }
                             }
-                            None => Ok(Value::Err(Box::new(Value::String("file not open for writing".into())))),
+                            None => Ok(Value::Err(Box::new(Value::String(
+                                "file not open for writing".into(),
+                            )))),
                         }
                     }
                     "seek" => {
                         use std::io::Seek;
                         let offset = match args.first() {
                             Some(Value::Int(n)) => *n,
-                            Some(_) => return Err(Signal::Error(QueError::new(
-                                ErrorKind::TypeMismatch, "seek() offset must be an integer",
-                            ))),
+                            Some(_) => {
+                                return Err(Signal::Error(QueError::new(
+                                    ErrorKind::TypeMismatch,
+                                    "seek() offset must be an integer",
+                                )))
+                            }
                             None => 0,
                         };
                         let origin = match args.get(1) {
                             Some(Value::String(s)) => s.as_str(),
                             None => "start",
-                            _ => return Err(Signal::Error(QueError::new(
-                                ErrorKind::TypeMismatch, "seek() origin must be a string",
-                            ))),
+                            _ => {
+                                return Err(Signal::Error(QueError::new(
+                                    ErrorKind::TypeMismatch,
+                                    "seek() origin must be a string",
+                                )))
+                            }
                         };
                         let seek_from = match origin {
                             "start" => std::io::SeekFrom::Start(offset as u64),
@@ -435,22 +528,32 @@ impl Interpreter {
                                 format!("seek() origin must be \"start\", \"current\", or \"end\", got \"{}\"", origin),
                             ))),
                         };
-                        let mut inner = fh.inner.lock().map_err(|_| Signal::Error(QueError::new(
-                            ErrorKind::Runtime, "FileHandle lock poisoned",
-                        )))?;
+                        let mut inner = fh.inner.lock().map_err(|_| {
+                            Signal::Error(QueError::new(
+                                ErrorKind::Runtime,
+                                "FileHandle lock poisoned",
+                            ))
+                        })?;
                         if !inner.open {
-                            return Ok(Value::Err(Box::new(Value::String("file is closed".into()))));
+                            return Ok(Value::Err(Box::new(Value::String(
+                                "file is closed".into(),
+                            ))));
                         }
                         let result = if let Some(r) = inner.reader.as_mut() {
                             r.seek(seek_from)
                         } else if let Some(w) = inner.writer.as_mut() {
                             w.seek(seek_from)
                         } else {
-                            return Ok(Value::Err(Box::new(Value::String("file has no reader or writer".into()))));
+                            return Ok(Value::Err(Box::new(Value::String(
+                                "file has no reader or writer".into(),
+                            ))));
                         };
                         match result {
                             Ok(pos) => Ok(Value::Int(pos as i64)),
-                            Err(e) => Ok(Value::Err(Box::new(Value::String(format!("seek failed: {}", e))))),
+                            Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                "seek failed: {}",
+                                e
+                            ))))),
                         }
                     }
                     _ => Err(Signal::Error(QueError::new(
@@ -462,19 +565,17 @@ impl Interpreter {
             // ── Tuple methods ──
             Value::Tuple(items) => self.tuple_method(items, method, &args),
             // ── BuiltinFn methods (e.g. path.home()) ──
-            Value::BuiltinFn(name) if name == "path" => {
-                match method {
-                    "home" => {
-                        let home = crate::interpreter::helpers::home_dir()
-                            .unwrap_or_else(|| ".".to_string());
-                        Ok(Value::Path(home))
-                    }
-                    _ => Err(Signal::Error(QueError::new(
-                        ErrorKind::Runtime,
-                        format!("path has no method '{}'", method),
-                    ))),
+            Value::BuiltinFn(name) if name == "path" => match method {
+                "home" => {
+                    let home =
+                        crate::interpreter::helpers::home_dir().unwrap_or_else(|| ".".to_string());
+                    Ok(Value::Path(home))
                 }
-            }
+                _ => Err(Signal::Error(QueError::new(
+                    ErrorKind::Runtime,
+                    format!("path has no method '{}'", method),
+                ))),
+            },
             // ── `env` namespace methods (env.get(), env.int(), env.is_ci(), ...) ──
             Value::BuiltinFn(name) if name == "env" => {
                 // The environment is where credentials live in CI, so it is
@@ -543,10 +644,12 @@ impl Interpreter {
                         //   with env.scope({ "DEBUG": "1" }) { ... }
                         let vars = match args.first() {
                             Some(Value::Map(m)) => m.clone(),
-                            _ => return Err(Signal::Error(QueError::new(
-                                ErrorKind::TypeMismatch,
-                                "env.scope() requires a map of variables",
-                            ))),
+                            _ => {
+                                return Err(Signal::Error(QueError::new(
+                                    ErrorKind::TypeMismatch,
+                                    "env.scope() requires a map of variables",
+                                )))
+                            }
                         };
                         let mut fields = BTreeMap::new();
                         fields.insert("vars".to_string(), Value::Map(vars));
@@ -559,7 +662,10 @@ impl Interpreter {
                         let key = args.first().map(|v| v.display_string()).unwrap_or_default();
                         match std::env::var(&key) {
                             Ok(v) => {
-                                let b = matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on");
+                                let b = matches!(
+                                    v.to_lowercase().as_str(),
+                                    "1" | "true" | "yes" | "on"
+                                );
                                 Ok(Value::Bool(b))
                             }
                             Err(_) => Ok(Value::Null),
@@ -572,9 +678,10 @@ impl Interpreter {
                                 if let Ok(n) = v.parse::<i64>() {
                                     Ok(Value::Int(n))
                                 } else {
-                                    Ok(Value::Err(Box::new(Value::String(
-                                        format!("cannot parse '{}' as int", v),
-                                    ))))
+                                    Ok(Value::Err(Box::new(Value::String(format!(
+                                        "cannot parse '{}' as int",
+                                        v
+                                    )))))
                                 }
                             }
                             Err(_) => Ok(Value::Null),
@@ -582,10 +689,14 @@ impl Interpreter {
                     }
                     "list" => {
                         let key = args.first().map(|v| v.display_string()).unwrap_or_default();
-                        let sep = args.get(1).map(|v| v.display_string()).unwrap_or_else(|| ",".to_string());
+                        let sep = args
+                            .get(1)
+                            .map(|v| v.display_string())
+                            .unwrap_or_else(|| ",".to_string());
                         match std::env::var(&key) {
                             Ok(v) => {
-                                let items: Vec<Value> = v.split(&sep)
+                                let items: Vec<Value> = v
+                                    .split(&sep)
                                     .map(|s| Value::String(s.trim().to_string()))
                                     .collect();
                                 Ok(Value::List(items))
@@ -622,9 +733,10 @@ impl Interpreter {
                                 }
                                 Ok(Value::Ok(Box::new(Value::Null)))
                             }
-                            Err(e) => Ok(Value::Err(Box::new(Value::String(
-                                format!("failed to load env file: {}", e),
-                            )))),
+                            Err(e) => Ok(Value::Err(Box::new(Value::String(format!(
+                                "failed to load env file: {}",
+                                e
+                            ))))),
                         }
                     }
                     "all" => {
@@ -638,15 +750,16 @@ impl Interpreter {
                     "require" => {
                         // require(["VAR1", "VAR2"]) or require("VAR1") — fail if any var is missing
                         let keys: Vec<String> = match args.first() {
-                            Some(Value::List(items)) => items
-                                .iter()
-                                .map(|v| v.display_string())
-                                .collect(),
+                            Some(Value::List(items)) => {
+                                items.iter().map(|v| v.display_string()).collect()
+                            }
                             Some(v) => vec![v.display_string()],
-                            None => return Err(Signal::Error(QueError::new(
-                                ErrorKind::ArityMismatch,
-                                "env.require() requires at least one variable name",
-                            ))),
+                            None => {
+                                return Err(Signal::Error(QueError::new(
+                                    ErrorKind::ArityMismatch,
+                                    "env.require() requires at least one variable name",
+                                )))
+                            }
                         };
                         let mut missing = Vec::new();
                         for key in &keys {
@@ -733,9 +846,7 @@ impl Interpreter {
                             ))))),
                         }
                     }
-                    "platform" => {
-                        Ok(Value::String(std::env::consts::OS.to_string()))
-                    }
+                    "platform" => Ok(Value::String(std::env::consts::OS.to_string())),
                     "is_root" => Ok(Value::Bool(running_as_root())),
                     "is_interactive" => {
                         // Check if stdout is a TTY using stable std::io::IsTerminal (Rust 1.70+)
@@ -783,19 +894,23 @@ impl Interpreter {
             // ── Stream methods ──
             Value::Stream(s) => self.stream_method(s.clone(), method, args),
             // ── DateTime instance methods ──
-            Value::Instance { ref type_name, ref fields } if type_name == "DateTime" => {
-                self.datetime_method(fields, method, &args)
-            }
+            Value::Instance {
+                ref type_name,
+                ref fields,
+            } if type_name == "DateTime" => self.datetime_method(fields, method, &args),
             // ── Logger instance methods ──
-            Value::Instance { ref type_name, ref fields } if type_name == "Logger" => {
+            Value::Instance {
+                ref type_name,
+                ref fields,
+            } if type_name == "Logger" => {
                 let context = match fields.get("context") {
                     Some(Value::Map(m)) => m.clone(),
                     _ => BTreeMap::new(),
                 };
                 match method {
                     "debug" => self.log_emit_to_sinks("DEBUG", 0, &context, &args),
-                    "info"  => self.log_emit_to_sinks("INFO",  1, &context, &args),
-                    "warn"  => self.log_emit_to_sinks("WARN",  2, &context, &args),
+                    "info" => self.log_emit_to_sinks("INFO", 1, &context, &args),
+                    "warn" => self.log_emit_to_sinks("WARN", 2, &context, &args),
                     "error" => self.log_emit_to_sinks("ERROR", 3, &context, &args),
                     "child" | "with" => {
                         let mut merged = context;
@@ -818,7 +933,11 @@ impl Interpreter {
                 }
             }
             // ── User-defined enum variant methods ──
-            Value::Enum { enum_name, variant, fields } => {
+            Value::Enum {
+                enum_name,
+                variant,
+                fields,
+            } => {
                 let enum_name = enum_name.clone();
                 let variant = variant.clone();
                 let fields = fields.clone();
@@ -828,10 +947,12 @@ impl Interpreter {
                     "is_variant" => {
                         let name = match args.first() {
                             Some(Value::String(s)) => s.clone(),
-                            _ => return Err(Signal::Error(QueError::new(
-                                ErrorKind::TypeMismatch,
-                                "is_variant() requires a string argument",
-                            ))),
+                            _ => {
+                                return Err(Signal::Error(QueError::new(
+                                    ErrorKind::TypeMismatch,
+                                    "is_variant() requires a string argument",
+                                )))
+                            }
                         };
                         Ok(Value::Bool(variant == name))
                     }
@@ -850,11 +971,7 @@ impl Interpreter {
             }
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
-                format!(
-                    "{} has no method '{}'",
-                    obj.type_name(),
-                    method
-                ),
+                format!("{} has no method '{}'", obj.type_name(), method),
             ))),
         }
     }
@@ -898,20 +1015,14 @@ impl Interpreter {
             "split" => {
                 let sep = arg_str(args, 0, "split")?;
                 Ok(Value::List(
-                    s.split(sep)
-                        .map(|p| Value::String(p.to_string()))
-                        .collect(),
+                    s.split(sep).map(|p| Value::String(p.to_string())).collect(),
                 ))
             }
             "chars" => Ok(Value::List(
-                s.chars()
-                    .map(|c| Value::String(c.to_string()))
-                    .collect(),
+                s.chars().map(|c| Value::String(c.to_string())).collect(),
             )),
             "lines" => Ok(Value::List(
-                s.lines()
-                    .map(|l| Value::String(l.to_string()))
-                    .collect(),
+                s.lines().map(|l| Value::String(l.to_string())).collect(),
             )),
             "repeat" => {
                 let n = arg_int(args, 0, "repeat")? as usize;
@@ -946,7 +1057,9 @@ impl Interpreter {
                 if start >= end {
                     return Ok(Value::String(String::new()));
                 }
-                Ok(Value::String(s.chars().skip(start).take(end - start).collect()))
+                Ok(Value::String(
+                    s.chars().skip(start).take(end - start).collect(),
+                ))
             }
             "pad_start" | "pad_end" => {
                 let width = arg_int(args, 0, method)?.max(0) as usize;
@@ -967,24 +1080,26 @@ impl Interpreter {
                     }))
                 }
             }
-            "reverse" => {
-                Ok(Value::String(s.chars().rev().collect()))
-            }
+            "reverse" => Ok(Value::String(s.chars().rev().collect())),
             "to_path" => Ok(Value::Path(s.to_string())),
             "matches" => {
                 let pattern = arg_str(args, 0, "matches")?;
                 let matched = simple_regex_test(pattern, s);
                 Ok(Value::Bool(matched))
             }
-            "bytes" => {
-                Ok(Value::List(s.bytes().map(|b| Value::Int(b as i64)).collect()))
-            }
+            "bytes" => Ok(Value::List(
+                s.bytes().map(|b| Value::Int(b as i64)).collect(),
+            )),
             // Parsing a string can fail, so it belongs with the other
             // `parse_*` methods that say so in their return type. These two
             // handed back a bare Int or Float when they worked and an Err
             // when they did not, which no caller could match on.
             "to_int" | "to_float" => {
-                let instead = if method == "to_int" { "parse_int" } else { "parse_float" };
+                let instead = if method == "to_int" {
+                    "parse_int"
+                } else {
+                    "parse_float"
+                };
                 Err(Signal::Error(QueError::new(
                     ErrorKind::Runtime,
                     format!("`.{}()` was removed; use `.{}()` instead", method, instead),
@@ -1005,12 +1120,7 @@ impl Interpreter {
     // the source line-by-line and applying ops on the fly so large files
     // never need to fit in memory.
 
-    fn stream_method(
-        &mut self,
-        stream: Stream,
-        method: &str,
-        args: Vec<Value>,
-    ) -> IResult {
+    fn stream_method(&mut self, stream: Stream, method: &str, args: Vec<Value>) -> IResult {
         match method {
             // ── Chainable / lazy: push an op, no I/O ──────────────────
             "to_upper" => Ok(Value::Stream(stream.pushed(StreamOp::ToUpper))),
@@ -1019,17 +1129,21 @@ impl Interpreter {
             "replace" => {
                 let from = match args.first() {
                     Some(Value::String(s)) => s.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "stream.replace requires 2 string arguments",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "stream.replace requires 2 string arguments",
+                        )))
+                    }
                 };
                 let to = match args.get(1) {
                     Some(Value::String(s)) => s.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "stream.replace requires 2 string arguments",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "stream.replace requires 2 string arguments",
+                        )))
+                    }
                 };
                 // If the pattern can span lines, fall back to a buffering op.
                 let op = if from.contains('\n') {
@@ -1048,31 +1162,39 @@ impl Interpreter {
                 Ok(Value::Stream(stream.pushed(StreamOp::Append(suffix))))
             }
             "map" => {
-                let func = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "stream.map requires a function argument",
-                    ))
-                })?.clone();
+                let func = args
+                    .first()
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "stream.map requires a function argument",
+                        ))
+                    })?
+                    .clone();
                 Ok(Value::Stream(stream.pushed(StreamOp::Map(func))))
             }
             "filter" => {
-                let func = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "stream.filter requires a function argument",
-                    ))
-                })?.clone();
+                let func = args
+                    .first()
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "stream.filter requires a function argument",
+                        ))
+                    })?
+                    .clone();
                 Ok(Value::Stream(stream.pushed(StreamOp::Filter(func))))
             }
             "grep" => {
                 let pattern = match args.first() {
                     Some(Value::String(s)) => s.clone(),
                     Some(Value::Regex(r)) => r.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "stream.grep requires a string or regex pattern",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "stream.grep requires a string or regex pattern",
+                        )))
+                    }
                 };
                 Ok(Value::Stream(stream.pushed(StreamOp::Grep(pattern))))
             }
@@ -1080,10 +1202,12 @@ impl Interpreter {
                 let n = match args.first() {
                     Some(Value::Int(n)) => *n as usize,
                     None => 10,
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "stream.head requires an integer argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "stream.head requires an integer argument",
+                        )))
+                    }
                 };
                 Ok(Value::Stream(stream.pushed(StreamOp::Head(n))))
             }
@@ -1091,10 +1215,12 @@ impl Interpreter {
                 let n = match args.first() {
                     Some(Value::Int(n)) => *n as usize,
                     None => 10,
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "stream.tail requires an integer argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "stream.tail requires an integer argument",
+                        )))
+                    }
                 };
                 Ok(Value::Stream(stream.pushed(StreamOp::Tail(n))))
             }
@@ -1107,10 +1233,12 @@ impl Interpreter {
                 let sep = match args.first() {
                     Some(Value::String(s)) => s.clone(),
                     None => " ".to_string(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "stream.join_lines requires a string separator",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "stream.join_lines requires a string separator",
+                        )))
+                    }
                 };
                 Ok(Value::Stream(stream.pushed(StreamOp::JoinLines(sep))))
             }
@@ -1123,23 +1251,23 @@ impl Interpreter {
             }
             "lines" => {
                 let mut lines: Vec<Value> = Vec::new();
-                self.run_stream_pipeline(
-                    &stream,
-                    &mut StreamOutput::Lines(&mut lines),
-                )?;
+                self.run_stream_pipeline(&stream, &mut StreamOutput::Lines(&mut lines))?;
                 Ok(Value::List(lines))
             }
             "split" => {
                 let sep = match args.first() {
                     Some(Value::String(s)) => s.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "stream.split requires a string separator",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "stream.split requires a string separator",
+                        )))
+                    }
                 };
                 let mut buf = String::new();
                 self.run_stream_pipeline(&stream, &mut StreamOutput::Buffer(&mut buf))?;
-                let parts: Vec<Value> = buf.split(&*sep)
+                let parts: Vec<Value> = buf
+                    .split(&*sep)
                     .map(|s| Value::String(s.to_string()))
                     .collect();
                 Ok(Value::List(parts))
@@ -1156,9 +1284,11 @@ impl Interpreter {
                 match target {
                     Value::String(_) | Value::Path(_) => {
                         let p = path_arg(target, "stream.write_to")?;
-                        match self.stream_to_file(&stream, &p, /*append=*/false) {
+                        match self.stream_to_file(&stream, &p, /*append=*/ false) {
                             Ok(_) => Ok(Value::Ok(Box::new(Value::Stream(stream)))),
-                            Err(Signal::Error(e)) => Ok(Value::Err(Box::new(Value::String(e.message)))),
+                            Err(Signal::Error(e)) => {
+                                Ok(Value::Err(Box::new(Value::String(e.message))))
+                            }
                             Err(other) => Err(other),
                         }
                     }
@@ -1166,7 +1296,9 @@ impl Interpreter {
                         let sink = sink_stream.get_sink();
                         match self.stream_to_sink(&stream, &sink) {
                             Ok(_) => Ok(Value::Ok(Box::new(Value::Stream(stream)))),
-                            Err(Signal::Error(e)) => Ok(Value::Err(Box::new(Value::String(e.message)))),
+                            Err(Signal::Error(e)) => {
+                                Ok(Value::Err(Box::new(Value::String(e.message))))
+                            }
                             Err(other) => Err(other),
                         }
                     }
@@ -1186,20 +1318,26 @@ impl Interpreter {
                 match target {
                     Value::String(_) | Value::Path(_) => {
                         let p = path_arg(target, "stream.append_to")?;
-                        match self.stream_to_file(&stream, &p, /*append=*/true) {
+                        match self.stream_to_file(&stream, &p, /*append=*/ true) {
                             Ok(_) => Ok(Value::Ok(Box::new(Value::Stream(stream)))),
-                            Err(Signal::Error(e)) => Ok(Value::Err(Box::new(Value::String(e.message)))),
+                            Err(Signal::Error(e)) => {
+                                Ok(Value::Err(Box::new(Value::String(e.message))))
+                            }
                             Err(other) => Err(other),
                         }
                     }
                     Value::Stream(sink_stream) => {
                         let sink = match sink_stream.get_sink() {
-                            StreamSink::File { path, .. } => StreamSink::File { path, append: true },
+                            StreamSink::File { path, .. } => {
+                                StreamSink::File { path, append: true }
+                            }
                             other => other,
                         };
                         match self.stream_to_sink(&stream, &sink) {
                             Ok(_) => Ok(Value::Ok(Box::new(Value::Stream(stream)))),
-                            Err(Signal::Error(e)) => Ok(Value::Err(Box::new(Value::String(e.message)))),
+                            Err(Signal::Error(e)) => {
+                                Ok(Value::Err(Box::new(Value::String(e.message))))
+                            }
                             Err(other) => Err(other),
                         }
                     }
@@ -1229,10 +1367,12 @@ impl Interpreter {
             "contains" => {
                 let needle = match args.first() {
                     Some(Value::String(s)) => s.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch,
-                        "stream.contains requires a string argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "stream.contains requires a string argument",
+                        )))
+                    }
                 };
                 let mut buf = String::new();
                 self.run_stream_pipeline(&stream, &mut StreamOutput::Buffer(&mut buf))?;
@@ -1308,15 +1448,20 @@ impl Interpreter {
             .append(append)
             .truncate(!append)
             .open(path)
-            .map_err(|e| Signal::Error(QueError::new(
-                ErrorKind::IoError,
-                format!("stream: cannot open '{}': {}", path, e),
-            )))?;
+            .map_err(|e| {
+                Signal::Error(QueError::new(
+                    ErrorKind::IoError,
+                    format!("stream: cannot open '{}': {}", path, e),
+                ))
+            })?;
         let mut w: Box<dyn Write> = Box::new(std::io::BufWriter::new(file));
         self.run_stream_pipeline(stream, &mut StreamOutput::Writer(&mut w))?;
-        w.flush().map_err(|e| Signal::Error(QueError::new(
-            ErrorKind::IoError, format!("stream: write failed: {}", e),
-        )))
+        w.flush().map_err(|e| {
+            Signal::Error(QueError::new(
+                ErrorKind::IoError,
+                format!("stream: write failed: {}", e),
+            ))
+        })
     }
 
     /// Write a stream's output to a `StreamSink`. Stdout/Stderr/File sinks
@@ -1432,18 +1577,29 @@ impl Interpreter {
         // Per-segment state for stateful ops.
         let mut head_remaining: Vec<Option<usize>> = ops
             .iter()
-            .map(|o| if let StreamOp::Head(n) = o { Some(*n) } else { None })
+            .map(|o| {
+                if let StreamOp::Head(n) = o {
+                    Some(*n)
+                } else {
+                    None
+                }
+            })
             .collect();
         let mut enum_counters: Vec<usize> = ops.iter().map(|_| 0usize).collect();
-        let mut unique_seen: Vec<std::collections::HashSet<String>> =
-            ops.iter().map(|_| std::collections::HashSet::new()).collect();
+        let mut unique_seen: Vec<std::collections::HashSet<String>> = ops
+            .iter()
+            .map(|_| std::collections::HashSet::new())
+            .collect();
 
         let mut emitted_any = false;
         let mut iter = open_source_lines(source)?;
         'outer: while let Some(line_res) = iter.next() {
-            let mut line = line_res.map_err(|e| Signal::Error(QueError::new(
-                ErrorKind::IoError, format!("stream: read error: {}", e),
-            )))?;
+            let mut line = line_res.map_err(|e| {
+                Signal::Error(QueError::new(
+                    ErrorKind::IoError,
+                    format!("stream: read error: {}", e),
+                ))
+            })?;
             // Apply ops in order.
             for (i, op) in ops.iter().enumerate() {
                 match op {
@@ -1456,7 +1612,9 @@ impl Interpreter {
                         } else {
                             line.contains(pat.as_str())
                         };
-                        if !m { continue 'outer; }
+                        if !m {
+                            continue 'outer;
+                        }
                     }
                     StreamOp::Map(func) => {
                         let v = self.call_value(func.clone(), vec![Value::String(line.clone())])?;
@@ -1464,24 +1622,28 @@ impl Interpreter {
                     }
                     StreamOp::Filter(func) => {
                         let v = self.call_value(func.clone(), vec![Value::String(line.clone())])?;
-                        if !v.is_truthy() { continue 'outer; }
-                    }
-                    StreamOp::SkipEmpty => {
-                        if line.trim().is_empty() { continue 'outer; }
-                    }
-                    StreamOp::Head(_) => {
-                        match &mut head_remaining[i] {
-                            Some(0) => break 'outer,
-                            Some(n) => *n -= 1,
-                            None => {}
+                        if !v.is_truthy() {
+                            continue 'outer;
                         }
                     }
+                    StreamOp::SkipEmpty => {
+                        if line.trim().is_empty() {
+                            continue 'outer;
+                        }
+                    }
+                    StreamOp::Head(_) => match &mut head_remaining[i] {
+                        Some(0) => break 'outer,
+                        Some(n) => *n -= 1,
+                        None => {}
+                    },
                     StreamOp::EnumerateLines => {
                         enum_counters[i] += 1;
                         line = format!("{}\t{}", enum_counters[i], line);
                     }
                     StreamOp::UniqueLines => {
-                        if !unique_seen[i].insert(line.clone()) { continue 'outer; }
+                        if !unique_seen[i].insert(line.clone()) {
+                            continue 'outer;
+                        }
                     }
                     // Buffering ops never appear inside a streaming segment.
                     _ => {}
@@ -1496,12 +1658,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn list_method(
-        &mut self,
-        items: &[Value],
-        method: &str,
-        args: Vec<Value>,
-    ) -> IResult {
+    fn list_method(&mut self, items: &[Value], method: &str, args: Vec<Value>) -> IResult {
         match method {
             "len" => Ok(Value::Int(items.len() as i64)),
             "is_empty" => Ok(Value::Bool(items.is_empty())),
@@ -1520,7 +1677,11 @@ impl Interpreter {
                     }
                 };
                 let default = args.get(1).cloned().unwrap_or(Value::Null);
-                let resolved = if idx < 0 { items.len() as i64 + idx } else { idx };
+                let resolved = if idx < 0 {
+                    items.len() as i64 + idx
+                } else {
+                    idx
+                };
                 if resolved < 0 {
                     return Ok(default);
                 }
@@ -1572,8 +1733,7 @@ impl Interpreter {
                         }
                     })
                     .unwrap_or("");
-                let parts: Vec<String> =
-                    items.iter().map(|v| v.display_string()).collect();
+                let parts: Vec<String> = items.iter().map(|v| v.display_string()).collect();
                 Ok(Value::String(parts.join(sep)))
             }
             "map" => {
@@ -1623,9 +1783,7 @@ impl Interpreter {
                 items
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| {
-                        Value::Tuple(vec![Value::Int(i as i64), v.clone()])
-                    })
+                    .map(|(i, v)| Value::Tuple(vec![Value::Int(i as i64), v.clone()]))
                     .collect(),
             )),
             "flat_map" => {
@@ -1692,43 +1850,93 @@ impl Interpreter {
                 Ok(Value::Bool(true))
             }
             "take" => {
-                let n = args.first().and_then(|v| if let Value::Int(n) = v { Some(*n as usize) } else { None })
-                    .ok_or_else(|| Signal::Error(QueError::new(ErrorKind::ArityMismatch, "take requires an integer argument")))?;
+                let n = args
+                    .first()
+                    .and_then(|v| {
+                        if let Value::Int(n) = v {
+                            Some(*n as usize)
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "take requires an integer argument",
+                        ))
+                    })?;
                 Ok(Value::List(items.iter().take(n).cloned().collect()))
             }
             "skip" => {
-                let n = args.first().and_then(|v| if let Value::Int(n) = v { Some(*n as usize) } else { None })
-                    .ok_or_else(|| Signal::Error(QueError::new(ErrorKind::ArityMismatch, "skip requires an integer argument")))?;
+                let n = args
+                    .first()
+                    .and_then(|v| {
+                        if let Value::Int(n) = v {
+                            Some(*n as usize)
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "skip requires an integer argument",
+                        ))
+                    })?;
                 Ok(Value::List(items.iter().skip(n).cloned().collect()))
             }
             "chunk" => {
-                let n = args.first().and_then(|v| if let Value::Int(n) = v { Some(*n as usize) } else { None })
-                    .ok_or_else(|| Signal::Error(QueError::new(ErrorKind::ArityMismatch, "chunk requires an integer argument")))?;
+                let n = args
+                    .first()
+                    .and_then(|v| {
+                        if let Value::Int(n) = v {
+                            Some(*n as usize)
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "chunk requires an integer argument",
+                        ))
+                    })?;
                 if n == 0 {
-                    return Err(Signal::Error(QueError::new(ErrorKind::Runtime, "chunk size must be > 0")));
+                    return Err(Signal::Error(QueError::new(
+                        ErrorKind::Runtime,
+                        "chunk size must be > 0",
+                    )));
                 }
-                let chunks: Vec<Value> = items.chunks(n)
-                    .map(|c| Value::List(c.to_vec()))
-                    .collect();
+                let chunks: Vec<Value> = items.chunks(n).map(|c| Value::List(c.to_vec())).collect();
                 Ok(Value::List(chunks))
             }
             "zip" => {
                 let other = args.into_iter().next().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "zip requires a list argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "zip requires a list argument",
+                    ))
                 })?;
                 if let Value::List(other_items) = other {
-                    let zipped: Vec<Value> = items.iter()
+                    let zipped: Vec<Value> = items
+                        .iter()
                         .zip(other_items.iter())
                         .map(|(a, b)| Value::Tuple(vec![a.clone(), b.clone()]))
                         .collect();
                     Ok(Value::List(zipped))
                 } else {
-                    Err(Signal::Error(QueError::new(ErrorKind::TypeMismatch, "zip requires a list argument")))
+                    Err(Signal::Error(QueError::new(
+                        ErrorKind::TypeMismatch,
+                        "zip requires a list argument",
+                    )))
                 }
             }
             "partition" => {
                 let func = args.into_iter().next().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "partition requires a function argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "partition requires a function argument",
+                    ))
                 })?;
                 let mut matching = Vec::new();
                 let mut not_matching = Vec::new();
@@ -1740,11 +1948,17 @@ impl Interpreter {
                         not_matching.push(item.clone());
                     }
                 }
-                Ok(Value::Tuple(vec![Value::List(matching), Value::List(not_matching)]))
+                Ok(Value::Tuple(vec![
+                    Value::List(matching),
+                    Value::List(not_matching),
+                ]))
             }
             "group_by" => {
                 let func = args.into_iter().next().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "group_by requires a function argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "group_by requires a function argument",
+                    ))
                 })?;
                 let mut groups: BTreeMap<String, Value> = BTreeMap::new();
                 for item in items {
@@ -1760,7 +1974,10 @@ impl Interpreter {
             }
             "sort_by" => {
                 let func = args.into_iter().next().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "sort_by requires a function argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "sort_by requires a function argument",
+                    ))
                 })?;
                 let mut keyed: Vec<(Value, Value)> = Vec::new();
                 for item in items {
@@ -1772,7 +1989,10 @@ impl Interpreter {
             }
             "each" => {
                 let func = args.into_iter().next().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "each requires a function argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "each requires a function argument",
+                    ))
                 })?;
                 for item in items {
                     self.call_value(func.clone(), vec![item.clone()])?;
@@ -1803,7 +2023,10 @@ impl Interpreter {
             }
             "index_of" => {
                 let target = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "index_of requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "index_of requires 1 argument",
+                    ))
                 })?;
                 let idx = items.iter().position(|v| v == target);
                 Ok(idx.map(|i| Value::Int(i as i64)).unwrap_or(Value::Int(-1)))
@@ -1825,10 +2048,8 @@ impl Interpreter {
                 if n == 0 || n > items.len() {
                     return Ok(Value::List(Vec::new()));
                 }
-                let result: Vec<Value> = items
-                    .windows(n)
-                    .map(|w| Value::List(w.to_vec()))
-                    .collect();
+                let result: Vec<Value> =
+                    items.windows(n).map(|w| Value::List(w.to_vec())).collect();
                 Ok(Value::List(result))
             }
             "to_tuple" => Ok(Value::Tuple(items.to_vec())),
@@ -1872,25 +2093,29 @@ impl Interpreter {
         }
     }
 
-    fn set_method(
-        &mut self,
-        items: &[Value],
-        method: &str,
-        args: Vec<Value>,
-    ) -> IResult {
+    fn set_method(&mut self, items: &[Value], method: &str, args: Vec<Value>) -> IResult {
         match method {
             "len" => Ok(Value::Int(items.len() as i64)),
             "is_empty" => Ok(Value::Bool(items.is_empty())),
             "contains" => {
                 let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "contains requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "contains requires 1 argument",
+                    ))
                 })?;
                 Ok(Value::Bool(self.set_contains(items, val)?))
             }
             "add" => {
-                let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "add requires 1 argument"))
-                })?.clone();
+                let val = args
+                    .first()
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "add requires 1 argument",
+                        ))
+                    })?
+                    .clone();
                 let mut new_items: Vec<Value> = items.to_vec();
                 if !self.set_contains(&new_items, &val)? {
                     new_items.push(val);
@@ -1898,9 +2123,15 @@ impl Interpreter {
                 Ok(Value::Set(new_items))
             }
             "remove" => {
-                let val = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "remove requires 1 argument"))
-                })?.clone();
+                let val = args
+                    .first()
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "remove requires 1 argument",
+                        ))
+                    })?
+                    .clone();
                 let mut new_items = Vec::new();
                 for item in items {
                     if !self.interpreter_eq(item, &val)? {
@@ -1913,9 +2144,12 @@ impl Interpreter {
                 let other = match args.first() {
                     Some(Value::Set(s)) => s.clone(),
                     Some(Value::List(l)) => l.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "union requires a set or list argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "union requires a set or list argument",
+                        )))
+                    }
                 };
                 let mut result = items.to_vec();
                 for val in other {
@@ -1929,9 +2163,12 @@ impl Interpreter {
                 let other = match args.first() {
                     Some(Value::Set(s)) => s.clone(),
                     Some(Value::List(l)) => l.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "intersection requires a set or list argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "intersection requires a set or list argument",
+                        )))
+                    }
                 };
                 let mut result = Vec::new();
                 for item in items {
@@ -1945,9 +2182,12 @@ impl Interpreter {
                 let other = match args.first() {
                     Some(Value::Set(s)) => s.clone(),
                     Some(Value::List(l)) => l.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "difference requires a set or list argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "difference requires a set or list argument",
+                        )))
+                    }
                 };
                 let mut result = Vec::new();
                 for item in items {
@@ -1961,9 +2201,12 @@ impl Interpreter {
                 let other = match args.first() {
                     Some(Value::Set(s)) => s.clone(),
                     Some(Value::List(l)) => l.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "symmetric_difference requires a set or list argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "symmetric_difference requires a set or list argument",
+                        )))
+                    }
                 };
                 let mut result = Vec::new();
                 for item in items {
@@ -1982,9 +2225,12 @@ impl Interpreter {
                 let other = match args.first() {
                     Some(Value::Set(s)) => s.clone(),
                     Some(Value::List(l)) => l.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "is_subset requires a set or list argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "is_subset requires a set or list argument",
+                        )))
+                    }
                 };
                 let mut all_in = true;
                 for item in items {
@@ -1999,9 +2245,12 @@ impl Interpreter {
                 let other = match args.first() {
                     Some(Value::Set(s)) => s.clone(),
                     Some(Value::List(l)) => l.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "is_superset requires a set or list argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "is_superset requires a set or list argument",
+                        )))
+                    }
                 };
                 let mut all_in = true;
                 for item in &other {
@@ -2016,9 +2265,12 @@ impl Interpreter {
                 let other = match args.first() {
                     Some(Value::Set(s)) => s.clone(),
                     Some(Value::List(l)) => l.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "is_disjoint requires a set or list argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "is_disjoint requires a set or list argument",
+                        )))
+                    }
                 };
                 let mut any_common = false;
                 for item in items {
@@ -2032,9 +2284,15 @@ impl Interpreter {
             "to_list" => Ok(Value::List(items.to_vec())),
             "to_tuple" => Ok(Value::Tuple(items.to_vec())),
             "map" => {
-                let func = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "map requires a function argument"))
-                })?.clone();
+                let func = args
+                    .first()
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "map requires a function argument",
+                        ))
+                    })?
+                    .clone();
                 let mut result = Vec::new();
                 for item in items {
                     let val = self.call_value(func.clone(), vec![item.clone()])?;
@@ -2045,9 +2303,15 @@ impl Interpreter {
                 Ok(Value::Set(result))
             }
             "filter" => {
-                let func = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "filter requires a function argument"))
-                })?.clone();
+                let func = args
+                    .first()
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "filter requires a function argument",
+                        ))
+                    })?
+                    .clone();
                 let mut result = Vec::new();
                 for item in items {
                     let keep = self.call_value(func.clone(), vec![item.clone()])?;
@@ -2058,9 +2322,15 @@ impl Interpreter {
                 Ok(Value::Set(result))
             }
             "each" => {
-                let func = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "each requires a function argument"))
-                })?.clone();
+                let func = args
+                    .first()
+                    .ok_or_else(|| {
+                        Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "each requires a function argument",
+                        ))
+                    })?
+                    .clone();
                 for item in items {
                     self.call_value(func.clone(), vec![item.clone()])?;
                 }
@@ -2092,9 +2362,7 @@ impl Interpreter {
             "values" => Ok(Value::List(map.values().cloned().collect())),
             "entries" => Ok(Value::List(
                 map.iter()
-                    .map(|(k, v)| {
-                        Value::Tuple(vec![Value::String(k.clone()), v.clone()])
-                    })
+                    .map(|(k, v)| Value::Tuple(vec![Value::String(k.clone()), v.clone()]))
                     .collect(),
             )),
             "contains" => {
@@ -2134,7 +2402,10 @@ impl Interpreter {
             }
             "map_values" => {
                 let func = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "map_values requires a function argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "map_values requires a function argument",
+                    ))
                 })?;
                 let mut result = BTreeMap::new();
                 for (k, v) in map {
@@ -2145,7 +2416,10 @@ impl Interpreter {
             }
             "filter_values" => {
                 let func = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "filter_values requires a function argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "filter_values requires a function argument",
+                    ))
                 })?;
                 let mut result = BTreeMap::new();
                 for (k, v) in map {
@@ -2158,14 +2432,25 @@ impl Interpreter {
             }
             "deep_merge" => {
                 let other = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "deep_merge requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "deep_merge requires 1 argument",
+                    ))
                 })?;
                 if let Value::Map(other_map) = other {
-                    fn deep_merge(base: &BTreeMap<String, Value>, overlay: &BTreeMap<String, Value>) -> BTreeMap<String, Value> {
+                    fn deep_merge(
+                        base: &BTreeMap<String, Value>,
+                        overlay: &BTreeMap<String, Value>,
+                    ) -> BTreeMap<String, Value> {
                         let mut result = base.clone();
                         for (k, v) in overlay {
-                            if let (Some(Value::Map(base_inner)), Value::Map(overlay_inner)) = (result.get(k), v) {
-                                result.insert(k.clone(), Value::Map(deep_merge(base_inner, overlay_inner)));
+                            if let (Some(Value::Map(base_inner)), Value::Map(overlay_inner)) =
+                                (result.get(k), v)
+                            {
+                                result.insert(
+                                    k.clone(),
+                                    Value::Map(deep_merge(base_inner, overlay_inner)),
+                                );
                             } else {
                                 result.insert(k.clone(), v.clone());
                             }
@@ -2174,15 +2459,16 @@ impl Interpreter {
                     }
                     Ok(Value::Map(deep_merge(map, other_map)))
                 } else {
-                    Err(Signal::Error(QueError::new(ErrorKind::TypeMismatch, "deep_merge requires a map argument")))
+                    Err(Signal::Error(QueError::new(
+                        ErrorKind::TypeMismatch,
+                        "deep_merge requires a map argument",
+                    )))
                 }
             }
 
             "to_list" => Ok(Value::List(
                 map.iter()
-                    .map(|(k, v)| {
-                        Value::Tuple(vec![Value::String(k.clone()), v.clone()])
-                    })
+                    .map(|(k, v)| Value::Tuple(vec![Value::String(k.clone()), v.clone()]))
                     .collect(),
             )),
 
@@ -2200,7 +2486,11 @@ impl Interpreter {
                 }
                 let path = arg_str(args, 0, "set_path")?;
                 let new_val = args[1].clone();
-                Ok(crate::config::config_set(&Value::Map(map.clone()), path, new_val))
+                Ok(crate::config::config_set(
+                    &Value::Map(map.clone()),
+                    path,
+                    new_val,
+                ))
             }
             "delete_path" => {
                 let path = arg_str(args, 0, "delete_path")?;
@@ -2208,7 +2498,10 @@ impl Interpreter {
             }
             "has_path" => {
                 let path = arg_str(args, 0, "has_path")?;
-                Ok(Value::Bool(crate::config::config_has(&Value::Map(map.clone()), path)))
+                Ok(Value::Bool(crate::config::config_has(
+                    &Value::Map(map.clone()),
+                    path,
+                )))
             }
             "paths" => {
                 let paths = crate::config::config_paths(&Value::Map(map.clone()));
@@ -2218,34 +2511,36 @@ impl Interpreter {
             // ── Config serialization methods ──
             "to_json" => {
                 let indent = args.first().and_then(|v| {
-                    if let Value::Int(n) = v { Some(*n as usize) } else { None }
+                    if let Value::Int(n) = v {
+                        Some(*n as usize)
+                    } else {
+                        None
+                    }
                 });
                 match crate::config::to_json(&Value::Map(map.clone()), indent) {
                     Ok(s) => Ok(Value::String(s)),
                     Err(e) => Err(Signal::Error(QueError::new(ErrorKind::Runtime, e))),
                 }
             }
-            "to_yaml" => {
-                match crate::config::to_yaml(&Value::Map(map.clone())) {
-                    Ok(s) => Ok(Value::String(s)),
-                    Err(e) => Err(Signal::Error(QueError::new(ErrorKind::Runtime, e))),
-                }
-            }
-            "to_toml" => {
-                match crate::config::to_toml(&Value::Map(map.clone())) {
-                    Ok(s) => Ok(Value::String(s)),
-                    Err(e) => Err(Signal::Error(QueError::new(ErrorKind::Runtime, e))),
-                }
-            }
+            "to_yaml" => match crate::config::to_yaml(&Value::Map(map.clone())) {
+                Ok(s) => Ok(Value::String(s)),
+                Err(e) => Err(Signal::Error(QueError::new(ErrorKind::Runtime, e))),
+            },
+            "to_toml" => match crate::config::to_toml(&Value::Map(map.clone())) {
+                Ok(s) => Ok(Value::String(s)),
+                Err(e) => Err(Signal::Error(QueError::new(ErrorKind::Runtime, e))),
+            },
             // Convenience method for HTTP responses: parse the body field as JSON
             "json" => {
                 let body = match map.get("body") {
                     Some(Value::String(s)) => s.clone(),
                     Some(other) => other.display_string(),
-                    None => return Err(Signal::Error(QueError::new(
-                        ErrorKind::Runtime,
-                        "json() called on a map without a 'body' field",
-                    ))),
+                    None => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::Runtime,
+                            "json() called on a map without a 'body' field",
+                        )))
+                    }
                 };
                 match crate::config::parse_json(&body) {
                     Ok(v) => Ok(v),
@@ -2253,9 +2548,7 @@ impl Interpreter {
                 }
             }
             // Convenience method for HTTP responses: check ok field
-            "ok" => {
-                Ok(map.get("ok").cloned().unwrap_or(Value::Bool(false)))
-            }
+            "ok" => Ok(map.get("ok").cloned().unwrap_or(Value::Bool(false))),
 
             _ => {
                 // Not a built-in map method. Check if the map has a
@@ -2267,7 +2560,11 @@ impl Interpreter {
                         }
                         _ => Err(Signal::Error(QueError::new(
                             ErrorKind::NotCallable,
-                            format!("map key '{}' is not callable (got {})", method, func_val.type_name()),
+                            format!(
+                                "map key '{}' is not callable (got {})",
+                                method,
+                                func_val.type_name()
+                            ),
                         ))),
                     }
                 } else {
@@ -2424,16 +2721,16 @@ impl Interpreter {
                 let absolute = if path.is_absolute() {
                     path.to_path_buf()
                 } else {
-                    std::env::current_dir()
-                        .unwrap_or_default()
-                        .join(path)
+                    std::env::current_dir().unwrap_or_default().join(path)
                 };
                 // Normalize: remove . and ..
                 let mut components = Vec::new();
                 for comp in absolute.components() {
                     match comp {
                         std::path::Component::CurDir => {}
-                        std::path::Component::ParentDir => { components.pop(); }
+                        std::path::Component::ParentDir => {
+                            components.pop();
+                        }
                         _ => components.push(comp),
                     }
                 }
@@ -2455,7 +2752,9 @@ impl Interpreter {
                 for comp in absolute.components() {
                     match comp {
                         std::path::Component::CurDir => {}
-                        std::path::Component::ParentDir => { components.pop(); }
+                        std::path::Component::ParentDir => {
+                            components.pop();
+                        }
                         _ => components.push(comp),
                     }
                 }
@@ -2468,7 +2767,9 @@ impl Interpreter {
                 for comp in path.components() {
                     match comp {
                         std::path::Component::CurDir => {}
-                        std::path::Component::ParentDir => { components.pop(); }
+                        std::path::Component::ParentDir => {
+                            components.pop();
+                        }
                         _ => components.push(comp),
                     }
                 }
@@ -2497,12 +2798,10 @@ impl Interpreter {
                 let new_path = path.with_file_name(new_name);
                 Ok(Value::Path(new_path.to_string_lossy().to_string()))
             }
-            "size" => {
-                match std::fs::metadata(p) {
-                    Ok(meta) => Ok(Value::Int(meta.len() as i64)),
-                    Err(e) => Ok(Value::Err(Box::new(Value::String(e.to_string())))),
-                }
-            }
+            "size" => match std::fs::metadata(p) {
+                Ok(meta) => Ok(Value::Int(meta.len() as i64)),
+                Err(e) => Ok(Value::Err(Box::new(Value::String(e.to_string())))),
+            },
             "to_string" => Ok(Value::String(p.to_string())),
             "read" => match std::fs::read_to_string(p) {
                 Ok(content) => Ok(Value::Ok(Box::new(Value::String(content)))),
@@ -2524,7 +2823,11 @@ impl Interpreter {
                     return Ok(Value::Ok(Box::new(Value::Null)));
                 }
                 use std::io::Write;
-                match std::fs::OpenOptions::new().create(true).append(true).open(p) {
+                match std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(p)
+                {
                     Ok(mut f) => match f.write_all(content.as_bytes()) {
                         Ok(_) => Ok(Value::Ok(Box::new(Value::Null))),
                         Err(e) => Ok(Value::Err(Box::new(Value::String(e.to_string())))),
@@ -2729,21 +3032,19 @@ impl Interpreter {
                 let result = path.join(other);
                 Ok(Value::Path(result.to_string_lossy().to_string()))
             }
-            "modified" => {
-                match std::fs::metadata(p) {
-                    Ok(meta) => match meta.modified() {
-                        Ok(time) => {
-                            let millis = time
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_millis() as i64;
-                            Ok(Value::Int(millis))
-                        }
-                        Err(e) => Ok(Value::Err(Box::new(Value::String(e.to_string())))),
-                    },
+            "modified" => match std::fs::metadata(p) {
+                Ok(meta) => match meta.modified() {
+                    Ok(time) => {
+                        let millis = time
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as i64;
+                        Ok(Value::Int(millis))
+                    }
                     Err(e) => Ok(Value::Err(Box::new(Value::String(e.to_string())))),
-                }
-            }
+                },
+                Err(e) => Ok(Value::Err(Box::new(Value::String(e.to_string())))),
+            },
             "relative_to" => {
                 let base = arg_path_str(_args, 0, "relative_to")?;
                 let base_path = std::path::Path::new(&base);
@@ -2766,8 +3067,8 @@ impl Interpreter {
                 Ok(Value::Int(count as i64))
             }
             // Second spellings of the arms above, kept only to say so.
-            "ext" | "is_abs" | "is_rel" | "read_text" | "remove" | "copy"
-            | "children" | "str" | "parts" => {
+            "ext" | "is_abs" | "is_rel" | "read_text" | "remove" | "copy" | "children" | "str"
+            | "parts" => {
                 let instead = match method {
                     "ext" => "extension",
                     "is_abs" => "is_absolute",
@@ -2802,7 +3103,10 @@ impl Interpreter {
             // so only the `to_` ones survive.
             "millis" | "seconds" | "minutes" | "hours" => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
-                format!("`.{}()` was removed; use `.to_{}()` instead", method, method),
+                format!(
+                    "`.{}()` was removed; use `.to_{}()` instead",
+                    method, method
+                ),
             ))),
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
@@ -2911,10 +3215,12 @@ impl Interpreter {
                 // Simple constraint matching: ">=1.2.0, <2.0.0".satisfiedBy(v"1.3.0")
                 let ver = match _args.first() {
                     Some(Value::Semver(v)) => v.as_str(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "satisfied_by requires a Semver argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "satisfied_by requires a Semver argument",
+                        )))
+                    }
                 };
                 let satisfied = check_semver_constraint(s, ver);
                 Ok(Value::Bool(satisfied))
@@ -2943,7 +3249,6 @@ impl Interpreter {
             ))),
         }
     }
-
 
     // ── Glob methods ─────────────────────────────────────────────────
 
@@ -2979,10 +3284,12 @@ impl Interpreter {
                 let path = match args.first() {
                     Some(Value::Path(p)) => p.as_str(),
                     Some(Value::String(s)) => s.as_str(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "test() requires a path or string argument",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "test() requires a path or string argument",
+                        )))
+                    }
                 };
                 let matches = glob_matches(pattern, path);
                 Ok(Value::Bool(matches))
@@ -2999,8 +3306,12 @@ impl Interpreter {
                 Some(entry) => Ok(Value::Path(entry.to_string_lossy().into_owned())),
                 None => Ok(Value::Null),
             },
-            "count" => Ok(Value::Int(glob_expand(pattern).unwrap_or_default().len() as i64)),
-            "any" => Ok(Value::Bool(!glob_expand(pattern).unwrap_or_default().is_empty())),
+            "count" => Ok(Value::Int(
+                glob_expand(pattern).unwrap_or_default().len() as i64
+            )),
+            "any" => Ok(Value::Bool(
+                !glob_expand(pattern).unwrap_or_default().is_empty(),
+            )),
             "pattern" => Ok(Value::String(pattern.to_string())),
             "to_string" => Ok(Value::String(pattern.to_string())),
             "copy_to" | "move_to" => self.glob_transfer(pattern, method, args),
@@ -3087,8 +3398,7 @@ impl Interpreter {
                             copy_dir_recursive(&src, &target)
                                 .and_then(|_| std::fs::remove_dir_all(&src))
                         } else {
-                            std::fs::copy(&src, &target)
-                                .and_then(|_| std::fs::remove_file(&src))
+                            std::fs::copy(&src, &target).and_then(|_| std::fs::remove_file(&src))
                         }
                     })
                 } else if src.is_dir() {
@@ -3133,10 +3443,12 @@ impl Interpreter {
             _ if method == "to_string" => {
                 return Ok(Value::String(pattern.to_string()));
             }
-            _ => return Err(Signal::Error(QueError::new(
-                ErrorKind::TypeMismatch,
-                format!("{}() requires a string argument", method),
-            ))),
+            _ => {
+                return Err(Signal::Error(QueError::new(
+                    ErrorKind::TypeMismatch,
+                    format!("{}() requires a string argument", method),
+                )))
+            }
         };
 
         match method {
@@ -3154,15 +3466,19 @@ impl Interpreter {
             }
             "find_all" => {
                 let matches = simple_regex_find_all(pattern, input);
-                Ok(Value::List(matches.into_iter().map(Value::String).collect()))
+                Ok(Value::List(
+                    matches.into_iter().map(Value::String).collect(),
+                ))
             }
             "replace" => {
                 let replacement = match args.get(1) {
                     Some(Value::String(s)) => s.as_str(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "replace() requires a replacement string",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "replace() requires a replacement string",
+                        )))
+                    }
                 };
                 let result = simple_regex_replace(pattern, input, replacement);
                 Ok(Value::String(result))
@@ -3170,10 +3486,12 @@ impl Interpreter {
             "replace_all" => {
                 let replacement = match args.get(1) {
                     Some(Value::String(s)) => s.as_str(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "replace_all() requires a replacement string",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "replace_all() requires a replacement string",
+                        )))
+                    }
                 };
                 let result = simple_regex_replace_all(pattern, input, replacement);
                 Ok(Value::String(result))
@@ -3185,7 +3503,9 @@ impl Interpreter {
             "named_captures" => {
                 let map = simple_regex_named_captures(pattern, input);
                 Ok(Value::Map(
-                    map.into_iter().map(|(k, v)| (k, Value::String(v))).collect(),
+                    map.into_iter()
+                        .map(|(k, v)| (k, Value::String(v)))
+                        .collect(),
                 ))
             }
             "split" => {
@@ -3211,7 +3531,10 @@ impl Interpreter {
     /// use `.try()` to get the `ProcessResult` without raising.
     pub(crate) fn run_cmd_checked(&mut self, parts: &[CmdPart], mods: &CmdModifiers) -> IResult {
         let result = self.run_cmd_parts(parts, mods)?;
-        if let Value::ProcessResult { exit_code, stderr, .. } = &result {
+        if let Value::ProcessResult {
+            exit_code, stderr, ..
+        } = &result
+        {
             if *exit_code != 0 {
                 let detail = stderr.trim();
                 let suffix = if detail.is_empty() {
@@ -3233,7 +3556,13 @@ impl Interpreter {
         Ok(result)
     }
 
-    fn cmd_method(&mut self, parts: &[CmdPart], mods: &CmdModifiers, method: &str, args: &[Value]) -> IResult {
+    fn cmd_method(
+        &mut self,
+        parts: &[CmdPart],
+        mods: &CmdModifiers,
+        method: &str,
+        args: &[Value],
+    ) -> IResult {
         match method {
             // `.run()` is the explicit spelling of what a bare `` `cmd` ``
             // statement does: stream output to the terminal, raise if it fails.
@@ -3473,7 +3802,10 @@ impl Interpreter {
             }
             "contains" => {
                 let item = _args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "contains requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "contains requires 1 argument",
+                    ))
                 })?;
                 Ok(Value::Bool(items.contains(item)))
             }
@@ -3542,10 +3874,12 @@ impl Interpreter {
                 .stdout(std::process::Stdio::inherit())
                 .stderr(std::process::Stdio::inherit())
                 .status()
-                .map_err(|e| Signal::Error(QueError::new(
-                    ErrorKind::CommandFailed,
-                    format!("failed to execute command: {}", e),
-                )))?;
+                .map_err(|e| {
+                    Signal::Error(QueError::new(
+                        ErrorKind::CommandFailed,
+                        format!("failed to execute command: {}", e),
+                    ))
+                })?;
             return Ok(Value::ProcessResult {
                 exit_code: status.code().unwrap_or(-1) as i64,
                 stdout: String::new(),
@@ -3560,14 +3894,20 @@ impl Interpreter {
         // Waiting on `output()` can't be interrupted, so a run with a time
         // limit or a cancellation token takes the polling path.
         if has_stdin || has_fwd_stdout || has_fwd_stderr || self.host.limits.is_active() {
-            cmd.stdin(if has_stdin { std::process::Stdio::piped() } else { std::process::Stdio::null() });
+            cmd.stdin(if has_stdin {
+                std::process::Stdio::piped()
+            } else {
+                std::process::Stdio::null()
+            });
             cmd.stdout(std::process::Stdio::piped());
             cmd.stderr(std::process::Stdio::piped());
 
-            let mut child = cmd.spawn().map_err(|e| Signal::Error(QueError::new(
-                ErrorKind::CommandFailed,
-                format!("failed to execute command: {}", e),
-            )))?;
+            let mut child = cmd.spawn().map_err(|e| {
+                Signal::Error(QueError::new(
+                    ErrorKind::CommandFailed,
+                    format!("failed to execute command: {}", e),
+                ))
+            })?;
 
             if let Some(ref stdin_data) = mods.stdin_data {
                 if let Some(mut stdin) = child.stdin.take() {
@@ -3577,18 +3917,32 @@ impl Interpreter {
             }
 
             let (exit_code, stdout, stderr) = capture_child(child, mods, &self.host.limits)?;
-            Ok(Value::ProcessResult { exit_code, stdout, stderr })
+            Ok(Value::ProcessResult {
+                exit_code,
+                stdout,
+                stderr,
+            })
         } else {
             // Simple path: no stdin data, no forwarding.
             cmd.stdin(std::process::Stdio::null());
-            let output = cmd.output().map_err(|e| Signal::Error(QueError::new(
-                ErrorKind::CommandFailed,
-                format!("failed to execute command: {}", e),
-            )))?;
+            let output = cmd.output().map_err(|e| {
+                Signal::Error(QueError::new(
+                    ErrorKind::CommandFailed,
+                    format!("failed to execute command: {}", e),
+                ))
+            })?;
             Ok(Value::ProcessResult {
                 exit_code: output.status.code().unwrap_or(-1) as i64,
-                stdout: if mods.silent { String::new() } else { String::from_utf8_lossy(&output.stdout).to_string() },
-                stderr: if mods.silent { String::new() } else { String::from_utf8_lossy(&output.stderr).to_string() },
+                stdout: if mods.silent {
+                    String::new()
+                } else {
+                    String::from_utf8_lossy(&output.stdout).to_string()
+                },
+                stderr: if mods.silent {
+                    String::new()
+                } else {
+                    String::from_utf8_lossy(&output.stderr).to_string()
+                },
             })
         }
     }
@@ -3632,7 +3986,8 @@ impl Interpreter {
 
         for (i, stage) in mods.stdin_from.iter().enumerate() {
             let text = render_cmd(&stage.parts);
-            let mut cmd = build_shell_command(&text, &stage.mods);            match previous.take() {
+            let mut cmd = build_shell_command(&text, &stage.mods);
+            match previous.take() {
                 Some(out) => {
                     cmd.stdin(Stdio::from(out));
                 }
@@ -3705,12 +4060,20 @@ impl Interpreter {
                 return Ok(Value::ProcessResult {
                     exit_code: code,
                     stdout,
-                    stderr: format!("`{}` in pipeline failed with exit code {}", text.trim(), code),
+                    stderr: format!(
+                        "`{}` in pipeline failed with exit code {}",
+                        text.trim(),
+                        code
+                    ),
                 });
             }
         }
 
-        Ok(Value::ProcessResult { exit_code, stdout, stderr })
+        Ok(Value::ProcessResult {
+            exit_code,
+            stdout,
+            stderr,
+        })
     }
 }
 
@@ -4028,10 +4391,20 @@ fn capture_child(
     let stderr_buf: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
 
     let stdout_thread = child.stdout.take().map(|out| {
-        drain(out, Arc::clone(&stdout_buf), mods.forward_stdout.as_deref().cloned(), mods.silent)
+        drain(
+            out,
+            Arc::clone(&stdout_buf),
+            mods.forward_stdout.as_deref().cloned(),
+            mods.silent,
+        )
     });
     let stderr_thread = child.stderr.take().map(|err| {
-        drain(err, Arc::clone(&stderr_buf), mods.forward_stderr.as_deref().cloned(), mods.silent)
+        drain(
+            err,
+            Arc::clone(&stderr_buf),
+            mods.forward_stderr.as_deref().cloned(),
+            mods.silent,
+        )
     });
 
     let status = wait_child(&mut child, limits)?;
@@ -4126,19 +4499,15 @@ fn sink_to_writer(sink: &StreamSink) -> Option<Box<dyn std::io::Write + Send>> {
     match sink {
         StreamSink::Stdout => Some(Box::new(std::io::stdout())),
         StreamSink::Stderr => Some(Box::new(std::io::stderr())),
-        StreamSink::File { path, append } => {
-            std::fs::OpenOptions::new()
-                .create(true)
-                .write(!append)
-                .append(*append)
-                .truncate(!append)
-                .open(path)
-                .ok()
-                .map(|f| Box::new(f) as Box<dyn std::io::Write + Send>)
-        }
-        StreamSink::FileHandle(fh) => {
-            Some(Box::new(FileHandleWriter(Arc::clone(&fh.inner))))
-        }
+        StreamSink::File { path, append } => std::fs::OpenOptions::new()
+            .create(true)
+            .write(!append)
+            .append(*append)
+            .truncate(!append)
+            .open(path)
+            .ok()
+            .map(|f| Box::new(f) as Box<dyn std::io::Write + Send>),
+        StreamSink::FileHandle(fh) => Some(Box::new(FileHandleWriter(Arc::clone(&fh.inner)))),
         StreamSink::None => None,
     }
 }
@@ -4152,13 +4521,19 @@ impl std::io::Write for FileHandleWriter {
         if inner.discard {
             return Ok(buf.len());
         }
-        inner.writer.as_mut()
+        inner
+            .writer
+            .as_mut()
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "not open for writing"))
             .and_then(|w| w.write(buf))
     }
     fn flush(&mut self) -> std::io::Result<()> {
         let mut inner = self.0.lock().unwrap();
-        if let Some(ref mut w) = inner.writer { w.flush() } else { Ok(()) }
+        if let Some(ref mut w) = inner.writer {
+            w.flush()
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -4224,10 +4599,12 @@ pub(crate) fn open_source_lines(
             Ok(Box::new(lines.into_iter().map(Ok)))
         }
         StreamSource::File(path) => {
-            let file = std::fs::File::open(path).map_err(|e| Signal::Error(QueError::new(
-                ErrorKind::IoError,
-                format!("stream: cannot open '{}': {}", path, e),
-            )))?;
+            let file = std::fs::File::open(path).map_err(|e| {
+                Signal::Error(QueError::new(
+                    ErrorKind::IoError,
+                    format!("stream: cannot open '{}': {}", path, e),
+                ))
+            })?;
             let reader = std::io::BufReader::new(file);
             Ok(Box::new(reader.lines()))
         }
@@ -4334,11 +4711,32 @@ mod tests {
     /// or spawning processes.
     const DO_NOT_ACTUALLY_RUN: &[&str] = &[
         // Filesystem mutation
-        "delete", "remove", "mkdir", "copy", "copy_to", "move_to", "symlink",
-        "write", "write_text", "append", "append_text", "write_to", "append_to",
+        "delete",
+        "remove",
+        "mkdir",
+        "copy",
+        "copy_to",
+        "move_to",
+        "symlink",
+        "write",
+        "write_text",
+        "append",
+        "append_text",
+        "write_to",
+        "append_to",
         // Process execution
-        "run", "out", "try", "capture", "run_checked", "attach", "sudo",
-        "kill", "kill_force", "wait", "close", "flush",
+        "run",
+        "out",
+        "try",
+        "capture",
+        "run_checked",
+        "attach",
+        "sudo",
+        "kill",
+        "kill_force",
+        "wait",
+        "close",
+        "flush",
     ];
 
     /// A value of every type that carries a built-in method table, paired

@@ -9,7 +9,6 @@
 ///   "array[0]"         — array index
 ///   "array[0].key"     — array index then map key
 ///   "array[*].key"     — wildcard: collect from all array elements
-
 use crate::value::Value;
 use std::collections::BTreeMap;
 
@@ -29,9 +28,7 @@ fn json_to_value(j: serde_json::Value) -> Value {
             }
         }
         serde_json::Value::String(s) => Value::String(s),
-        serde_json::Value::Array(arr) => {
-            Value::List(arr.into_iter().map(json_to_value).collect())
-        }
+        serde_json::Value::Array(arr) => Value::List(arr.into_iter().map(json_to_value).collect()),
         serde_json::Value::Object(obj) => {
             let map: BTreeMap<String, Value> = obj
                 .into_iter()
@@ -47,24 +44,19 @@ fn value_to_json(v: &Value) -> serde_json::Value {
         Value::Null => serde_json::Value::Null,
         Value::Bool(b) => serde_json::Value::Bool(*b),
         Value::Int(n) => serde_json::Value::Number((*n).into()),
-        Value::Float(f) => {
-            serde_json::Number::from_f64(*f)
-                .map(serde_json::Value::Number)
-                .unwrap_or(serde_json::Value::Null)
+        Value::Float(f) => serde_json::Number::from_f64(*f)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        Value::String(s) | Value::Path(s) | Value::Glob(s) | Value::Regex(s) | Value::Semver(s) => {
+            serde_json::Value::String(s.clone())
         }
-        Value::String(s) | Value::Path(s) | Value::Glob(s)
-        | Value::Regex(s) | Value::Semver(s) => serde_json::Value::String(s.clone()),
         // A secret serialised into a config file is a secret written to
         // disk, and `json.stringify(config)` is not where anyone decides to
         // do that. Callers who mean it write `.expose()`.
         Value::Secret(_) => serde_json::Value::String(crate::value::REDACTED.to_string()),
         Value::Stream(s) => serde_json::Value::String(s.materialize_eager().unwrap_or_default()),
-        Value::List(items) => {
-            serde_json::Value::Array(items.iter().map(value_to_json).collect())
-        }
-        Value::Set(items) => {
-            serde_json::Value::Array(items.iter().map(value_to_json).collect())
-        }
+        Value::List(items) => serde_json::Value::Array(items.iter().map(value_to_json).collect()),
+        Value::Set(items) => serde_json::Value::Array(items.iter().map(value_to_json).collect()),
         Value::Map(map) => {
             let obj: serde_json::Map<String, serde_json::Value> = map
                 .iter()
@@ -72,9 +64,7 @@ fn value_to_json(v: &Value) -> serde_json::Value {
                 .collect();
             serde_json::Value::Object(obj)
         }
-        Value::Tuple(items) => {
-            serde_json::Value::Array(items.iter().map(value_to_json).collect())
-        }
+        Value::Tuple(items) => serde_json::Value::Array(items.iter().map(value_to_json).collect()),
         Value::Ok(inner) => value_to_json(inner),
         Value::Err(inner) => value_to_json(inner),
         _ => serde_json::Value::String(v.display_string()),
@@ -122,26 +112,20 @@ fn value_to_yaml(v: &Value) -> serde_yaml::Value {
         Value::Null => serde_yaml::Value::Null,
         Value::Bool(b) => serde_yaml::Value::Bool(*b),
         Value::Int(n) => serde_yaml::Value::Number(serde_yaml::Number::from(*n)),
-        Value::Float(f) => {
-            serde_yaml::Value::Number(serde_yaml::Number::from(*f))
+        Value::Float(f) => serde_yaml::Value::Number(serde_yaml::Number::from(*f)),
+        Value::String(s) | Value::Path(s) | Value::Glob(s) | Value::Regex(s) | Value::Semver(s) => {
+            serde_yaml::Value::String(s.clone())
         }
-        Value::String(s) | Value::Path(s) | Value::Glob(s)
-        | Value::Regex(s) | Value::Semver(s) => serde_yaml::Value::String(s.clone()),
         Value::Secret(_) => serde_yaml::Value::String(crate::value::REDACTED.to_string()),
         Value::Stream(s) => serde_yaml::Value::String(s.materialize_eager().unwrap_or_default()),
         Value::List(items) => {
             serde_yaml::Value::Sequence(items.iter().map(value_to_yaml).collect())
         }
-        Value::Set(items) => {
-            serde_yaml::Value::Sequence(items.iter().map(value_to_yaml).collect())
-        }
+        Value::Set(items) => serde_yaml::Value::Sequence(items.iter().map(value_to_yaml).collect()),
         Value::Map(map) => {
             let mut m = serde_yaml::Mapping::new();
             for (k, v) in map {
-                m.insert(
-                    serde_yaml::Value::String(k.clone()),
-                    value_to_yaml(v),
-                );
+                m.insert(serde_yaml::Value::String(k.clone()), value_to_yaml(v));
             }
             serde_yaml::Value::Mapping(m)
         }
@@ -163,9 +147,7 @@ fn toml_to_value(t: toml::Value) -> Value {
         toml::Value::Float(f) => Value::Float(f),
         toml::Value::String(s) => Value::String(s),
         toml::Value::Datetime(dt) => Value::String(dt.to_string()),
-        toml::Value::Array(arr) => {
-            Value::List(arr.into_iter().map(toml_to_value).collect())
-        }
+        toml::Value::Array(arr) => Value::List(arr.into_iter().map(toml_to_value).collect()),
         toml::Value::Table(table) => {
             let map: BTreeMap<String, Value> = table
                 .into_iter()
@@ -182,20 +164,19 @@ fn value_to_toml(v: &Value) -> Result<toml::Value, String> {
         Value::Int(n) => Ok(toml::Value::Integer(*n)),
         Value::Float(f) => Ok(toml::Value::Float(*f)),
         Value::String(s) => Ok(toml::Value::String(s.clone())),
-        Value::Path(s) | Value::Glob(s) | Value::Regex(s)
-        | Value::Semver(s) => {
+        Value::Path(s) | Value::Glob(s) | Value::Regex(s) | Value::Semver(s) => {
             Ok(toml::Value::String(s.clone()))
         }
         Value::Secret(_) => Ok(toml::Value::String(crate::value::REDACTED.to_string())),
-        Value::Stream(s) => Ok(toml::Value::String(s.materialize_eager().unwrap_or_default())),
+        Value::Stream(s) => Ok(toml::Value::String(
+            s.materialize_eager().unwrap_or_default(),
+        )),
         Value::List(items) => {
-            let arr: Result<Vec<toml::Value>, String> =
-                items.iter().map(value_to_toml).collect();
+            let arr: Result<Vec<toml::Value>, String> = items.iter().map(value_to_toml).collect();
             Ok(toml::Value::Array(arr?))
         }
         Value::Set(items) => {
-            let arr: Result<Vec<toml::Value>, String> =
-                items.iter().map(value_to_toml).collect();
+            let arr: Result<Vec<toml::Value>, String> = items.iter().map(value_to_toml).collect();
             Ok(toml::Value::Array(arr?))
         }
         Value::Map(map) => {
@@ -206,8 +187,7 @@ fn value_to_toml(v: &Value) -> Result<toml::Value, String> {
             Ok(toml::Value::Table(table))
         }
         Value::Tuple(items) => {
-            let arr: Result<Vec<toml::Value>, String> =
-                items.iter().map(value_to_toml).collect();
+            let arr: Result<Vec<toml::Value>, String> = items.iter().map(value_to_toml).collect();
             Ok(toml::Value::Array(arr?))
         }
         Value::Null => {
@@ -269,21 +249,18 @@ pub fn to_json(value: &Value, indent: Option<usize>) -> Result<String, String> {
                 Ok(result)
             }
         }
-        None => serde_json::to_string(&jv)
-            .map_err(|e| format!("JSON serialize error: {}", e)),
+        None => serde_json::to_string(&jv).map_err(|e| format!("JSON serialize error: {}", e)),
     }
 }
 
 pub fn to_yaml(value: &Value) -> Result<String, String> {
     let yv = value_to_yaml(value);
-    serde_yaml::to_string(&yv)
-        .map_err(|e| format!("YAML serialize error: {}", e))
+    serde_yaml::to_string(&yv).map_err(|e| format!("YAML serialize error: {}", e))
 }
 
 pub fn to_toml(value: &Value) -> Result<String, String> {
     let tv = value_to_toml(value)?;
-    toml::to_string_pretty(&tv)
-        .map_err(|e| format!("TOML serialize error: {}", e))
+    toml::to_string_pretty(&tv).map_err(|e| format!("TOML serialize error: {}", e))
 }
 
 // ── Order-preserving serialization (for edit functions) ──────────────
@@ -311,17 +288,19 @@ fn value_to_json_ordered(v: &Value, template: &serde_json::Value) -> serde_json:
             }
             serde_json::Value::Object(obj)
         }
-        (Value::List(items), serde_json::Value::Array(orig_arr)) => {
-            serde_json::Value::Array(
-                items.iter().enumerate().map(|(i, item)| {
+        (Value::List(items), serde_json::Value::Array(orig_arr)) => serde_json::Value::Array(
+            items
+                .iter()
+                .enumerate()
+                .map(|(i, item)| {
                     if let Some(orig_item) = orig_arr.get(i) {
                         value_to_json_ordered(item, orig_item)
                     } else {
                         value_to_json(item)
                     }
-                }).collect()
-            )
-        }
+                })
+                .collect(),
+        ),
         _ => value_to_json(v),
     }
 }
@@ -351,8 +330,7 @@ fn apply_value_to_toml_item(item: &mut toml_edit::Item, value: &Value) {
                 *item = toml_edit::Item::Value((*f).into());
             }
         }
-        Value::String(s) | Value::Path(s) | Value::Glob(s)
-        | Value::Regex(s) | Value::Semver(s) => {
+        Value::String(s) | Value::Path(s) | Value::Glob(s) | Value::Regex(s) | Value::Semver(s) => {
             if let Some(v) = item.as_value_mut() {
                 *v = s.as_str().into();
             } else {
@@ -422,7 +400,8 @@ fn apply_value_to_toml_item(item: &mut toml_edit::Item, value: &Value) {
                 for (i, val) in items.iter().enumerate() {
                     if let Value::Map(map) = val {
                         if let Some(table) = aot.get_mut(i) {
-                            let existing: Vec<String> = table.iter().map(|(k, _)| k.to_string()).collect();
+                            let existing: Vec<String> =
+                                table.iter().map(|(k, _)| k.to_string()).collect();
                             for key in &existing {
                                 if !map.contains_key(key) {
                                     table.remove(key);
@@ -475,8 +454,9 @@ fn apply_value_to_toml_value(target: &mut toml_edit::Value, value: &Value) {
         Value::Bool(b) => *target = (*b).into(),
         Value::Int(n) => *target = (*n).into(),
         Value::Float(f) => *target = (*f).into(),
-        Value::String(s) | Value::Path(s) | Value::Glob(s)
-        | Value::Regex(s) | Value::Semver(s) => *target = s.as_str().into(),
+        Value::String(s) | Value::Path(s) | Value::Glob(s) | Value::Regex(s) | Value::Semver(s) => {
+            *target = s.as_str().into()
+        }
         Value::Secret(_) => *target = crate::value::REDACTED.into(),
         Value::Stream(s) => *target = s.materialize_eager().unwrap_or_default().as_str().into(),
         Value::Map(map) => {
@@ -523,8 +503,9 @@ fn que_value_to_toml_edit_value(value: &Value) -> toml_edit::Value {
         Value::Bool(b) => (*b).into(),
         Value::Int(n) => (*n).into(),
         Value::Float(f) => (*f).into(),
-        Value::String(s) | Value::Path(s) | Value::Glob(s)
-        | Value::Regex(s) | Value::Semver(s) => s.as_str().into(),
+        Value::String(s) | Value::Path(s) | Value::Glob(s) | Value::Regex(s) | Value::Semver(s) => {
+            s.as_str().into()
+        }
         Value::Secret(_) => crate::value::REDACTED.into(),
         Value::Stream(s) => s.materialize_eager().unwrap_or_default().as_str().into(),
         Value::List(items) | Value::Tuple(items) | Value::Set(items) => {
@@ -568,25 +549,31 @@ fn value_to_yaml_ordered(v: &Value, template: &serde_yaml::Value) -> serde_yaml:
             }
             serde_yaml::Value::Mapping(m)
         }
-        (Value::List(items), serde_yaml::Value::Sequence(orig_seq)) => {
-            serde_yaml::Value::Sequence(
-                items.iter().enumerate().map(|(i, item)| {
+        (Value::List(items), serde_yaml::Value::Sequence(orig_seq)) => serde_yaml::Value::Sequence(
+            items
+                .iter()
+                .enumerate()
+                .map(|(i, item)| {
                     if let Some(orig_item) = orig_seq.get(i) {
                         value_to_yaml_ordered(item, orig_item)
                     } else {
                         value_to_yaml(item)
                     }
-                }).collect()
-            )
-        }
+                })
+                .collect(),
+        ),
         _ => value_to_yaml(v),
     }
 }
 
 /// Serialize to JSON, preserving key order from the original content.
-pub fn to_json_ordered(value: &Value, original: &str, indent: Option<usize>) -> Result<String, String> {
-    let orig_jv: serde_json::Value = serde_json::from_str(original)
-        .map_err(|e| format!("JSON parse error: {}", e))?;
+pub fn to_json_ordered(
+    value: &Value,
+    original: &str,
+    indent: Option<usize>,
+) -> Result<String, String> {
+    let orig_jv: serde_json::Value =
+        serde_json::from_str(original).map_err(|e| format!("JSON parse error: {}", e))?;
     let jv = value_to_json_ordered(value, &orig_jv);
     match indent {
         Some(n) => {
@@ -611,15 +598,15 @@ pub fn to_json_ordered(value: &Value, original: &str, indent: Option<usize>) -> 
                 Ok(result)
             }
         }
-        None => serde_json::to_string(&jv)
-            .map_err(|e| format!("JSON serialize error: {}", e)),
+        None => serde_json::to_string(&jv).map_err(|e| format!("JSON serialize error: {}", e)),
     }
 }
 
 /// Serialize to TOML, preserving formatting from the original content.
 /// Uses `toml_edit` to keep inline tables, comments, and key order intact.
 pub fn to_toml_ordered(value: &Value, original: &str) -> Result<String, String> {
-    let mut doc: toml_edit::DocumentMut = original.parse()
+    let mut doc: toml_edit::DocumentMut = original
+        .parse()
         .map_err(|e| format!("TOML parse error: {}", e))?;
     if let Value::Map(map) = value {
         let table = doc.as_table_mut();
@@ -644,11 +631,10 @@ pub fn to_toml_ordered(value: &Value, original: &str) -> Result<String, String> 
 
 /// Serialize to YAML, preserving key order from the original content.
 pub fn to_yaml_ordered(value: &Value, original: &str) -> Result<String, String> {
-    let orig_yv: serde_yaml::Value = serde_yaml::from_str(original)
-        .map_err(|e| format!("YAML parse error: {}", e))?;
+    let orig_yv: serde_yaml::Value =
+        serde_yaml::from_str(original).map_err(|e| format!("YAML parse error: {}", e))?;
     let yv = value_to_yaml_ordered(value, &orig_yv);
-    serde_yaml::to_string(&yv)
-        .map_err(|e| format!("YAML serialize error: {}", e))
+    serde_yaml::to_string(&yv).map_err(|e| format!("YAML serialize error: {}", e))
 }
 
 // ── Lossless YAML editing ────────────────────────────────────────────
@@ -703,8 +689,9 @@ fn yaml_flow_text(value: &Value) -> String {
             rendered
         }
         Value::Null => "null".to_string(),
-        Value::String(s) | Value::Path(s) | Value::Glob(s)
-        | Value::Regex(s) | Value::Semver(s) => yaml_flow_scalar(s),
+        Value::String(s) | Value::Path(s) | Value::Glob(s) | Value::Regex(s) | Value::Semver(s) => {
+            yaml_flow_scalar(s)
+        }
         // A secret written into a config file is a secret written to disk;
         // callers who mean it write `.expose()` first.
         Value::Secret(_) => yaml_flow_scalar(crate::value::REDACTED),
@@ -739,8 +726,8 @@ fn que_value_to_yaml_node(value: &Value) -> Result<FreshYaml, String> {
     use std::str::FromStr;
 
     let text = yaml_flow_text(value);
-    let doc = yaml_edit::Document::from_str(&text)
-        .map_err(|e| format!("YAML serialize error: {}", e))?;
+    let doc =
+        yaml_edit::Document::from_str(&text).map_err(|e| format!("YAML serialize error: {}", e))?;
     if let Some(mapping) = doc.as_mapping() {
         return Ok(FreshYaml::Mapping(mapping));
     }
@@ -765,8 +752,8 @@ pub fn to_yaml_lossless(value: &Value, original: &str) -> Result<String, String>
 
     // Parse as a file rather than a document: a comment above the first key
     // belongs to the file, and `Document` alone would drop it.
-    let file = yaml_edit::YamlFile::from_str(original)
-        .map_err(|e| format!("YAML parse error: {}", e))?;
+    let file =
+        yaml_edit::YamlFile::from_str(original).map_err(|e| format!("YAML parse error: {}", e))?;
     let doc = file
         .document()
         .ok_or_else(|| "YAML document is empty".to_string())?;
@@ -872,10 +859,7 @@ fn apply_map_to_yaml_mapping(
     Ok(())
 }
 
-fn apply_list_to_yaml_sequence(
-    seq: &yaml_edit::Sequence,
-    items: &[Value],
-) -> Result<(), String> {
+fn apply_list_to_yaml_sequence(seq: &yaml_edit::Sequence, items: &[Value]) -> Result<(), String> {
     // `Sequence::remove` leaves the removed entry's indentation behind and
     // corrupts the document, so a shortened list takes the lossy path.
     if seq.len() > items.len() {
@@ -900,10 +884,7 @@ fn apply_list_to_yaml_sequence(
 ///
 /// Returns `false` when the shapes do not match (a scalar becoming a list,
 /// say) and the caller has to replace the node wholesale.
-fn apply_value_to_yaml_node(
-    node: &yaml_edit::YamlNode,
-    value: &Value,
-) -> Result<bool, String> {
+fn apply_value_to_yaml_node(node: &yaml_edit::YamlNode, value: &Value) -> Result<bool, String> {
     match value {
         Value::Map(map) if !map.is_empty() => match node.as_mapping() {
             Some(child) => {
@@ -912,15 +893,13 @@ fn apply_value_to_yaml_node(
             }
             None => Ok(false),
         },
-        Value::List(items) | Value::Tuple(items) if !items.is_empty() => {
-            match node.as_sequence() {
-                Some(child) => {
-                    apply_list_to_yaml_sequence(child, items)?;
-                    Ok(true)
-                }
-                None => Ok(false),
+        Value::List(items) | Value::Tuple(items) if !items.is_empty() => match node.as_sequence() {
+            Some(child) => {
+                apply_list_to_yaml_sequence(child, items)?;
+                Ok(true)
             }
-        }
+            None => Ok(false),
+        },
         Value::Map(_) | Value::List(_) | Value::Tuple(_) | Value::Set(_) => Ok(false),
         _ => match node.as_scalar() {
             Some(scalar) => {
@@ -940,8 +919,9 @@ fn yaml_scalar_replacement(scalar: &yaml_edit::Scalar, value: &Value) -> String 
     use yaml_edit::{ScalarStyle, ScalarValue};
 
     let text = match value {
-        Value::String(s) | Value::Path(s) | Value::Glob(s)
-        | Value::Regex(s) | Value::Semver(s) => s.clone(),
+        Value::String(s) | Value::Path(s) | Value::Glob(s) | Value::Regex(s) | Value::Semver(s) => {
+            s.clone()
+        }
         Value::Secret(_) => crate::value::REDACTED.to_string(),
         Value::Stream(s) => s.materialize_eager().unwrap_or_default(),
         // Numbers, bools and null are never quoted, so there is no style to
@@ -1041,18 +1021,14 @@ fn get_at_path(value: &Value, segments: &[PathSegment]) -> Value {
 
     let (head, tail) = segments.split_first().unwrap();
     match (head, value) {
-        (PathSegment::Key(key), Value::Map(map)) => {
-            match map.get(key) {
-                Some(child) => get_at_path(child, tail),
-                None => Value::Null,
-            }
-        }
-        (PathSegment::Index(idx), Value::List(items)) => {
-            match items.get(*idx) {
-                Some(child) => get_at_path(child, tail),
-                None => Value::Null,
-            }
-        }
+        (PathSegment::Key(key), Value::Map(map)) => match map.get(key) {
+            Some(child) => get_at_path(child, tail),
+            None => Value::Null,
+        },
+        (PathSegment::Index(idx), Value::List(items)) => match items.get(*idx) {
+            Some(child) => get_at_path(child, tail),
+            None => Value::Null,
+        },
         (PathSegment::Wildcard, Value::List(items)) => {
             let results: Vec<Value> = items
                 .iter()
@@ -1075,18 +1051,18 @@ fn set_at_path(value: &Value, segments: &[PathSegment], new_val: Value) -> Value
     match (head, value) {
         (PathSegment::Key(key), Value::Map(map)) => {
             let mut new_map = map.clone();
-            let child = map.get(key).cloned().unwrap_or(
-                if tail.is_empty() {
-                    Value::Null
-                } else {
-                    // Auto-create intermediate structure based on next segment
-                    match tail.first() {
-                        Some(PathSegment::Key(_)) => Value::Map(BTreeMap::new()),
-                        Some(PathSegment::Index(_)) | Some(PathSegment::Wildcard) => Value::List(Vec::new()),
-                        None => Value::Null,
+            let child = map.get(key).cloned().unwrap_or(if tail.is_empty() {
+                Value::Null
+            } else {
+                // Auto-create intermediate structure based on next segment
+                match tail.first() {
+                    Some(PathSegment::Key(_)) => Value::Map(BTreeMap::new()),
+                    Some(PathSegment::Index(_)) | Some(PathSegment::Wildcard) => {
+                        Value::List(Vec::new())
                     }
+                    None => Value::Null,
                 }
-            );
+            });
             new_map.insert(key.clone(), set_at_path(&child, tail, new_val));
             Value::Map(new_map)
         }
@@ -1095,7 +1071,9 @@ fn set_at_path(value: &Value, segments: &[PathSegment], new_val: Value) -> Value
             let mut new_map = BTreeMap::new();
             let child = match tail.first() {
                 Some(PathSegment::Key(_)) => Value::Map(BTreeMap::new()),
-                Some(PathSegment::Index(_)) | Some(PathSegment::Wildcard) => Value::List(Vec::new()),
+                Some(PathSegment::Index(_)) | Some(PathSegment::Wildcard) => {
+                    Value::List(Vec::new())
+                }
                 None => Value::Null,
             };
             new_map.insert(key.clone(), set_at_path(&child, tail, new_val));
@@ -1118,7 +1096,9 @@ fn set_at_path(value: &Value, segments: &[PathSegment], new_val: Value) -> Value
             }
             let child = match tail.first() {
                 Some(PathSegment::Key(_)) => Value::Map(BTreeMap::new()),
-                Some(PathSegment::Index(_)) | Some(PathSegment::Wildcard) => Value::List(Vec::new()),
+                Some(PathSegment::Index(_)) | Some(PathSegment::Wildcard) => {
+                    Value::List(Vec::new())
+                }
                 None => Value::Null,
             };
             new_items[*idx] = set_at_path(&child, tail, new_val);
@@ -1157,9 +1137,7 @@ fn delete_at_path(value: &Value, segments: &[PathSegment]) -> Value {
                 }
                 Value::List(new_items)
             }
-            (PathSegment::Wildcard, Value::List(_)) => {
-                Value::List(Vec::new())
-            }
+            (PathSegment::Wildcard, Value::List(_)) => Value::List(Vec::new()),
             _ => value.clone(),
         }
     } else {
@@ -1203,18 +1181,14 @@ fn has_at_path(value: &Value, segments: &[PathSegment]) -> bool {
 
     let (head, tail) = segments.split_first().unwrap();
     match (head, value) {
-        (PathSegment::Key(key), Value::Map(map)) => {
-            match map.get(key) {
-                Some(child) => has_at_path(child, tail),
-                None => false,
-            }
-        }
-        (PathSegment::Index(idx), Value::List(items)) => {
-            match items.get(*idx) {
-                Some(child) => has_at_path(child, tail),
-                None => false,
-            }
-        }
+        (PathSegment::Key(key), Value::Map(map)) => match map.get(key) {
+            Some(child) => has_at_path(child, tail),
+            None => false,
+        },
+        (PathSegment::Index(idx), Value::List(items)) => match items.get(*idx) {
+            Some(child) => has_at_path(child, tail),
+            None => false,
+        },
         (PathSegment::Wildcard, Value::List(items)) => {
             items.iter().any(|item| has_at_path(item, tail))
         }
@@ -1286,8 +1260,8 @@ fn detect_format(path: &str) -> Option<&'static str> {
 
 /// Read a config file, auto-detecting format from extension.
 pub fn config_read(path: &str) -> Result<Value, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("cannot read '{}': {}", path, e))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("cannot read '{}': {}", path, e))?;
 
     match detect_format(path) {
         Some("json") => parse_json(&content),
@@ -1298,10 +1272,12 @@ pub fn config_read(path: &str) -> Result<Value, String> {
             parse_json(&content)
                 .or_else(|_| parse_toml(&content))
                 .or_else(|_| parse_yaml(&content))
-                .map_err(|_| format!(
+                .map_err(|_| {
+                    format!(
                     "cannot determine config format for '{}'; use .json, .yaml, or .toml extension",
                     path,
-                ))
+                )
+                })
         }
     }
 }
@@ -1318,8 +1294,7 @@ pub fn config_write(path: &str, value: &Value, indent: Option<usize>) -> Result<
         }
     };
 
-    std::fs::write(path, &content)
-        .map_err(|e| format!("cannot write '{}': {}", path, e))
+    std::fs::write(path, &content).map_err(|e| format!("cannot write '{}': {}", path, e))
 }
 
 // ── List available config path keys ──────────────────────────────────
@@ -1416,7 +1391,10 @@ port = 5432
 "#;
         let val = parse_toml(toml_str).unwrap();
         assert_eq!(config_get(&val, "name"), Value::String("wisp".into()));
-        assert_eq!(config_get(&val, "database.host"), Value::String("localhost".into()));
+        assert_eq!(
+            config_get(&val, "database.host"),
+            Value::String("localhost".into())
+        );
         assert_eq!(config_get(&val, "database.port"), Value::Int(5432));
     }
 
@@ -1441,7 +1419,10 @@ port = 5432
         let json = r#"{"items":[{"id":1},{"id":2},{"id":3}]}"#;
         let val = parse_json(json).unwrap();
         let result = config_get(&val, "items[*].id");
-        assert_eq!(result, Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+        assert_eq!(
+            result,
+            Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+        );
     }
 
     #[test]
@@ -1450,14 +1431,20 @@ port = 5432
         let val = parse_json(json).unwrap();
         let updated = config_set(&val, "database.port", Value::Int(3306));
         assert_eq!(config_get(&updated, "database.port"), Value::Int(3306));
-        assert_eq!(config_get(&updated, "database.host"), Value::String("localhost".into()));
+        assert_eq!(
+            config_get(&updated, "database.host"),
+            Value::String("localhost".into())
+        );
     }
 
     #[test]
     fn test_config_set_creates_path() {
         let val = Value::Map(BTreeMap::new());
         let updated = config_set(&val, "new.nested.key", Value::String("value".into()));
-        assert_eq!(config_get(&updated, "new.nested.key"), Value::String("value".into()));
+        assert_eq!(
+            config_get(&updated, "new.nested.key"),
+            Value::String("value".into())
+        );
     }
 
     #[test]

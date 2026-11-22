@@ -10,7 +10,6 @@
 /// scopes it pushes are private, while the outer scopes it shares with its
 /// siblings are serialised by the lock. Every lock here is taken and
 /// released inside a single method, so no two are ever held at once.
-
 use crate::value::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -29,7 +28,9 @@ type Scope = HashMap<String, Binding>;
 /// program permanently unreadable: the map behind the lock is a plain
 /// `HashMap` that no half-finished write can leave inconsistent.
 fn lock(scope: &Mutex<Scope>) -> MutexGuard<'_, Scope> {
-    scope.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    scope
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 #[derive(Debug, Clone)]
@@ -59,13 +60,7 @@ impl Environment {
     /// Define a new variable in the current scope.
     pub fn define(&mut self, name: &str, value: Value, mutable: bool) {
         if let Some(scope) = self.scopes.last() {
-            lock(scope).insert(
-                name.to_string(),
-                Binding {
-                    value,
-                    mutable,
-                },
-            );
+            lock(scope).insert(name.to_string(), Binding { value, mutable });
         }
     }
 

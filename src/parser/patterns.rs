@@ -84,15 +84,24 @@ impl Parser {
                 }
                 let (enum_name, variant_name) = self.parse_qualified_pattern_head(name)?;
                 // Check for glob() pattern: glob("*.rs")
-                if enum_name.is_none() && variant_name == "glob" && matches!(self.peek(), TokenKind::LParen) {
+                if enum_name.is_none()
+                    && variant_name == "glob"
+                    && matches!(self.peek(), TokenKind::LParen)
+                {
                     self.advance(); // consume '('
                     let g = match self.peek() {
-                        TokenKind::StringLit(s) => { let s = s.clone(); self.advance(); s }
-                        _ => return Err(QueError::parser(
-                            ErrorKind::ExpectedPattern,
-                            "glob() pattern requires a string literal argument".to_string(),
-                            self.current_span(),
-                        )),
+                        TokenKind::StringLit(s) => {
+                            let s = s.clone();
+                            self.advance();
+                            s
+                        }
+                        _ => {
+                            return Err(QueError::parser(
+                                ErrorKind::ExpectedPattern,
+                                "glob() pattern requires a string literal argument".to_string(),
+                                self.current_span(),
+                            ))
+                        }
                     };
                     self.expect(&TokenKind::RParen)?;
                     return Ok(Pattern::Glob(g));
@@ -117,7 +126,11 @@ impl Parser {
                 // Instance pattern: `TypeName { field, other: pat, ...rest }`
                 // Also supports qualified enum-variant syntax: `EnumName.variant { ... }`.
                 if (enum_name.is_some()
-                    || variant_name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false))
+                    || variant_name
+                        .chars()
+                        .next()
+                        .map(|c| c.is_uppercase())
+                        .unwrap_or(false))
                     && matches!(self.peek(), TokenKind::LBrace)
                 {
                     self.advance(); // consume `{`
@@ -157,7 +170,11 @@ impl Parser {
 
                 if enum_name.is_some()
                     || (self.pattern_mode == PatternMode::Match
-                        && variant_name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false))
+                        && variant_name
+                            .chars()
+                            .next()
+                            .map(|c| c.is_uppercase())
+                            .unwrap_or(false))
                 {
                     Ok(Pattern::Enum(enum_name, variant_name, vec![]))
                 } else {

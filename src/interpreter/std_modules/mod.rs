@@ -27,9 +27,9 @@ pub(crate) mod tty;
 mod watch;
 mod yaml;
 
+use super::Interpreter;
 use crate::error::*;
 use crate::value::Value;
-use super::Interpreter;
 
 /// Descriptor for a std module: its name and the bare function names it provides.
 /// The fully-qualified name is constructed as `"{name}.{fn_name}"`.

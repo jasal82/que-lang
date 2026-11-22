@@ -1,19 +1,26 @@
 //! std.fs module — File system operations.
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::Value;
 
 pub(super) fn module() -> StdModule {
     StdModule {
         name: "fs",
         functions: &[
-            "read", "write", "exists",
+            "read",
+            "write",
+            "exists",
             "read_secret",
-            "atomic_write", "temp_file", "temp_dir",
-            "copy_dir", "remove_dir", "find",
-            "read_lines", "write_lines",
+            "atomic_write",
+            "temp_file",
+            "temp_dir",
+            "copy_dir",
+            "remove_dir",
+            "find",
+            "read_lines",
+            "write_lines",
             "transform",
         ],
     }
@@ -24,7 +31,10 @@ impl Interpreter {
         match func {
             "read" => {
                 let path = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "fs.read requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "fs.read requires 1 argument",
+                    ))
                 })?;
                 let p = path_str(path, "fs.read")?;
                 match std::fs::read_to_string(&p) {
@@ -51,7 +61,10 @@ impl Interpreter {
             }
             "exists" => {
                 let path = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "exists requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "exists requires 1 argument",
+                    ))
                 })?;
                 let p = path_str(path, "exists")?;
                 Ok(Value::Bool(std::path::Path::new(&p).exists()))
@@ -169,9 +182,12 @@ impl Interpreter {
             "remove_dir" => {
                 let path = match args.first() {
                     Some(val) => path_str(val, "fs.remove_dir: argument")?,
-                    None => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch, "fs.remove_dir requires 1 argument",
-                    ))),
+                    None => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "fs.remove_dir requires 1 argument",
+                        )))
+                    }
                 };
                 if self.dry_run_skip(format!("remove {}", path)) {
                     return Ok(Value::Ok(Box::new(Value::Null)));
@@ -184,9 +200,12 @@ impl Interpreter {
             "find" => {
                 let dir = match args.first() {
                     Some(val) => path_str(val, "fs.find: first argument")?,
-                    None => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch, "fs.find requires at least 1 argument",
-                    ))),
+                    None => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "fs.find requires at least 1 argument",
+                        )))
+                    }
                 };
                 let pattern = match args.get(1) {
                     Some(Value::String(s)) => Some(s.clone()),
@@ -200,13 +219,17 @@ impl Interpreter {
             "read_lines" => {
                 let path = match args.first() {
                     Some(val) => path_str(val, "fs.read_lines: argument")?,
-                    None => return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch, "fs.read_lines requires a path argument",
-                    ))),
+                    None => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::ArityMismatch,
+                            "fs.read_lines requires a path argument",
+                        )))
+                    }
                 };
                 match std::fs::read_to_string(&path) {
                     Ok(content) => {
-                        let lines: Vec<Value> = content.lines()
+                        let lines: Vec<Value> = content
+                            .lines()
                             .map(|l| Value::String(l.to_string()))
                             .collect();
                         Ok(Value::Ok(Box::new(Value::List(lines))))
@@ -217,16 +240,20 @@ impl Interpreter {
             "write_lines" => {
                 if args.len() < 2 {
                     return Err(Signal::Error(QueError::new(
-                        ErrorKind::ArityMismatch, "fs.write_lines requires 2 arguments: lines, path",
+                        ErrorKind::ArityMismatch,
+                        "fs.write_lines requires 2 arguments: lines, path",
                     )));
                 }
                 let lines_val = &args[0];
                 let path = path_str(&args[1], "fs.write_lines: second argument")?;
                 let lines: Vec<String> = match lines_val {
                     Value::List(items) => items.iter().map(|v| v.display_string()).collect(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch, "fs.write_lines: first argument must be a list",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "fs.write_lines: first argument must be a list",
+                        )))
+                    }
                 };
                 let content = lines.join("\n") + "\n";
                 if self.dry_run_skip(format!("write {} ({} lines)", path, lines.len())) {
@@ -246,22 +273,28 @@ impl Interpreter {
                 }
                 let p = path_str(&args[0], "fs.transform")?;
                 let func_val = args[1].clone();
-                let content = std::fs::read_to_string(&p).map_err(|e| {
-                    Signal::Error(QueError::new(ErrorKind::IoError, e.to_string()))
-                })?;
+                let content = std::fs::read_to_string(&p)
+                    .map_err(|e| Signal::Error(QueError::new(ErrorKind::IoError, e.to_string())))?;
                 let result = self.call_value(func_val, vec![Value::String(content)])?;
                 let new_content = match &result {
                     Value::String(s) => s.clone(),
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        "fs.transform: callback must return a String",
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            "fs.transform: callback must return a String",
+                        )))
+                    }
                 };
-                if self.dry_run_skip(format!("write {} ({} bytes, transformed)", p, new_content.len())) {
+                if self.dry_run_skip(format!(
+                    "write {} ({} bytes, transformed)",
+                    p,
+                    new_content.len()
+                )) {
                     return Ok(Value::Null);
                 }
                 atomic_write_str(&p, &new_content)?;
-                Ok(Value::Null)            }
+                Ok(Value::Null)
+            }
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
                 format!("unknown function 'fs.{}'", func),
@@ -279,15 +312,12 @@ pub(super) fn path_str(val: &Value, fn_name: &str) -> Result<String, Signal> {
 pub(super) fn atomic_write_str(dest: &str, content: &str) -> Result<(), Signal> {
     let dest_path = std::path::Path::new(dest);
     let parent = dest_path.parent().unwrap_or(std::path::Path::new("."));
-    let (_, tmp_path) = tempfile_in(parent).map_err(|e| {
-        Signal::Error(QueError::new(ErrorKind::IoError, e))
-    })?;
-    std::fs::write(&tmp_path, content).map_err(|e| {
-        Signal::Error(QueError::new(ErrorKind::IoError, e.to_string()))
-    })?;
-    std::fs::rename(&tmp_path, dest).map_err(|e| {
-        Signal::Error(QueError::new(ErrorKind::IoError, e.to_string()))
-    })?;
+    let (_, tmp_path) =
+        tempfile_in(parent).map_err(|e| Signal::Error(QueError::new(ErrorKind::IoError, e)))?;
+    std::fs::write(&tmp_path, content)
+        .map_err(|e| Signal::Error(QueError::new(ErrorKind::IoError, e.to_string())))?;
+    std::fs::rename(&tmp_path, dest)
+        .map_err(|e| Signal::Error(QueError::new(ErrorKind::IoError, e.to_string())))?;
     Ok(())
 }
 
@@ -299,8 +329,7 @@ fn tempfile_in(dir: &std::path::Path) -> Result<(String, String), String> {
         .unwrap_or(0);
     let tmp_name = format!(".que_atomic_{}", ts);
     let tmp_path = dir.join(&tmp_name);
-    std::fs::File::create(&tmp_path)
-        .map_err(|e| e.to_string())?;
+    std::fs::File::create(&tmp_path).map_err(|e| e.to_string())?;
     let path_str = tmp_path.to_string_lossy().into_owned();
     Ok((path_str.clone(), path_str))
 }
@@ -412,7 +441,9 @@ fn unique_token() -> String {
             .unwrap_or(0);
         let mix = ts
             ^ ((std::process::id() as u64) << 32)
-            ^ COUNTER.fetch_add(1, Ordering::Relaxed).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+            ^ COUNTER
+                .fetch_add(1, Ordering::Relaxed)
+                .wrapping_mul(0x9E37_79B9_7F4A_7C15);
         bytes[..8].copy_from_slice(&mix.to_le_bytes());
     }
     bytes.iter().map(|b| format!("{:02x}", b)).collect()

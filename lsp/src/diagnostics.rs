@@ -1,5 +1,4 @@
 /// Diagnostics — convert analysis errors into LSP diagnostics.
-
 use crate::analysis::{self, AnalysisError, AnalysisResult};
 use tower_lsp::lsp_types::*;
 

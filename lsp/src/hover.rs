@@ -1,5 +1,4 @@
 /// Hover provider — returns documentation for the symbol under the cursor.
-
 use crate::analysis;
 use crate::builtins;
 use tower_lsp::lsp_types::*;
@@ -22,10 +21,7 @@ pub fn hover(source: &str, position: &Position) -> Option<Hover> {
     // 2. Check built-in functions
     for bi in builtins::builtin_functions() {
         if bi.name == word {
-            let md = format!(
-                "```que\n{}\n```\n\n{}",
-                bi.signature, bi.documentation
-            );
+            let md = format!("```que\n{}\n```\n\n{}", bi.signature, bi.documentation);
             return Some(Hover {
                 contents: HoverContents::Markup(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -63,10 +59,7 @@ pub fn hover(source: &str, position: &Position) -> Option<Hover> {
     let result = analysis::analyze(source);
     for sym in &result.symbols {
         if sym.name == word {
-            let detail = sym
-                .detail
-                .as_deref()
-                .unwrap_or(&sym.name);
+            let detail = sym.detail.as_deref().unwrap_or(&sym.name);
             let kind = match sym.kind {
                 analysis::SymbolKind::Function => "function",
                 analysis::SymbolKind::Task => "task",

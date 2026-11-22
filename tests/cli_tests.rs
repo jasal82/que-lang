@@ -40,7 +40,16 @@ fn every_command_has_a_help_page_listing_its_options() {
     // Each command's own flags must appear on its page: a flag that exists
     // but is undocumented is one nobody will ever use.
     let expected = [
-        ("run", vec!["-f <file>", "-g, --global", "-B, --force", "--dry-run", "--allow"]),
+        (
+            "run",
+            vec![
+                "-f <file>",
+                "-g, --global",
+                "-B, --force",
+                "--dry-run",
+                "--allow",
+            ],
+        ),
         ("tasks", vec!["-f <file>", "-g, --global"]),
         ("test", vec!["--filter <text>"]),
         ("install", vec!["--locked", "-g, --global"]),
@@ -73,7 +82,10 @@ fn an_unknown_command_points_at_the_help_command() {
     let output = que(&["--nonsense"]);
     assert!(!output.status.success());
     let err = String::from_utf8_lossy(&output.stderr);
-    assert!(err.contains("unknown command or option: --nonsense"), "{err}");
+    assert!(
+        err.contains("unknown command or option: --nonsense"),
+        "{err}"
+    );
     assert!(err.contains("que help"), "{err}");
 }
 
@@ -226,9 +238,18 @@ task build {
     assert!(output.status.success(), "{:?}", output);
     let project = fixture.root.join("project");
     let out = stdout(&output);
-    assert!(out.contains(&format!("before={}", project.display())), "{out}");
-    assert!(out.contains(&format!("inside={}", project.join("sub").display())), "{out}");
-    assert!(out.contains(&format!("after={}", project.display())), "{out}");
+    assert!(
+        out.contains(&format!("before={}", project.display())),
+        "{out}"
+    );
+    assert!(
+        out.contains(&format!("inside={}", project.join("sub").display())),
+        "{out}"
+    );
+    assert!(
+        out.contains(&format!("after={}", project.display())),
+        "{out}"
+    );
 }
 
 #[test]
@@ -258,14 +279,26 @@ task boom {
     let output = fixture.que("project", &["run", "build"]);
     assert!(output.status.success(), "{:?}", output);
     let out = stdout(&output);
-    assert!(out.contains(&format!("before={}", project.display())), "{out}");
-    assert!(out.contains(&format!("inside={}", project.join("sub").display())), "{out}");
-    assert!(out.contains(&format!("after={}", project.display())), "{out}");
+    assert!(
+        out.contains(&format!("before={}", project.display())),
+        "{out}"
+    );
+    assert!(
+        out.contains(&format!("inside={}", project.join("sub").display())),
+        "{out}"
+    );
+    assert!(
+        out.contains(&format!("after={}", project.display())),
+        "{out}"
+    );
 
     let failed = fixture.que("project", &["run", "boom"]);
     assert!(!failed.status.success(), "{:?}", failed);
     let out = stdout(&failed);
-    assert!(out.contains(&format!("unwind={}", project.display())), "{out}");
+    assert!(
+        out.contains(&format!("unwind={}", project.display())),
+        "{out}"
+    );
 }
 
 #[test]
@@ -292,10 +325,7 @@ fn a_global_quefile_can_import_packages_installed_with_install_g() {
     // Installed from the project directory: the point of the flag.
     let installed = fixture.que("project/sub", &["install", "-g"]);
     assert!(installed.status.success(), "{:?}", installed);
-    assert!(fixture
-        .root
-        .join("home/.que/que_packages/shared")
-        .exists());
+    assert!(fixture.root.join("home/.que/que_packages/shared").exists());
 
     // The task is not in the project Quefile, so it falls through to the
     // global one — whose import has to resolve against the global directory.
@@ -387,10 +417,18 @@ fn the_flags_start_a_repl_when_there_is_no_script_to_run() {
     assert!(output.status.success(), "{:?}", output);
     assert!(stdout(&output).contains("hi repl"), "{}", stdout(&output));
 
-    let dir = fixture.root.join("home/.que/que_packages").display().to_string();
+    let dir = fixture
+        .root
+        .join("home/.que/que_packages")
+        .display()
+        .to_string();
     let with_dir = fixture.que_repl("project", &["--packages", &dir], session);
     assert!(with_dir.status.success(), "{:?}", with_dir);
-    assert!(stdout(&with_dir).contains("hi repl"), "{}", stdout(&with_dir));
+    assert!(
+        stdout(&with_dir).contains("hi repl"),
+        "{}",
+        stdout(&with_dir)
+    );
 
     // A plain REPL still sees only the local packages.
     let plain = fixture.que_repl("project", &[], session);
@@ -402,7 +440,8 @@ fn the_flags_start_a_repl_when_there_is_no_script_to_run() {
 }
 
 #[test]
-fn a_local_package_wins_over_the_global_one_of_the_same_name() {    // Otherwise a machine-wide install would silently change what a project
+fn a_local_package_wins_over_the_global_one_of_the_same_name() {
+    // Otherwise a machine-wide install would silently change what a project
     // that vendored its own copy runs.
     let fixture = Fixture::new("script-shadow", None, None);
     for (dir, body) in [
@@ -439,7 +478,10 @@ task build(target, ...files) {
 "#;
     let fixture = Fixture::new("rest-param", Some(quefile), None);
 
-    let output = fixture.que("project", &["run", "build", "--", "app", "a.txt", "b.txt", "c.txt"]);
+    let output = fixture.que(
+        "project",
+        &["run", "build", "--", "app", "a.txt", "b.txt", "c.txt"],
+    );
     assert!(output.status.success(), "{:?}", output);
     let out = stdout(&output);
     assert!(out.contains("target=app"), "{out}");
@@ -466,10 +508,17 @@ fn arguments_no_parameter_can_claim_are_refused_rather_than_dropped() {
 
     assert!(!output.status.success(), "{:?}", output);
     let err = String::from_utf8_lossy(&output.stderr);
-    assert!(err.contains("takes 1 positional argument, but 2 were given"), "{err}");
+    assert!(
+        err.contains("takes 1 positional argument, but 2 were given"),
+        "{err}"
+    );
     assert!(err.contains("...name"), "{err}");
     // The check runs ahead of the body, so the task never started.
-    assert!(!stdout(&output).contains("target=app"), "{}", stdout(&output));
+    assert!(
+        !stdout(&output).contains("target=app"),
+        "{}",
+        stdout(&output)
+    );
 }
 
 #[test]
@@ -494,12 +543,16 @@ fn a_rest_parameter_is_a_task_spelling_and_must_come_last() {
         let output = fixture.que("project", &["run", "build"]);
         assert!(!output.status.success(), "{quefile}\n{:?}", output);
         let err = String::from_utf8_lossy(&output.stderr);
-        assert!(err.contains(expected), "{quefile}\nexpected {expected:?}, got: {err}");
+        assert!(
+            err.contains(expected),
+            "{quefile}\nexpected {expected:?}, got: {err}"
+        );
     }
 }
 
 #[test]
-fn a_task_the_project_quefile_lacks_comes_from_the_global_one() {    let fixture = Fixture::new(
+fn a_task_the_project_quefile_lacks_comes_from_the_global_one() {
+    let fixture = Fixture::new(
         "fallback",
         Some("task build {\n    println(\"project build\")\n}\n"),
         Some("task backup {\n    println(\"global backup\")\n}\n"),
@@ -508,7 +561,11 @@ fn a_task_the_project_quefile_lacks_comes_from_the_global_one() {    let fixture
     let output = fixture.que("project", &["run", "backup"]);
 
     assert!(output.status.success(), "{:?}", output);
-    assert!(stdout(&output).contains("global backup"), "{}", stdout(&output));
+    assert!(
+        stdout(&output).contains("global backup"),
+        "{}",
+        stdout(&output)
+    );
 }
 
 #[test]
@@ -521,11 +578,19 @@ fn the_project_quefile_shadows_a_global_task_unless_g_is_given() {
 
     let local = fixture.que("project", &["run", "build"]);
     assert!(local.status.success(), "{:?}", local);
-    assert!(stdout(&local).contains("project build"), "{}", stdout(&local));
+    assert!(
+        stdout(&local).contains("project build"),
+        "{}",
+        stdout(&local)
+    );
 
     let global = fixture.que("project", &["run", "-g", "build"]);
     assert!(global.status.success(), "{:?}", global);
-    assert!(stdout(&global).contains("global build"), "{}", stdout(&global));
+    assert!(
+        stdout(&global).contains("global build"),
+        "{}",
+        stdout(&global)
+    );
 }
 
 #[test]
@@ -563,7 +628,11 @@ fn an_unknown_task_names_both_the_project_and_the_global_quefile() {
 
 #[test]
 fn f_and_g_cannot_be_combined() {
-    let fixture = Fixture::new("conflict", Some("task build { 1 }\n"), Some("task build { 1 }\n"));
+    let fixture = Fixture::new(
+        "conflict",
+        Some("task build { 1 }\n"),
+        Some("task build { 1 }\n"),
+    );
 
     let output = fixture.que("project", &["run", "-f", "Quefile", "-g", "build"]);
 
@@ -600,14 +669,26 @@ fn a_glob_rooted_at_the_quefile_directory_still_detects_a_changed_input() {
 
     let first = fixture.que("project/sub", &["run", "build"]);
     assert!(first.status.success(), "{:?}", first);
-    assert!(stdout(&first).contains("[DONE] build"), "{}", stdout(&first));
+    assert!(
+        stdout(&first).contains("[DONE] build"),
+        "{}",
+        stdout(&first)
+    );
 
     let second = fixture.que("project/sub", &["run", "build"]);
-    assert!(stdout(&second).contains("[SKIP] build"), "{}", stdout(&second));
+    assert!(
+        stdout(&second).contains("[SKIP] build"),
+        "{}",
+        stdout(&second)
+    );
 
     fs::write(src.join("a.txt"), "v2\n").unwrap();
     let third = fixture.que("project/sub", &["run", "build"]);
-    assert!(stdout(&third).contains("[DONE] build"), "{}", stdout(&third));
+    assert!(
+        stdout(&third).contains("[DONE] build"),
+        "{}",
+        stdout(&third)
+    );
 }
 
 #[test]
@@ -635,10 +716,18 @@ fn force_runs_a_task_that_would_otherwise_be_skipped() {
 
     let first = fixture.que("project/sub", &["run", "build"]);
     assert!(first.status.success(), "{:?}", first);
-    assert!(stdout(&first).contains("[DONE] build"), "{}", stdout(&first));
+    assert!(
+        stdout(&first).contains("[DONE] build"),
+        "{}",
+        stdout(&first)
+    );
 
     let second = fixture.que("project/sub", &["run", "build"]);
-    assert!(stdout(&second).contains("[SKIP] build"), "{}", stdout(&second));
+    assert!(
+        stdout(&second).contains("[SKIP] build"),
+        "{}",
+        stdout(&second)
+    );
 
     for flag in ["--force", "-B"] {
         let forced = fixture.que("project/sub", &["run", flag, "build"]);
@@ -654,5 +743,9 @@ fn force_runs_a_task_that_would_otherwise_be_skipped() {
     // A forced run still records what it produced, so the next plain run can
     // skip again — forcing once must not poison the cache.
     let after = fixture.que("project/sub", &["run", "build"]);
-    assert!(stdout(&after).contains("[SKIP] build"), "{}", stdout(&after));
+    assert!(
+        stdout(&after).contains("[SKIP] build"),
+        "{}",
+        stdout(&after)
+    );
 }

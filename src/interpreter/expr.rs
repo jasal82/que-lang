@@ -1,10 +1,10 @@
 //! Expression evaluation for the Que interpreter.
 
+use super::helpers::{cmp_semver, duration_to_ms};
 use super::Interpreter;
-use super::helpers::{duration_to_ms, cmp_semver};
+use crate::ast::AstStringPart;
 use crate::ast::*;
 use crate::error::*;
-use crate::ast::AstStringPart;
 use crate::token::DurationUnit;
 use crate::value::{CmdModifiers, CmdPart, Value};
 
@@ -80,8 +80,7 @@ impl Interpreter {
                 Ok(Value::Set(items))
             }
             Expr::TupleLit(elems) => {
-                let items: Result<Vec<_>, _> =
-                    elems.iter().map(|e| self.eval_expr(e)).collect();
+                let items: Result<Vec<_>, _> = elems.iter().map(|e| self.eval_expr(e)).collect();
                 Ok(Value::Tuple(items?))
             }
             Expr::CmdLit(parts) => {
@@ -98,7 +97,9 @@ impl Interpreter {
                                 // human-facing rendering of this command
                                 // will show `<redacted>` instead.
                                 Value::Secret(s) => cmd_parts.push(CmdPart::Secret(s)),
-                                other => cmd_parts.push(CmdPart::Interpolated(other.display_string())),
+                                other => {
+                                    cmd_parts.push(CmdPart::Interpolated(other.display_string()))
+                                }
                             }
                         }
                         AstStringPart::RawExpr(expr) => {
@@ -182,7 +183,9 @@ impl Interpreter {
             // ── Calls ──
             Expr::Call { callee, args } => {
                 // Check for partial application: if any arg is `_`, create a closure
-                let has_placeholder = args.iter().any(|a| matches!(&a.value, Expr::Ident(n) if n == "_"));
+                let has_placeholder = args
+                    .iter()
+                    .any(|a| matches!(&a.value, Expr::Ident(n) if n == "_"));
                 if has_placeholder {
                     let callee_val = self.eval_expr(callee)?;
                     // Build a partially applied function:
@@ -318,9 +321,7 @@ impl Interpreter {
                 }
             }
 
-            Expr::StructLit { name, fields } => {
-                self.eval_struct_lit(name, fields)
-            }
+            Expr::StructLit { name, fields } => self.eval_struct_lit(name, fields),
             Expr::Index { object, index } => {
                 let obj = self.eval_expr(object)?;
                 let idx = self.eval_expr(index)?;
@@ -406,9 +407,11 @@ impl Interpreter {
             Expr::Block(block) => self.eval_block_scoped(block),
 
             // ── With expressions ──
-            Expr::WithContext { manager, name, body } => {
-                self.eval_with_context(manager, name, body)
-            }
+            Expr::WithContext {
+                manager,
+                name,
+                body,
+            } => self.eval_with_context(manager, name, body),
 
             // ── Loop expression (returns value via break) ──
             Expr::Loop { body } => {
@@ -493,12 +496,9 @@ impl Interpreter {
             }
 
             // ── parallel { branches } — evaluate branches (concurrently when safe) ──
-            Expr::Parallel(branches) => {
-                self.eval_parallel(branches)
-            }
+            Expr::Parallel(branches) => self.eval_parallel(branches),
         }
     }
-
 
     // ── Pipe operator ────────────────────────────────────────────────
 
@@ -607,13 +607,21 @@ impl Interpreter {
                 Ok(Some(annotate(&source, &values)))
             }
             // Report the operand that decided the result, not the whole chain.
-            Expr::BinaryOp { left, op: BinOp::And, right } => {
+            Expr::BinaryOp {
+                left,
+                op: BinOp::And,
+                right,
+            } => {
                 if let Some(detail) = self.explain_assert(left)? {
                     return Ok(Some(detail));
                 }
                 self.explain_assert(right)
             }
-            Expr::BinaryOp { left, op: BinOp::Or, right } => {
+            Expr::BinaryOp {
+                left,
+                op: BinOp::Or,
+                right,
+            } => {
                 let l = self.eval_expr(left)?;
                 if l.is_truthy() {
                     return Ok(None);
@@ -623,7 +631,10 @@ impl Interpreter {
                     Some(_) => Ok(Some(format!("{}  (both sides false)", source))),
                 }
             }
-            Expr::UnaryOp { op: UnaryOp::Not, expr: inner } => {
+            Expr::UnaryOp {
+                op: UnaryOp::Not,
+                expr: inner,
+            } => {
                 let val = self.eval_expr(inner)?;
                 if !val.is_truthy() {
                     return Ok(None);
@@ -648,10 +659,8 @@ impl Interpreter {
             BinOp::Sub => {
                 // Set - Set → difference
                 if let (Value::Set(a), Value::Set(b)) = (left, right) {
-                    let result: Vec<Value> = a.iter()
-                        .filter(|item| !b.contains(item))
-                        .cloned()
-                        .collect();
+                    let result: Vec<Value> =
+                        a.iter().filter(|item| !b.contains(item)).cloned().collect();
                     return Ok(Value::Set(result));
                 }
                 // Int - Duration → Int (timestamp arithmetic: now() - 7d)
@@ -667,22 +676,35 @@ impl Interpreter {
             BinOp::Pow => self.eval_pow(left, right),
 
             BinOp::Eq => {
-                if let (Value::Instance { type_name: ta, .. }, Value::Instance { type_name: tb, .. }) = (left, right) {
+                if let (
+                    Value::Instance { type_name: ta, .. },
+                    Value::Instance { type_name: tb, .. },
+                ) = (left, right)
+                {
                     if ta == tb {
                         let ta = ta.clone();
                         if let Some(m) = self.find_instance_method(&ta, "equals") {
-                            return self.call_method_def(m, Some(left.clone()), vec![right.clone()]);
+                            return self.call_method_def(
+                                m,
+                                Some(left.clone()),
+                                vec![right.clone()],
+                            );
                         }
                     }
                 }
                 Ok(Value::Bool(left == right))
             }
             BinOp::NotEq => {
-                if let (Value::Instance { type_name: ta, .. }, Value::Instance { type_name: tb, .. }) = (left, right) {
+                if let (
+                    Value::Instance { type_name: ta, .. },
+                    Value::Instance { type_name: tb, .. },
+                ) = (left, right)
+                {
                     if ta == tb {
                         let ta = ta.clone();
                         if let Some(m) = self.find_instance_method(&ta, "equals") {
-                            let result = self.call_method_def(m, Some(left.clone()), vec![right.clone()])?;
+                            let result =
+                                self.call_method_def(m, Some(left.clone()), vec![right.clone()])?;
                             return Ok(Value::Bool(!result.is_truthy()));
                         }
                     }
@@ -720,10 +742,8 @@ impl Interpreter {
             BinOp::BitAnd => {
                 // Set & Set → intersection
                 if let (Value::Set(a), Value::Set(b)) = (left, right) {
-                    let result: Vec<Value> = a.iter()
-                        .filter(|item| b.contains(item))
-                        .cloned()
-                        .collect();
+                    let result: Vec<Value> =
+                        a.iter().filter(|item| b.contains(item)).cloned().collect();
                     return Ok(Value::Set(result));
                 }
                 self.eval_bitop(left, right, "bitand", |a, b| a & b)
@@ -779,10 +799,8 @@ impl Interpreter {
             BinOp::BitXor => {
                 // Set ^ Set → symmetric difference
                 if let (Value::Set(a), Value::Set(b)) = (left, right) {
-                    let mut result: Vec<Value> = a.iter()
-                        .filter(|item| !b.contains(item))
-                        .cloned()
-                        .collect();
+                    let mut result: Vec<Value> =
+                        a.iter().filter(|item| !b.contains(item)).cloned().collect();
                     for val in b {
                         if !a.contains(val) && !result.contains(val) {
                             result.push(val.clone());
@@ -803,9 +821,7 @@ impl Interpreter {
             (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
             (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 + b)),
             (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a + *b as f64)),
-            (Value::String(a), Value::String(b)) => {
-                Ok(Value::String(format!("{}{}", a, b)))
-            }
+            (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
             (Value::String(a), b) => Ok(Value::String(format!("{}{}", a, b))),
             (Value::List(a), Value::List(b)) => {
                 let mut result = a.clone();
@@ -838,11 +854,7 @@ impl Interpreter {
             }
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::TypeMismatch,
-                format!(
-                    "cannot add {} and {}",
-                    left.type_name(),
-                    right.type_name()
-                ),
+                format!("cannot add {} and {}", left.type_name(), right.type_name()),
             ))),
         }
     }
@@ -864,24 +876,39 @@ impl Interpreter {
             (Value::Duration(a, au), Value::Duration(b, bu)) => {
                 let a_ms = duration_to_ms(*a, *au);
                 let b_ms = duration_to_ms(*b, *bu);
-                Ok(Value::Duration(float_op(a_ms, b_ms), DurationUnit::Milliseconds))
+                Ok(Value::Duration(
+                    float_op(a_ms, b_ms),
+                    DurationUnit::Milliseconds,
+                ))
             }
             // Duration * number / number * Duration
             (Value::Duration(a, au), Value::Int(b)) => {
                 let a_ms = duration_to_ms(*a, *au);
-                Ok(Value::Duration(float_op(a_ms, *b as f64), DurationUnit::Milliseconds))
+                Ok(Value::Duration(
+                    float_op(a_ms, *b as f64),
+                    DurationUnit::Milliseconds,
+                ))
             }
             (Value::Duration(a, au), Value::Float(b)) => {
                 let a_ms = duration_to_ms(*a, *au);
-                Ok(Value::Duration(float_op(a_ms, *b), DurationUnit::Milliseconds))
+                Ok(Value::Duration(
+                    float_op(a_ms, *b),
+                    DurationUnit::Milliseconds,
+                ))
             }
             (Value::Int(a), Value::Duration(b, bu)) => {
                 let b_ms = duration_to_ms(*b, *bu);
-                Ok(Value::Duration(float_op(*a as f64, b_ms), DurationUnit::Milliseconds))
+                Ok(Value::Duration(
+                    float_op(*a as f64, b_ms),
+                    DurationUnit::Milliseconds,
+                ))
             }
             (Value::Float(a), Value::Duration(b, bu)) => {
                 let b_ms = duration_to_ms(*b, *bu);
-                Ok(Value::Duration(float_op(*a, b_ms), DurationUnit::Milliseconds))
+                Ok(Value::Duration(
+                    float_op(*a, b_ms),
+                    DurationUnit::Milliseconds,
+                ))
             }
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::TypeMismatch,
@@ -1026,9 +1053,15 @@ impl Interpreter {
     ) -> IResult {
         let ord = match (left, right) {
             (Value::Int(a), Value::Int(b)) => a.cmp(b),
-            (Value::Float(a), Value::Float(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal),
-            (Value::Int(a), Value::Float(b)) => (*a as f64).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal),
-            (Value::Float(a), Value::Int(b)) => a.partial_cmp(&(*b as f64)).unwrap_or(std::cmp::Ordering::Equal),
+            (Value::Float(a), Value::Float(b)) => {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            }
+            (Value::Int(a), Value::Float(b)) => (*a as f64)
+                .partial_cmp(b)
+                .unwrap_or(std::cmp::Ordering::Equal),
+            (Value::Float(a), Value::Int(b)) => a
+                .partial_cmp(&(*b as f64))
+                .unwrap_or(std::cmp::Ordering::Equal),
             (Value::String(a), Value::String(b)) => a.cmp(b),
             (Value::Semver(a), Value::Semver(b)) => cmp_semver(a, b),
             (Value::Duration(a, au), Value::Duration(b, bu)) => {
@@ -1036,23 +1069,33 @@ impl Interpreter {
                 let b_ms = duration_to_ms(*b, *bu);
                 a_ms.partial_cmp(&b_ms).unwrap_or(std::cmp::Ordering::Equal)
             }
-            (Value::Instance { type_name: ta, fields: fa },
-             Value::Instance { type_name: tb, fields: fb })
-                if ta == "DateTime" && tb == "DateTime" =>
-            {
+            (
+                Value::Instance {
+                    type_name: ta,
+                    fields: fa,
+                },
+                Value::Instance {
+                    type_name: tb,
+                    fields: fb,
+                },
+            ) if ta == "DateTime" && tb == "DateTime" => {
                 let a_ms = match fa.get("_timestamp_ms") {
                     Some(Value::Int(ms)) => *ms,
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::Runtime,
-                        "DateTime missing _timestamp_ms".to_string(),
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::Runtime,
+                            "DateTime missing _timestamp_ms".to_string(),
+                        )))
+                    }
                 };
                 let b_ms = match fb.get("_timestamp_ms") {
                     Some(Value::Int(ms)) => *ms,
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::Runtime,
-                        "DateTime missing _timestamp_ms".to_string(),
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::Runtime,
+                            "DateTime missing _timestamp_ms".to_string(),
+                        )))
+                    }
                 };
                 a_ms.cmp(&b_ms)
             }
@@ -1114,7 +1157,6 @@ impl Interpreter {
         }
     }
 
-
     // ── Function / method calling ────────────────────────────────────
 
     /// Call a zero-argument function from the `que test` runner.
@@ -1130,11 +1172,16 @@ impl Interpreter {
     }
 
     pub(crate) fn call_value(&mut self, callee: Value, args: Vec<Value>) -> IResult {
-        let named_args: Vec<(Option<String>, Value)> = args.into_iter().map(|v| (None, v)).collect();
+        let named_args: Vec<(Option<String>, Value)> =
+            args.into_iter().map(|v| (None, v)).collect();
         self.call_value_named(callee, named_args)
     }
 
-    pub(crate) fn call_value_named(&mut self, callee: Value, named_args: Vec<(Option<String>, Value)>) -> IResult {
+    pub(crate) fn call_value_named(
+        &mut self,
+        callee: Value,
+        named_args: Vec<(Option<String>, Value)>,
+    ) -> IResult {
         match callee {
             Value::Function {
                 name,
@@ -1252,15 +1299,17 @@ impl Interpreter {
                 self.call_builtin(&name, args)
             }
             // Handle tasks — calling a task triggers dependency resolution + execution
-            Value::Task(t) => {
-                self.execute_task(&t, named_args)
-            }
+            Value::Task(t) => self.execute_task(&t, named_args),
             // Handle composed functions (created by compose())
             Value::Tuple(ref items)
                 if items.first() == Some(&Value::String("__composed__".to_string())) =>
             {
                 let funcs = &items[1..];
-                let mut result = named_args.into_iter().next().map(|(_, v)| v).unwrap_or(Value::Null);
+                let mut result = named_args
+                    .into_iter()
+                    .next()
+                    .map(|(_, v)| v)
+                    .unwrap_or(Value::Null);
                 for func in funcs {
                     result = self.call_value(func.clone(), vec![result])?;
                 }
@@ -1284,95 +1333,98 @@ impl Interpreter {
         }
     }
 
-
     // ── Field access ─────────────────────────────────────────────────
 
     /// Dispatch `obj.method(args)` on an already-evaluated receiver.
     ///
     /// Shared by `Expr::MethodCall` and the method form of `Expr::OptionalAccess`.
     fn dispatch_method(&mut self, obj: Value, method: &str, args: &[CallArg]) -> IResult {
-            if let Value::TypeRef(type_name) = &obj {
-                let type_name = type_name.clone();
-                if let Some(variants) = self.enum_defs.get(&type_name).cloned() {
-                    if let Some((_, field_names)) = variants.iter().find(|(n, _)| n == method) {
-                        let field_names = field_names.clone();
-                        let has_names = args.iter().any(|a| a.name.is_some());
-                        let mut fields = BTreeMap::new();
-                        for (i, arg) in args.iter().enumerate() {
-                            let val = self.eval_expr(&arg.value)?;
-                            let name = if has_names {
-                                arg.name.clone().ok_or_else(|| Signal::Error(QueError::new(
+        if let Value::TypeRef(type_name) = &obj {
+            let type_name = type_name.clone();
+            if let Some(variants) = self.enum_defs.get(&type_name).cloned() {
+                if let Some((_, field_names)) = variants.iter().find(|(n, _)| n == method) {
+                    let field_names = field_names.clone();
+                    let has_names = args.iter().any(|a| a.name.is_some());
+                    let mut fields = BTreeMap::new();
+                    for (i, arg) in args.iter().enumerate() {
+                        let val = self.eval_expr(&arg.value)?;
+                        let name = if has_names {
+                            arg.name.clone().ok_or_else(|| Signal::Error(QueError::new(
                                     ErrorKind::Runtime,
                                     format!("enum variant constructor '{}' mixes named and positional arguments", method),
                                 )))?
-                            } else {
-                                field_names.get(i).cloned().ok_or_else(|| Signal::Error(QueError::new(
+                        } else {
+                            field_names.get(i).cloned().ok_or_else(|| Signal::Error(QueError::new(
                                     ErrorKind::Runtime,
                                     format!("enum variant '{}' has {} field(s) but {} argument(s) provided", method, field_names.len(), args.len()),
                                 )))?
-                            };
-                            fields.insert(name, val);
-                        }
-                        return Ok(Value::Enum {
-                            enum_name: type_name,
-                            variant: method.to_string(),
-                            fields,
-                        });
+                        };
+                        fields.insert(name, val);
                     }
+                    return Ok(Value::Enum {
+                        enum_name: type_name,
+                        variant: method.to_string(),
+                        fields,
+                    });
                 }
             }
+        }
 
-            // Also dispatch instance methods on Enum values: e.method(args)
-            if let Value::Enum { enum_name, .. } = &obj {
-                let enum_name = enum_name.clone();
-                let mut arg_vals = Vec::new();
-                for arg in args {
-                    arg_vals.push(self.eval_expr(&arg.value)?);
-                }
-                if let Some(m) = self.find_instance_method(&enum_name, method) {
-                    return self.call_method_def(m, Some(obj), arg_vals);
-                }
-                return self.call_method(&obj, method, arg_vals);
-            }
-
+        // Also dispatch instance methods on Enum values: e.method(args)
+        if let Value::Enum { enum_name, .. } = &obj {
+            let enum_name = enum_name.clone();
             let mut arg_vals = Vec::new();
             for arg in args {
                 arg_vals.push(self.eval_expr(&arg.value)?);
             }
-            // Static method dispatch on TypeRef: TypeName.method(args)
-            if let Value::TypeRef(type_name) = &obj {
-                let type_name = type_name.clone();
-                if let Some(m) = self.find_static_method(&type_name, method) {
-                    return self.call_method_def(m, None, arg_vals);
-                }
-                // If not found as a static method, fall through to call_method
+            if let Some(m) = self.find_instance_method(&enum_name, method) {
+                return self.call_method_def(m, Some(obj), arg_vals);
             }
-            // Instance method dispatch on Instance: instance.method(args)
-            if let Value::Instance { type_name, fields } = &obj {
-                let type_name = type_name.clone();
-                if let Some(m) = self.find_instance_method(&type_name, method) {
-                    return self.call_method_def(m, Some(obj), arg_vals);
-                }
-                // If no impl method found, check if the field itself is callable
-                // (e.g. os.exit where exit is a BuiltinFn stored in the struct field)
-                if let Some(callable) = fields.get(method).cloned() {
-                    if matches!(callable, Value::Function { .. } | Value::BuiltinFn(_)) {
-                        return self.call_value(callable, arg_vals);
-                    }
-                }
-                // If not found as user method or callable field, fall through to builtin call_method
+            return self.call_method(&obj, method, arg_vals);
+        }
+
+        let mut arg_vals = Vec::new();
+        for arg in args {
+            arg_vals.push(self.eval_expr(&arg.value)?);
+        }
+        // Static method dispatch on TypeRef: TypeName.method(args)
+        if let Value::TypeRef(type_name) = &obj {
+            let type_name = type_name.clone();
+            if let Some(m) = self.find_static_method(&type_name, method) {
+                return self.call_method_def(m, None, arg_vals);
             }
-            // Module dispatch: modules have no built-in methods, only callable entries
-            if let Value::Module { ref entries, ref name } = obj {
-                if let Some(callable) = entries.get(method).cloned() {
+            // If not found as a static method, fall through to call_method
+        }
+        // Instance method dispatch on Instance: instance.method(args)
+        if let Value::Instance { type_name, fields } = &obj {
+            let type_name = type_name.clone();
+            if let Some(m) = self.find_instance_method(&type_name, method) {
+                return self.call_method_def(m, Some(obj), arg_vals);
+            }
+            // If no impl method found, check if the field itself is callable
+            // (e.g. os.exit where exit is a BuiltinFn stored in the struct field)
+            if let Some(callable) = fields.get(method).cloned() {
+                if matches!(callable, Value::Function { .. } | Value::BuiltinFn(_)) {
                     return self.call_value(callable, arg_vals);
                 }
-                return Err(Signal::Error(QueError::new(
-                    ErrorKind::KeyNotFound,
-                    format!("'{}' is not a function in module '{}'", method, name),
-                )));
             }
-            self.call_method(&obj, method, arg_vals)
+            // If not found as user method or callable field, fall through to builtin call_method
+        }
+        // Module dispatch: modules have no built-in methods, only callable entries
+        if let Value::Module {
+            ref entries,
+            ref name,
+        } = obj
+        {
+            if let Some(callable) = entries.get(method).cloned() {
+                return self.call_value(callable, arg_vals);
+            }
+            return Err(Signal::Error(QueError::new(
+                ErrorKind::KeyNotFound,
+                format!("'{}' is not a function in module '{}'", method, name),
+            )));
+        }
+        self.call_method(&obj, method, arg_vals)
     }
 
     fn access_field(&self, obj: &Value, field: &str) -> IResult {
@@ -1434,40 +1486,43 @@ impl Interpreter {
                     ))),
                 }
             }
-            Value::Task(t) => {
-                match field {
-                    "name" => Ok(Value::String(t.name.clone())),
-                    "description" | "desc" => Ok(t.description.as_ref()
+            Value::Task(t) => match field {
+                "name" => Ok(Value::String(t.name.clone())),
+                "description" | "desc" => Ok(t
+                    .description
+                    .as_ref()
+                    .map(|d| Value::String(d.clone()))
+                    .unwrap_or(Value::Null)),
+                "deps" | "depends_on" => Ok(Value::List(
+                    t.depends_on
+                        .iter()
                         .map(|d| Value::String(d.clone()))
-                        .unwrap_or(Value::Null)),
-                    "deps" | "depends_on" => Ok(Value::List(
-                        t.depends_on.iter().map(|d| Value::String(d.clone())).collect(),
-                    )),
-                    "params" => Ok(Value::List(
-                        t.params.iter().map(|p| Value::String(p.name.clone())).collect(),
-                    )),
-                    "status" => {
-                        match self.task_status.get(t.name.as_str()) {
-                            Some((status, _)) => Ok(Value::String(status.clone())),
-                            None => Ok(Value::String("pending".to_string())),
-                        }
-                    }
-                    "result" => self.task_result(t.name.as_str()),
-                    "env" | "env_keys" => Ok(Value::List(
-                        t.env_keys.iter().map(|k| Value::String(k.clone())).collect(),
-                    )),
-                    _ => Err(Signal::Error(QueError::new(
-                        ErrorKind::KeyNotFound,
-                        format!("Task has no field '{}'", field),
-                    ))),
-                }
-            }
-            Value::Module { entries, .. } => {
-                Ok(entries.get(field).cloned().unwrap_or(Value::Null))
-            }
-            Value::Instance { fields, .. } => {
-                Ok(fields.get(field).cloned().unwrap_or(Value::Null))
-            }
+                        .collect(),
+                )),
+                "params" => Ok(Value::List(
+                    t.params
+                        .iter()
+                        .map(|p| Value::String(p.name.clone()))
+                        .collect(),
+                )),
+                "status" => match self.task_status.get(t.name.as_str()) {
+                    Some((status, _)) => Ok(Value::String(status.clone())),
+                    None => Ok(Value::String("pending".to_string())),
+                },
+                "result" => self.task_result(t.name.as_str()),
+                "env" | "env_keys" => Ok(Value::List(
+                    t.env_keys
+                        .iter()
+                        .map(|k| Value::String(k.clone()))
+                        .collect(),
+                )),
+                _ => Err(Signal::Error(QueError::new(
+                    ErrorKind::KeyNotFound,
+                    format!("Task has no field '{}'", field),
+                ))),
+            },
+            Value::Module { entries, .. } => Ok(entries.get(field).cloned().unwrap_or(Value::Null)),
+            Value::Instance { fields, .. } => Ok(fields.get(field).cloned().unwrap_or(Value::Null)),
             // Enum field access: EnumType.VariantName
             Value::TypeRef(type_name) => {
                 if let Some(variants) = self.enum_defs.get(type_name) {
@@ -1497,16 +1552,10 @@ impl Interpreter {
                 )))
             }
             // Enum instance field access: enum_val.field_name
-            Value::Enum { fields, .. } => {
-                Ok(fields.get(field).cloned().unwrap_or(Value::Null))
-            }
+            Value::Enum { fields, .. } => Ok(fields.get(field).cloned().unwrap_or(Value::Null)),
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::TypeMismatch,
-                format!(
-                    "cannot access field '{}' on {}",
-                    field,
-                    obj.type_name()
-                ),
+                format!("cannot access field '{}' on {}", field, obj.type_name()),
             ))),
         }
     }
@@ -1543,7 +1592,8 @@ impl Interpreter {
                     self.env.define("self", Value::Null, method.mutates_self);
                 }
             } else {
-                let val = arg_iter.next()
+                let val = arg_iter
+                    .next()
                     .or_else(|| param.default.as_ref().and_then(|_| None)) // evaluated below
                     .unwrap_or(Value::Null);
                 self.env.define(&param.name, val, true);
@@ -1629,25 +1679,19 @@ impl Interpreter {
                 items.get(index).cloned().ok_or_else(|| {
                     Signal::Error(QueError::new(
                         ErrorKind::IndexOutOfBounds,
-                        format!(
-                            "index {} out of bounds (len {})",
-                            i,
-                            items.len()
-                        ),
+                        format!("index {} out of bounds (len {})", i, items.len()),
                     ))
                 })
             }
-            (Value::Map(map), Value::String(key)) => {
-                map.get(key).cloned().ok_or_else(|| {
-                    Signal::Error(QueError::new(
-                        ErrorKind::KeyNotFound,
-                        format!(
-                            "key '{}' not found in map (use .get(\"{}\") to get null instead)",
-                            key, key
-                        ),
-                    ))
-                })
-            }
+            (Value::Map(map), Value::String(key)) => map.get(key).cloned().ok_or_else(|| {
+                Signal::Error(QueError::new(
+                    ErrorKind::KeyNotFound,
+                    format!(
+                        "key '{}' not found in map (use .get(\"{}\") to get null instead)",
+                        key, key
+                    ),
+                ))
+            }),
             (Value::String(s), Value::Int(i)) => {
                 let len = s.chars().count();
                 let index = if *i < 0 {
@@ -1661,11 +1705,7 @@ impl Interpreter {
                     .ok_or_else(|| {
                         Signal::Error(QueError::new(
                             ErrorKind::IndexOutOfBounds,
-                            format!(
-                                "string index {} out of bounds (len {})",
-                                i,
-                                len
-                            ),
+                            format!("string index {} out of bounds (len {})", i, len),
                         ))
                     })
             }
@@ -1678,25 +1718,16 @@ impl Interpreter {
                 items.get(index).cloned().ok_or_else(|| {
                     Signal::Error(QueError::new(
                         ErrorKind::IndexOutOfBounds,
-                        format!(
-                            "tuple index {} out of bounds (len {})",
-                            i,
-                            items.len()
-                        ),
+                        format!("tuple index {} out of bounds (len {})", i, items.len()),
                     ))
                 })
             }
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::TypeMismatch,
-                format!(
-                    "cannot index {} with {}",
-                    obj.type_name(),
-                    idx.type_name()
-                ),
+                format!("cannot index {} with {}", obj.type_name(), idx.type_name()),
             ))),
         }
     }
-
 
     // ── Path / Glob literal evaluation ──────────────────────────────
 
@@ -1735,7 +1766,9 @@ impl Interpreter {
         // and in a glob. A literal that expands in one construction form and
         // not in another is a trap, and the shell it borrows the notation from
         // does not have that seam either.
-        Ok(Value::Path(crate::interpreter::helpers::expand_tilde(&result)))
+        Ok(Value::Path(crate::interpreter::helpers::expand_tilde(
+            &result,
+        )))
     }
 
     fn eval_glob_lit(&mut self, parts: &[AstStringPart]) -> IResult {
@@ -1923,13 +1956,15 @@ impl Interpreter {
         // mgr must be a Value::Instance implementing Contextual
         let type_name = match &mgr {
             Value::Instance { type_name, .. } => type_name.clone(),
-            other => return Err(Signal::Error(QueError::new(
-                ErrorKind::TypeMismatch,
-                format!(
-                    "with ... as requires a struct instance implementing Contextual, got {}",
-                    other.type_name()
-                ),
-            ))),
+            other => {
+                return Err(Signal::Error(QueError::new(
+                    ErrorKind::TypeMismatch,
+                    format!(
+                        "with ... as requires a struct instance implementing Contextual, got {}",
+                        other.type_name()
+                    ),
+                )))
+            }
         };
         if !self.implements_trait(&type_name, "Contextual") {
             return Err(Signal::Error(QueError::new(
@@ -1938,11 +1973,14 @@ impl Interpreter {
             )));
         }
         // Call enter()
-        let enter_method = self.find_instance_method(&type_name, "enter")
-            .ok_or_else(|| Signal::Error(QueError::new(
-                ErrorKind::Runtime,
-                format!("Contextual impl for '{}' missing 'enter'", type_name),
-            )))?;
+        let enter_method = self
+            .find_instance_method(&type_name, "enter")
+            .ok_or_else(|| {
+                Signal::Error(QueError::new(
+                    ErrorKind::Runtime,
+                    format!("Contextual impl for '{}' missing 'enter'", type_name),
+                ))
+            })?;
         let resource = self.call_method_def(enter_method, Some(mgr.clone()), vec![])?;
         // A `mut self` enter() has nowhere to write itself back to — the
         // manager is usually a temporary like `with Dir("/tmp")` — so the
@@ -2088,13 +2126,16 @@ pub(crate) fn try_unwrap(val: Value) -> Result<Value, Signal> {
 }
 
 /// Check that a value matches a type annotation (for strict mode).
-fn check_type(val: &Value, ty: &TypeExpr, param_name: &str, func_name: &Option<String>) -> Result<(), Signal> {
+fn check_type(
+    val: &Value,
+    ty: &TypeExpr,
+    param_name: &str,
+    func_name: &Option<String>,
+) -> Result<(), Signal> {
     if value_matches_type(val, ty) {
         Ok(())
     } else {
-        let fn_label = func_name
-            .as_deref()
-            .unwrap_or("<anonymous>");
+        let fn_label = func_name.as_deref().unwrap_or("<anonymous>");
         Err(Signal::Error(QueError::new(
             ErrorKind::TypeMismatch,
             format!(
@@ -2114,9 +2155,7 @@ fn check_return_type(val: &Value, ty: &TypeExpr, func_name: &Option<String>) -> 
     if value_matches_type(val, ty) {
         Ok(())
     } else {
-        let fn_label = func_name
-            .as_deref()
-            .unwrap_or("<anonymous>");
+        let fn_label = func_name.as_deref().unwrap_or("<anonymous>");
         Err(Signal::Error(QueError::new(
             ErrorKind::TypeMismatch,
             format!(
@@ -2158,7 +2197,11 @@ fn value_matches_type(val: &Value, ty: &TypeExpr) -> bool {
             "Any" => true,
             // Check for struct instances
             _ => {
-                if let Value::Instance { type_name: ref inst_name, .. } = val {
+                if let Value::Instance {
+                    type_name: ref inst_name,
+                    ..
+                } = val
+                {
                     inst_name == name
                 } else if let Value::Ok(_) = val {
                     name == "Ok"

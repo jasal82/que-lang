@@ -4,7 +4,6 @@
 /// literal forms: strings with interpolation, path/glob/regex/semver
 /// literals, command literals (backticks), duration literals, and all
 /// operators/keywords specified in the spec.
-
 use crate::error::QueError;
 use crate::token::*;
 
@@ -87,7 +86,11 @@ impl<'src> Lexer<'src> {
     /// Snapshot the current position. Used at the start of `next_token`
     /// and propagated into the `lex_*` helpers.
     fn mark(&self) -> LexStart {
-        LexStart { pos: self.pos, line: self.line, col: self.col }
+        LexStart {
+            pos: self.pos,
+            line: self.line,
+            col: self.col,
+        }
     }
 
     fn peek(&self) -> Option<u8> {
@@ -133,8 +136,7 @@ impl<'src> Lexer<'src> {
         }
         // Multi-byte UTF-8: decode the full scalar from the source slice.
         // Safe: `self.source` is the bytes of a valid UTF-8 `&str`.
-        let s = std::str::from_utf8(&self.source[self.pos..])
-            .expect("source is valid UTF-8");
+        let s = std::str::from_utf8(&self.source[self.pos..]).expect("source is valid UTF-8");
         let ch = s.chars().next().unwrap();
         self.pos += ch.len_utf8();
         self.col += 1;
@@ -150,27 +152,29 @@ impl<'src> Lexer<'src> {
         start_col: usize,
     ) -> Result<char, QueError> {
         match self.advance() {
-            Some(b'n')  => Ok('\n'),
-            Some(b't')  => Ok('\t'),
-            Some(b'r')  => Ok('\r'),
+            Some(b'n') => Ok('\n'),
+            Some(b't') => Ok('\t'),
+            Some(b'r') => Ok('\r'),
             Some(b'\\') => Ok('\\'),
-            Some(b'"')  => Ok('"'),
-            Some(b'$')  => Ok('$'),
-            Some(b'0')  => Ok('\0'),
-            Some(b'e')  => Ok('\x1b'),
-            Some(b'x')  => {
+            Some(b'"') => Ok('"'),
+            Some(b'$') => Ok('$'),
+            Some(b'0') => Ok('\0'),
+            Some(b'e') => Ok('\x1b'),
+            Some(b'x') => {
                 let mut hex = String::new();
                 for _ in 0..2 {
                     match self.advance() {
                         Some(c) if (c as char).is_ascii_hexdigit() => hex.push(c as char),
-                        _ => return Err(QueError {
-                            kind: crate::error::ErrorKind::InvalidEscape,
-                            message: r"\xHH escape requires exactly 2 hex digits".into(),
-                            span: Some(self.span_from(start, start_line, start_col)),
-                            file: None,
-                            backtrace: Vec::new(),
-                            exit_code: None,
-                        }),
+                        _ => {
+                            return Err(QueError {
+                                kind: crate::error::ErrorKind::InvalidEscape,
+                                message: r"\xHH escape requires exactly 2 hex digits".into(),
+                                span: Some(self.span_from(start, start_line, start_col)),
+                                file: None,
+                                backtrace: Vec::new(),
+                                exit_code: None,
+                            })
+                        }
                     }
                 }
                 let code = u32::from_str_radix(&hex, 16).unwrap();
@@ -373,7 +377,10 @@ impl<'src> Lexer<'src> {
                     || !text.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
                 {
                     return Err(QueError::lexer(
-                        format!("`#!{}` is not a pragma; expected a bare name such as `#!strict`", text),
+                        format!(
+                            "`#!{}` is not a pragma; expected a bare name such as `#!strict`",
+                            text
+                        ),
                         self.span_from(start, start_line, start_col),
                     ));
                 } else {
@@ -588,7 +595,11 @@ impl<'src> Lexer<'src> {
     // ── String lexing ──
 
     fn lex_string(&mut self, start: LexStart) -> Result<Token, QueError> {
-        let LexStart { pos: start, line: start_line, col: start_col } = start;
+        let LexStart {
+            pos: start,
+            line: start_line,
+            col: start_col,
+        } = start;
         let mut parts: Vec<StringPart> = Vec::new();
         let mut buf = String::new();
         let mut has_interpolation = false;
@@ -643,7 +654,11 @@ impl<'src> Lexer<'src> {
     }
 
     fn lex_multiline_string(&mut self, start: LexStart) -> Result<Token, QueError> {
-        let LexStart { pos: start, line: start_line, col: start_col } = start;
+        let LexStart {
+            pos: start,
+            line: start_line,
+            col: start_col,
+        } = start;
         let mut parts: Vec<StringPart> = Vec::new();
         let mut buf = String::new();
         let mut has_interpolation = false;
@@ -715,12 +730,12 @@ impl<'src> Lexer<'src> {
     /// Lex a raw string literal: `r"..."` (hash_count=0) or `r#"..."#`, `r##"..."##`, etc.
     /// No escape processing is done; the string ends at `"` followed by the same
     /// number of `#` characters that appeared in the opening delimiter.
-    fn lex_raw_string(
-        &mut self,
-        start: LexStart,
-        hash_count: usize,
-    ) -> Result<Token, QueError> {
-        let LexStart { pos: start, line: start_line, col: start_col } = start;
+    fn lex_raw_string(&mut self, start: LexStart, hash_count: usize) -> Result<Token, QueError> {
+        let LexStart {
+            pos: start,
+            line: start_line,
+            col: start_col,
+        } = start;
         let mut buf = String::new();
         loop {
             match self.peek() {
@@ -736,7 +751,7 @@ impl<'src> Lexer<'src> {
                 }
                 Some(b'"') => {
                     self.advance(); // consume '"'
-                    // Check if followed by the right number of '#'
+                                    // Check if followed by the right number of '#'
                     let mut matched = true;
                     for i in 0..hash_count {
                         if self.peek_at(i) != Some(b'#') {
@@ -771,7 +786,11 @@ impl<'src> Lexer<'src> {
     /// Lex a path literal: `p"..."`. Supports `${...}` interpolation.
     /// Double slashes in the literal text are collapsed to single slashes.
     fn lex_path_literal(&mut self, start: LexStart) -> Result<Token, QueError> {
-        let LexStart { pos: start, line: start_line, col: start_col } = start;
+        let LexStart {
+            pos: start,
+            line: start_line,
+            col: start_col,
+        } = start;
         let mut parts: Vec<StringPart> = Vec::new();
         let mut buf = String::new();
 
@@ -835,7 +854,11 @@ impl<'src> Lexer<'src> {
     /// Lex a glob literal: `g"..."`. Supports `${...}` interpolation.
     /// Bare `{a,b}` alternation is treated as literal glob syntax (not interpolation).
     fn lex_glob_literal(&mut self, start: LexStart) -> Result<Token, QueError> {
-        let LexStart { pos: start, line: start_line, col: start_col } = start;
+        let LexStart {
+            pos: start,
+            line: start_line,
+            col: start_col,
+        } = start;
         let mut parts: Vec<StringPart> = Vec::new();
         let mut buf = String::new();
 
@@ -881,12 +904,12 @@ impl<'src> Lexer<'src> {
         ))
     }
 
-    fn lex_prefixed_string(
-        &mut self,
-        start: LexStart,
-        prefix: &str,
-    ) -> Result<Token, QueError> {
-        let LexStart { pos: start, line: start_line, col: start_col } = start;
+    fn lex_prefixed_string(&mut self, start: LexStart, prefix: &str) -> Result<Token, QueError> {
+        let LexStart {
+            pos: start,
+            line: start_line,
+            col: start_col,
+        } = start;
         let mut buf = String::new();
         loop {
             match self.peek() {
@@ -939,7 +962,11 @@ impl<'src> Lexer<'src> {
     // ── Command literal (backtick) ──
 
     fn lex_command(&mut self, start: LexStart) -> Result<Token, QueError> {
-        let LexStart { pos: start, line: start_line, col: start_col } = start;
+        let LexStart {
+            pos: start,
+            line: start_line,
+            col: start_col,
+        } = start;
         let mut parts: Vec<StringPart> = Vec::new();
         let mut buf = String::new();
 
@@ -1063,7 +1090,9 @@ impl<'src> Lexer<'src> {
                     loop {
                         match self.advance() {
                             Some(b'"') => break,
-                            Some(b'\\') => { self.advance(); } // skip escaped byte
+                            Some(b'\\') => {
+                                self.advance();
+                            } // skip escaped byte
                             Some(_) => {}
                             None => break,
                         }
@@ -1092,12 +1121,12 @@ impl<'src> Lexer<'src> {
 
     // ── Number lexing ──
 
-    fn lex_number(
-        &mut self,
-        first: u8,
-        start: LexStart,
-    ) -> Result<Token, QueError> {
-        let LexStart { pos: start, line: start_line, col: start_col } = start;
+    fn lex_number(&mut self, first: u8, start: LexStart) -> Result<Token, QueError> {
+        let LexStart {
+            pos: start,
+            line: start_line,
+            col: start_col,
+        } = start;
 
         // Check for hex/binary/octal prefix
         if first == b'0' {
@@ -1275,18 +1304,16 @@ impl<'src> Lexer<'src> {
                         None
                     }
                 }
-                b'h'
-                    if self
-                        .peek_at(1)
-                        .is_none_or(|n| !n.is_ascii_alphabetic() && n != b'_') =>
+                b'h' if self
+                    .peek_at(1)
+                    .is_none_or(|n| !n.is_ascii_alphabetic() && n != b'_') =>
                 {
                     self.advance();
                     Some(DurationUnit::Hours)
                 }
-                b'd'
-                    if self
-                        .peek_at(1)
-                        .is_none_or(|n| !n.is_ascii_alphabetic() && n != b'_') =>
+                b'd' if self
+                    .peek_at(1)
+                    .is_none_or(|n| !n.is_ascii_alphabetic() && n != b'_') =>
                 {
                     self.advance();
                     Some(DurationUnit::Days)
@@ -1331,11 +1358,7 @@ impl<'src> Lexer<'src> {
 
     // ── Identifier / keyword lexing ──
 
-    fn lex_identifier(
-        &mut self,
-        _first: u8,
-        start: LexStart,
-    ) -> Result<Token, QueError> {
+    fn lex_identifier(&mut self, _first: u8, start: LexStart) -> Result<Token, QueError> {
         // The first byte was already consumed by next_token. Walk forward
         // until the identifier ends; then slice the source once. This avoids
         // pushing one byte at a time into a fresh String (LEX-6).
@@ -1590,10 +1613,7 @@ mod tests {
     fn test_string_with_escapes() {
         assert_eq!(
             tokenize(r#""hello\nworld""#),
-            vec![
-                TokenKind::StringLit("hello\nworld".into()),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::StringLit("hello\nworld".into()), TokenKind::Eof]
         );
     }
 
@@ -1602,10 +1622,7 @@ mod tests {
         // \x1b is ESC (0x1B = 27)
         assert_eq!(
             tokenize(r#""\x1b[31m""#),
-            vec![
-                TokenKind::StringLit("\x1b[31m".into()),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::StringLit("\x1b[31m".into()), TokenKind::Eof]
         );
     }
 
@@ -1613,10 +1630,7 @@ mod tests {
     fn test_hex_escape_uppercase() {
         assert_eq!(
             tokenize(r#""\x1B""#),
-            vec![
-                TokenKind::StringLit("\x1b".into()),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::StringLit("\x1b".into()), TokenKind::Eof]
         );
     }
 
@@ -1625,10 +1639,7 @@ mod tests {
         // \e is shorthand for ESC
         assert_eq!(
             tokenize(r#""\e[0m""#),
-            vec![
-                TokenKind::StringLit("\x1b[0m".into()),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::StringLit("\x1b[0m".into()), TokenKind::Eof]
         );
     }
 
@@ -1694,10 +1705,7 @@ mod tests {
     fn test_path_literal_empty() {
         assert_eq!(
             tokenize(r#"p"""#),
-            vec![
-                TokenKind::PathLit(vec![]),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::PathLit(vec![]), TokenKind::Eof]
         );
     }
 
@@ -1769,10 +1777,7 @@ mod tests {
     fn test_regex_literal() {
         assert_eq!(
             tokenize(r#"re"^\d{3}-\d{4}$""#),
-            vec![
-                TokenKind::RegexLit(r"^\d{3}-\d{4}$".into()),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::RegexLit(r"^\d{3}-\d{4}$".into()), TokenKind::Eof]
         );
     }
 
@@ -1780,10 +1785,7 @@ mod tests {
     fn test_raw_string_basic() {
         assert_eq!(
             tokenize(r#"r"hello\nworld""#),
-            vec![
-                TokenKind::StringLit(r"hello\nworld".into()),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::StringLit(r"hello\nworld".into()), TokenKind::Eof]
         );
     }
 
@@ -1818,10 +1820,7 @@ mod tests {
         // Raw string should preserve backslashes literally
         assert_eq!(
             tokenize(r#"r"\t\n\\""#),
-            vec![
-                TokenKind::StringLit("\\t\\n\\\\".into()),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::StringLit("\\t\\n\\\\".into()), TokenKind::Eof]
         );
     }
 
@@ -1830,10 +1829,7 @@ mod tests {
         // r"${not_interp}" → literal ${not_interp}
         assert_eq!(
             tokenize(r#"r"${not_interp}""#),
-            vec![
-                TokenKind::StringLit("${not_interp}".into()),
-                TokenKind::Eof
-            ]
+            vec![TokenKind::StringLit("${not_interp}".into()), TokenKind::Eof]
         );
     }
 
@@ -2113,7 +2109,12 @@ mod tests {
     fn test_logical_operators() {
         assert_eq!(
             tokenize("&& || !"),
-            vec![TokenKind::And, TokenKind::Or, TokenKind::Bang, TokenKind::Eof]
+            vec![
+                TokenKind::And,
+                TokenKind::Or,
+                TokenKind::Bang,
+                TokenKind::Eof
+            ]
         );
     }
 
@@ -2341,10 +2342,7 @@ mod tests {
         let tokens = tokenize(src);
         assert_eq!(
             tokens,
-            vec![
-                TokenKind::StringLit("hello\nworld".into()),
-                TokenKind::Eof,
-            ]
+            vec![TokenKind::StringLit("hello\nworld".into()), TokenKind::Eof,]
         );
     }
 
@@ -2451,7 +2449,10 @@ mod tests {
 
         assert_eq!(comments[1].text, "// why");
         assert_eq!(comments[1].line, 3);
-        assert!(!comments[1].own_line, "a comment after code is not own-line");
+        assert!(
+            !comments[1].own_line,
+            "a comment after code is not own-line"
+        );
     }
 
     #[test]

@@ -1,17 +1,20 @@
 //! std.net module — Network utilities (ping, port checking, DNS resolution).
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::helpers::duration_to_ms;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::Value;
 
 pub(super) fn module() -> StdModule {
     StdModule {
         name: "net",
         functions: &[
-            "ping", "port_open", "resolve",
-            "wait_for_port", "wait_for_url",
+            "ping",
+            "port_open",
+            "resolve",
+            "wait_for_port",
+            "wait_for_url",
         ],
     }
 }
@@ -76,9 +79,19 @@ impl Interpreter {
                     Some(Value::Int(ms)) => *ms as u64,
                     Some(Value::Duration(val, unit)) => duration_to_ms(*val, *unit) as u64,
                     Some(Value::Null) | None => 500,
-                    _ => return Err(sig_type("net.wait_for_port", "Int or Duration for interval")),
+                    _ => {
+                        return Err(sig_type(
+                            "net.wait_for_port",
+                            "Int or Duration for interval",
+                        ))
+                    }
                 };
-                Ok(Value::Bool(net_wait_for_port(&host, port, timeout_ms, interval_ms)))
+                Ok(Value::Bool(net_wait_for_port(
+                    &host,
+                    port,
+                    timeout_ms,
+                    interval_ms,
+                )))
             }
             "wait_for_url" => {
                 let url = match args.first() {
@@ -102,7 +115,12 @@ impl Interpreter {
                     Some(Value::Null) | None => None,
                     _ => return Err(sig_type("net.wait_for_url", "Int for expected_status")),
                 };
-                Ok(Value::Bool(net_wait_for_url(&url, timeout_ms, interval_ms, expected_status)))
+                Ok(Value::Bool(net_wait_for_url(
+                    &url,
+                    timeout_ms,
+                    interval_ms,
+                    expected_status,
+                )))
             }
             _ => Err(Signal::Error(QueError::new(
                 ErrorKind::Runtime,
@@ -163,7 +181,8 @@ fn net_port_open(host: &str, port: u16, timeout_ms: u64) -> bool {
 fn net_resolve(host: &str) -> Result<Vec<String>, String> {
     use std::net::ToSocketAddrs;
     let addr = format!("{}:0", host);
-    let addrs = addr.to_socket_addrs()
+    let addrs = addr
+        .to_socket_addrs()
         .map_err(|e| format!("failed to resolve '{}': {}", host, e))?;
     let mut ips: Vec<String> = addrs.map(|a| a.ip().to_string()).collect();
     ips.dedup();
@@ -189,7 +208,12 @@ fn net_wait_for_port(host: &str, port: u16, timeout_ms: u64, interval_ms: u64) -
     false
 }
 
-fn net_wait_for_url(url: &str, timeout_ms: u64, interval_ms: u64, expected_status: Option<u16>) -> bool {
+fn net_wait_for_url(
+    url: &str,
+    timeout_ms: u64,
+    interval_ms: u64,
+    expected_status: Option<u16>,
+) -> bool {
     use std::time::{Duration, Instant};
 
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);

@@ -7,17 +7,23 @@
 //! ignores the user's `~/.gitconfig` fails on exactly the private repository
 //! it was reached for, so this defers to the program that already works.
 
-use crate::error::*;
-use crate::value::{CmdModifiers, CmdPart, Value};
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::{CmdModifiers, CmdPart, Value};
 
 pub(super) fn module() -> StdModule {
     StdModule {
         name: "git",
         functions: &[
-            "branch", "commit", "short_commit", "tag",
-            "tags", "is_dirty", "is_clean", "remote_url",
+            "branch",
+            "commit",
+            "short_commit",
+            "tag",
+            "tags",
+            "is_dirty",
+            "is_clean",
+            "remote_url",
             "clone",
         ],
     }
@@ -29,22 +35,30 @@ impl Interpreter {
             "clone" => self.git_clone(args),
             "branch" => {
                 let repo = open_repo(&repo_path_arg(args))?;
-                let head = repo.head().map_err(|e| sig_err(format!("git.branch: {}", e)))?;
+                let head = repo
+                    .head()
+                    .map_err(|e| sig_err(format!("git.branch: {}", e)))?;
                 let name = head.shorthand().unwrap_or("HEAD").to_string();
                 Ok(Value::String(name))
             }
             "commit" => {
                 let repo = open_repo(&repo_path_arg(args))?;
-                let head = repo.head().map_err(|e| sig_err(format!("git.commit: {}", e)))?;
-                let oid = head.peel_to_commit()
+                let head = repo
+                    .head()
+                    .map_err(|e| sig_err(format!("git.commit: {}", e)))?;
+                let oid = head
+                    .peel_to_commit()
                     .map_err(|e| sig_err(format!("git.commit: {}", e)))?
                     .id();
                 Ok(Value::String(oid.to_string()))
             }
             "short_commit" => {
                 let repo = open_repo(&repo_path_arg(args))?;
-                let head = repo.head().map_err(|e| sig_err(format!("git.short_commit: {}", e)))?;
-                let oid = head.peel_to_commit()
+                let head = repo
+                    .head()
+                    .map_err(|e| sig_err(format!("git.short_commit: {}", e)))?;
+                let oid = head
+                    .peel_to_commit()
                     .map_err(|e| sig_err(format!("git.short_commit: {}", e)))?
                     .id();
                 let full = oid.to_string();
@@ -60,11 +74,13 @@ impl Interpreter {
                     },
                     Err(_) => return Ok(Value::Null),
                 };
-                let tag_names = repo.tag_names(None)
+                let tag_names = repo
+                    .tag_names(None)
                     .map_err(|e| sig_err(format!("git.tag: {}", e)))?;
                 for name in tag_names.iter().flatten() {
                     if let Ok(reference) = repo.revparse_single(&format!("refs/tags/{}", name)) {
-                        let target_oid = reference.peel_to_commit()
+                        let target_oid = reference
+                            .peel_to_commit()
                             .map(|c| c.id())
                             .unwrap_or_else(|_| reference.id());
                         if target_oid == head_oid {
@@ -76,9 +92,11 @@ impl Interpreter {
             }
             "tags" => {
                 let repo = open_repo(&repo_path_arg(args))?;
-                let tag_names = repo.tag_names(None)
+                let tag_names = repo
+                    .tag_names(None)
                     .map_err(|e| sig_err(format!("git.tags: {}", e)))?;
-                let tags: Vec<Value> = tag_names.iter()
+                let tags: Vec<Value> = tag_names
+                    .iter()
                     .flatten()
                     .map(|name| Value::String(name.to_string()))
                     .collect();
@@ -96,11 +114,15 @@ impl Interpreter {
             }
             "remote_url" => {
                 let repo = open_repo(&repo_path_arg(args))?;
-                let remote_name = args.get(1).and_then(|v| match v {
-                    Value::String(s) => Some(s.clone()),
-                    _ => None,
-                }).unwrap_or_else(|| "origin".to_string());
-                let remote = repo.find_remote(&remote_name)
+                let remote_name = args
+                    .get(1)
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "origin".to_string());
+                let remote = repo
+                    .find_remote(&remote_name)
                     .map_err(|e| sig_err(format!("git.remote_url: {}", e)))?;
                 let url = remote.url().unwrap_or("").to_string();
                 Ok(Value::String(url))
@@ -169,9 +191,7 @@ impl Interpreter {
         }
         match opt("depth") {
             None | Some(Value::Null) => {}
-            Some(Value::Int(n)) if n > 0 => {
-                parts.push(CmdPart::Literal(format!(" --depth {}", n)))
-            }
+            Some(Value::Int(n)) if n > 0 => parts.push(CmdPart::Literal(format!(" --depth {}", n))),
             Some(other) => {
                 return Err(sig_err(format!(
                     "git.clone(): option 'depth' must be a positive Int, got {}",
@@ -204,7 +224,9 @@ impl Interpreter {
         // `run_cmd_parts` is where the exec permission check and `--dry-run`
         // live, so neither has to be repeated here.
         match self.run_cmd_parts(&parts, &mods)? {
-            Value::ProcessResult { exit_code, stderr, .. } => {
+            Value::ProcessResult {
+                exit_code, stderr, ..
+            } => {
                 if exit_code == 0 {
                     Ok(Value::Ok(Box::new(Value::Path(dest))))
                 } else {
@@ -252,15 +274,19 @@ fn repo_path_arg(args: &[Value]) -> String {
 }
 
 fn open_repo(path: &str) -> Result<git2::Repository, Signal> {
-    git2::Repository::discover(path)
-        .map_err(|e| sig_err(format!("failed to open git repository at '{}': {}", path, e)))
+    git2::Repository::discover(path).map_err(|e| {
+        sig_err(format!(
+            "failed to open git repository at '{}': {}",
+            path, e
+        ))
+    })
 }
 
 fn repo_is_dirty(repo: &git2::Repository) -> Result<bool, Signal> {
     let mut opts = git2::StatusOptions::new();
-    opts.include_untracked(true)
-        .recurse_untracked_dirs(true);
-    let statuses = repo.statuses(Some(&mut opts))
+    opts.include_untracked(true).recurse_untracked_dirs(true);
+    let statuses = repo
+        .statuses(Some(&mut opts))
         .map_err(|e| sig_err(format!("git status: {}", e)))?;
     Ok(!statuses.is_empty())
 }

@@ -4,7 +4,6 @@
 /// The provider detects the cursor context (inside `@deps([...])`, at the
 /// start of a task attribute, inside a string or comment, etc.) and narrows
 /// the suggestions accordingly.
-
 use crate::analysis;
 use crate::builtins::{self, BuiltinKind};
 use tower_lsp::lsp_types::*;
@@ -312,7 +311,11 @@ fn task_name_completions(source: &str) -> Vec<CompletionItem> {
 /// Completions for the `@...` attributes written above a task.
 fn task_attribute_completions() -> Vec<CompletionItem> {
     let attrs = [
-        ("description", "Task description string", "description(\"$0\")"),
+        (
+            "description",
+            "Task description string",
+            "description(\"$0\")",
+        ),
         ("deps", "Tasks that must run first", "deps([$0])"),
         ("inputs", "Task input files / glob patterns", "inputs([$0])"),
         ("outputs", "Task output files / paths", "outputs([$0])"),
@@ -436,17 +439,15 @@ fn type_from_call_name(name: &str) -> Option<&'static str> {
         "str" | "string" => Some("String"),
 
         // Methods → List
-        "split" | "lines" | "chars" | "keys" | "values" | "entries"
-        | "expand" | "ls" | "to_list" | "sort" | "reverse" | "filter"
-        | "map" | "take" | "skip" | "dedup" | "flatten" | "chunk"
-        | "zip" | "enumerate" | "push" | "sort_by" | "slice"
-        | "flat_map" | "matches" | "partition" => Some("List"),
+        "split" | "lines" | "chars" | "keys" | "values" | "entries" | "expand" | "ls"
+        | "to_list" | "sort" | "reverse" | "filter" | "map" | "take" | "skip" | "dedup"
+        | "flatten" | "chunk" | "zip" | "enumerate" | "push" | "sort_by" | "slice" | "flat_map"
+        | "matches" | "partition" => Some("List"),
 
         // Methods → String
-        "trim" | "trim_start" | "trim_end" | "to_upper" | "to_lower"
-        | "replace" | "join" | "read" | "collect" | "to_string"
-        | "to_json" | "to_yaml" | "to_toml" | "file_name" | "extension"
-        | "stem" | "pad_left" | "pad_right" | "repeat" | "name" => Some("String"),
+        "trim" | "trim_start" | "trim_end" | "to_upper" | "to_lower" | "replace" | "join"
+        | "read" | "collect" | "to_string" | "to_json" | "to_yaml" | "to_toml" | "file_name"
+        | "extension" | "stem" | "pad_left" | "pad_right" | "repeat" | "name" => Some("String"),
 
         // Methods → Path
         "parent" | "mkdir" | "copy_to" | "move_to" | "to_absolute" => Some("Path"),
@@ -458,8 +459,8 @@ fn type_from_call_name(name: &str) -> Option<&'static str> {
         "union" | "intersection" | "difference" | "symmetric_difference" => Some("Set"),
 
         // Methods → Stream
-        "grep" | "head" | "tail" | "uniq" | "numbered" | "skip_empty"
-        | "filter_lines" | "map_lines" | "words" | "upper" | "lower" => Some("Stream"),
+        "grep" | "head" | "tail" | "uniq" | "numbered" | "skip_empty" | "filter_lines"
+        | "map_lines" | "words" | "upper" | "lower" => Some("Stream"),
 
         _ => None,
     }
@@ -503,8 +504,7 @@ fn snippet_completions() -> Vec<CompletionItem> {
             kind: Some(CompletionItemKind::SNIPPET),
             detail: Some("Task declaration".to_string()),
             insert_text: Some(
-                "@description(\"${2:description}\")\ntask ${1:name} {\n\t$0\n}"
-                    .to_string(),
+                "@description(\"${2:description}\")\ntask ${1:name} {\n\t$0\n}".to_string(),
             ),
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
@@ -529,7 +529,9 @@ fn snippet_completions() -> Vec<CompletionItem> {
             label: "match".to_string(),
             kind: Some(CompletionItemKind::SNIPPET),
             detail: Some("Match expression".to_string()),
-            insert_text: Some("match ${1:value} {\n\t${2:pattern} => ${3:expr}\n\t_ => ${0:expr}\n}".to_string()),
+            insert_text: Some(
+                "match ${1:value} {\n\t${2:pattern} => ${3:expr}\n\t_ => ${0:expr}\n}".to_string(),
+            ),
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         },
@@ -543,7 +545,6 @@ fn snippet_completions() -> Vec<CompletionItem> {
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         },
-
         CompletionItem {
             label: "import".to_string(),
             kind: Some(CompletionItemKind::SNIPPET),

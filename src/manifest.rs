@@ -107,7 +107,10 @@ pub fn parse(text: &str) -> Result<Manifest, String> {
 
     if let Some(pkg) = doc.get("package") {
         manifest.name = pkg.get("name").and_then(|v| v.as_str()).map(String::from);
-        manifest.version = pkg.get("version").and_then(|v| v.as_str()).map(String::from);
+        manifest.version = pkg
+            .get("version")
+            .and_then(|v| v.as_str())
+            .map(String::from);
     }
 
     let Some(deps) = doc.get("dependencies") else {
@@ -186,9 +189,9 @@ fn parse_dependency(name: &str, spec: &toml::Value) -> Result<Dependency, String
     let subdir = match table.get("subdir") {
         None => None,
         Some(v) => {
-            let s = v.as_str().ok_or_else(|| {
-                format!("dependency '{}': `subdir` must be a string", name)
-            })?;
+            let s = v
+                .as_str()
+                .ok_or_else(|| format!("dependency '{}': `subdir` must be a string", name))?;
             if matches!(source, Source::Path(_)) {
                 return Err(format!(
                     "dependency '{}' is a path dependency, so `subdir` cannot apply to it; \
@@ -219,7 +222,9 @@ fn normalize_subdir(name: &str, raw: &str) -> Result<String, String> {
     let bad = cleaned.is_empty()
         || raw.starts_with('/')
         || Path::new(raw).is_absolute()
-        || cleaned.split('/').any(|c| c == ".." || c == "." || c.is_empty());
+        || cleaned
+            .split('/')
+            .any(|c| c == ".." || c == "." || c.is_empty());
     if bad {
         return Err(format!(
             "dependency '{}': `subdir` must be a relative path inside the repository, not '{}'",
@@ -397,7 +402,10 @@ deploy-tools = { git = "https://example.com/deploy", tag = "v1.2.0" }
 
     #[test]
     fn a_manifest_without_dependencies_is_fine() {
-        assert!(parse("[package]\nname = \"app\"\n").unwrap().dependencies.is_empty());
+        assert!(parse("[package]\nname = \"app\"\n")
+            .unwrap()
+            .dependencies
+            .is_empty());
     }
 
     #[test]

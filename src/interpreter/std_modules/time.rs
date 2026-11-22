@@ -1,18 +1,25 @@
 //! std.time module — DateTime construction and timezone handling.
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::Value;
 
-use chrono::{Datelike, Timelike, TimeZone, Duration, NaiveDate};
+use chrono::{Datelike, Duration, NaiveDate, TimeZone, Timelike};
 use chrono_tz::Tz;
 use std::collections::BTreeMap;
 
 pub(super) fn module() -> StdModule {
     StdModule {
         name: "time",
-        functions: &["now", "timestamp", "of", "parse", "from_timestamp", "timezone"],
+        functions: &[
+            "now",
+            "timestamp",
+            "of",
+            "parse",
+            "from_timestamp",
+            "timezone",
+        ],
     }
 }
 
@@ -28,7 +35,9 @@ pub(crate) fn make_datetime_value(timestamp_ms: i64, tz_str: &str) -> Value {
 }
 
 /// Reconstruct a `chrono::DateTime<Tz>` from the internal fields.
-pub(crate) fn extract_chrono_dt(fields: &BTreeMap<String, Value>) -> Result<chrono::DateTime<Tz>, Signal> {
+pub(crate) fn extract_chrono_dt(
+    fields: &BTreeMap<String, Value>,
+) -> Result<chrono::DateTime<Tz>, Signal> {
     let ts_ms = match fields.get("_timestamp_ms") {
         Some(Value::Int(ms)) => *ms,
         _ => return Err(sig_err("DateTime missing _timestamp_ms")),
@@ -37,7 +46,9 @@ pub(crate) fn extract_chrono_dt(fields: &BTreeMap<String, Value>) -> Result<chro
         Some(Value::String(s)) => s.as_str(),
         _ => return Err(sig_err("DateTime missing _tz")),
     };
-    let tz: Tz = tz_str.parse().map_err(|_| sig_err(format!("invalid timezone: {}", tz_str)))?;
+    let tz: Tz = tz_str
+        .parse()
+        .map_err(|_| sig_err(format!("invalid timezone: {}", tz_str)))?;
     let secs = ts_ms / 1000;
     let nanos = ((ts_ms % 1000) * 1_000_000) as u32;
     match chrono::DateTime::from_timestamp(secs, nanos) {
@@ -100,9 +111,7 @@ fn tz_matching_local_offset() -> Option<String> {
     }
     chrono_tz::TZ_VARIANTS
         .iter()
-        .find(|tz| {
-            tz.from_utc_datetime(&now.naive_utc()).offset().fix() == want
-        })
+        .find(|tz| tz.from_utc_datetime(&now.naive_utc()).offset().fix() == want)
         .map(|tz| tz.name().to_string())
 }
 
@@ -111,7 +120,8 @@ fn sig_err(msg: impl Into<String>) -> Signal {
 }
 
 fn parse_tz(name: &str) -> Result<Tz, Signal> {
-    name.parse::<Tz>().map_err(|_| sig_err(format!("invalid timezone: {}", name)))
+    name.parse::<Tz>()
+        .map_err(|_| sig_err(format!("invalid timezone: {}", name)))
 }
 
 impl Interpreter {
@@ -169,17 +179,19 @@ impl Interpreter {
 
                 let naive = NaiveDate::from_ymd_opt(year, month, day)
                     .and_then(|d| d.and_hms_opt(hour, minute, second))
-                    .ok_or_else(|| sig_err(format!(
-                        "invalid date/time: {}-{:02}-{:02} {:02}:{:02}:{:02}",
-                        year, month, day, hour, minute, second
-                    )))?;
+                    .ok_or_else(|| {
+                        sig_err(format!(
+                            "invalid date/time: {}-{:02}-{:02} {:02}:{:02}:{:02}",
+                            year, month, day, hour, minute, second
+                        ))
+                    })?;
 
-                let dt = tz.from_local_datetime(&naive)
-                    .single()
-                    .ok_or_else(|| sig_err(format!(
+                let dt = tz.from_local_datetime(&naive).single().ok_or_else(|| {
+                    sig_err(format!(
                         "ambiguous or invalid local time in timezone {}",
                         tz_name
-                    )))?;
+                    ))
+                })?;
 
                 Ok(make_datetime_value(dt.timestamp_millis(), &tz_name))
             }
@@ -191,7 +203,11 @@ impl Interpreter {
                 };
                 let fmt = match args.get(1) {
                     Some(Value::String(s)) => s.as_str(),
-                    _ => return Err(sig_err("time.parse() requires a format string as second argument")),
+                    _ => {
+                        return Err(sig_err(
+                            "time.parse() requires a format string as second argument",
+                        ))
+                    }
                 };
                 let tz_name = match args.get(2) {
                     Some(Value::String(s)) => s.clone(),
@@ -202,12 +218,12 @@ impl Interpreter {
                 let naive = chrono::NaiveDateTime::parse_from_str(input, fmt)
                     .map_err(|e| sig_err(format!("time.parse() failed: {}", e)))?;
 
-                let dt = tz.from_local_datetime(&naive)
-                    .single()
-                    .ok_or_else(|| sig_err(format!(
+                let dt = tz.from_local_datetime(&naive).single().ok_or_else(|| {
+                    sig_err(format!(
                         "ambiguous or invalid local time in timezone {}",
                         tz_name
-                    )))?;
+                    ))
+                })?;
 
                 Ok(make_datetime_value(dt.timestamp_millis(), &tz_name))
             }
@@ -215,7 +231,11 @@ impl Interpreter {
             "from_timestamp" => {
                 let ms = match args.first() {
                     Some(Value::Int(ms)) => *ms,
-                    _ => return Err(sig_err("time.from_timestamp() requires an Int (milliseconds)")),
+                    _ => {
+                        return Err(sig_err(
+                            "time.from_timestamp() requires an Int (milliseconds)",
+                        ))
+                    }
                 };
                 let tz_name = match args.get(1) {
                     Some(Value::String(s)) => s.clone(),
@@ -227,9 +247,7 @@ impl Interpreter {
                 Ok(make_datetime_value(ms, &tz_name))
             }
             // time.timezone() -> String (detected system IANA timezone)
-            "timezone" => {
-                Ok(Value::String(local_tz_name()))
-            }
+            "timezone" => Ok(Value::String(local_tz_name())),
             _ => Err(sig_err(format!("unknown function 'time.{}'", func))),
         }
     }
@@ -312,12 +330,10 @@ impl Interpreter {
                 };
                 Ok(make_datetime_value(ts_ms, "UTC"))
             }
-            "timezone" => {
-                match fields.get("_tz") {
-                    Some(Value::String(s)) => Ok(Value::String(s.clone())),
-                    _ => Err(sig_err("DateTime missing _tz")),
-                }
-            }
+            "timezone" => match fields.get("_tz") {
+                Some(Value::String(s)) => Ok(Value::String(s.clone())),
+                _ => Err(sig_err("DateTime missing _tz")),
+            },
             "add_days" => {
                 let n = match args.first() {
                     Some(Value::Int(n)) => *n,
@@ -325,10 +341,13 @@ impl Interpreter {
                 };
                 let dt = extract_chrono_dt(fields)?;
                 let new_dt = dt + Duration::days(n);
-                let tz_name = fields.get("_tz").and_then(|v| match v {
-                    Value::String(s) => Some(s.as_str()),
-                    _ => None,
-                }).unwrap_or("UTC");
+                let tz_name = fields
+                    .get("_tz")
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.as_str()),
+                        _ => None,
+                    })
+                    .unwrap_or("UTC");
                 Ok(make_datetime_value(new_dt.timestamp_millis(), tz_name))
             }
             "add_hours" => {
@@ -338,10 +357,13 @@ impl Interpreter {
                 };
                 let dt = extract_chrono_dt(fields)?;
                 let new_dt = dt + Duration::hours(n);
-                let tz_name = fields.get("_tz").and_then(|v| match v {
-                    Value::String(s) => Some(s.as_str()),
-                    _ => None,
-                }).unwrap_or("UTC");
+                let tz_name = fields
+                    .get("_tz")
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.as_str()),
+                        _ => None,
+                    })
+                    .unwrap_or("UTC");
                 Ok(make_datetime_value(new_dt.timestamp_millis(), tz_name))
             }
             "add_minutes" => {
@@ -351,10 +373,13 @@ impl Interpreter {
                 };
                 let dt = extract_chrono_dt(fields)?;
                 let new_dt = dt + Duration::minutes(n);
-                let tz_name = fields.get("_tz").and_then(|v| match v {
-                    Value::String(s) => Some(s.as_str()),
-                    _ => None,
-                }).unwrap_or("UTC");
+                let tz_name = fields
+                    .get("_tz")
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.as_str()),
+                        _ => None,
+                    })
+                    .unwrap_or("UTC");
                 Ok(make_datetime_value(new_dt.timestamp_millis(), tz_name))
             }
             "add_seconds" => {
@@ -364,18 +389,19 @@ impl Interpreter {
                 };
                 let dt = extract_chrono_dt(fields)?;
                 let new_dt = dt + Duration::seconds(n);
-                let tz_name = fields.get("_tz").and_then(|v| match v {
-                    Value::String(s) => Some(s.as_str()),
-                    _ => None,
-                }).unwrap_or("UTC");
+                let tz_name = fields
+                    .get("_tz")
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.as_str()),
+                        _ => None,
+                    })
+                    .unwrap_or("UTC");
                 Ok(make_datetime_value(new_dt.timestamp_millis(), tz_name))
             }
-            "timestamp" => {
-                match fields.get("_timestamp_ms") {
-                    Some(Value::Int(ms)) => Ok(Value::Int(*ms)),
-                    _ => Err(sig_err("DateTime missing _timestamp_ms")),
-                }
-            }
+            "timestamp" => match fields.get("_timestamp_ms") {
+                Some(Value::Int(ms)) => Ok(Value::Int(*ms)),
+                _ => Err(sig_err("DateTime missing _timestamp_ms")),
+            },
             "to_string" => {
                 let dt = extract_chrono_dt(fields)?;
                 Ok(Value::String(dt.to_rfc3339()))

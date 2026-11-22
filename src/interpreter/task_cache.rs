@@ -166,7 +166,8 @@ mod tests {
     use super::*;
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("que-task-cache-{}-{}", tag, std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("que-task-cache-{}-{}", tag, std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -181,14 +182,20 @@ mod tests {
             "build",
             TaskEntry {
                 args_hash: 7,
-                inputs: [("a.c".to_string(), "abc".to_string())].into_iter().collect(),
-                outputs: [("a.o".to_string(), "def".to_string())].into_iter().collect(),
+                inputs: [("a.c".to_string(), "abc".to_string())]
+                    .into_iter()
+                    .collect(),
+                outputs: [("a.o".to_string(), "def".to_string())]
+                    .into_iter()
+                    .collect(),
             },
         );
 
         let mut reloaded = TaskCache::default();
         reloaded.load_from(&dir);
-        let entry = reloaded.get("build").expect("entry should have been persisted");
+        let entry = reloaded
+            .get("build")
+            .expect("entry should have been persisted");
         assert_eq!(entry.args_hash, 7);
         assert_eq!(entry.inputs.get("a.c").map(String::as_str), Some("abc"));
         assert_eq!(entry.outputs.get("a.o").map(String::as_str), Some("def"));

@@ -1,3 +1,4 @@
+use crate::ast::AstStringPart;
 /// Static analysis linter for the Que language.
 ///
 /// Walks the AST without executing it, reporting potential issues:
@@ -7,9 +8,7 @@
 /// - unreachable-code: statements after return/break/continue/fail
 /// - secret-interpolation: Secret value used in string interpolation
 /// - empty-block: empty block body (likely mistake)
-
 use crate::ast::*;
-use crate::ast::AstStringPart;
 
 #[derive(Debug, Clone)]
 pub struct LintDiagnostic {
@@ -423,7 +422,11 @@ impl Linter {
                     collect_names(object, out);
                     out.push(field.clone());
                 }
-                Expr::MethodCall { object, method, args } => {
+                Expr::MethodCall {
+                    object,
+                    method,
+                    args,
+                } => {
                     collect_names(object, out);
                     out.push(method.clone());
                     for arg in args {
@@ -467,12 +470,6 @@ impl Linter {
 fn is_result_producing_fn(name: &str) -> bool {
     matches!(
         name,
-        "get"
-            | "post"
-            | "put"
-            | "patch"
-            | "delete"
-            | "request"
-            | "download"
+        "get" | "post" | "put" | "patch" | "delete" | "request" | "download"
     )
 }

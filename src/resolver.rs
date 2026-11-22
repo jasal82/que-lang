@@ -17,7 +17,6 @@
 /// names, method names, types) is left to the interpreter. The rule is that a
 /// diagnostic here must never be wrong; a false positive on a working script is
 /// worse than a missed typo.
-
 use crate::ast::*;
 use crate::interpreter::BUILTIN_NAMES;
 use crate::linter::{LintDiagnostic, Severity};
@@ -230,10 +229,7 @@ impl Resolver {
                     }
                 }
             }
-            Item::StructDecl(_)
-            | Item::EnumDecl(_)
-            | Item::TypeDecl(_)
-            | Item::Import(_) => {}
+            Item::StructDecl(_) | Item::EnumDecl(_) | Item::TypeDecl(_) | Item::Import(_) => {}
         }
     }
 
@@ -390,7 +386,11 @@ impl Resolver {
                 }
             }
 
-            Expr::WithContext { manager, name, body } => {
+            Expr::WithContext {
+                manager,
+                name,
+                body,
+            } => {
                 self.walk_expr(manager);
                 self.push_scope();
                 if !name.is_empty() {
@@ -523,7 +523,10 @@ impl Resolver {
             .closest_name(name)
             .map(|s| format!(" (did you mean '{}'?)", s))
             .unwrap_or_default();
-        self.report("undefined-name", format!("'{}' is not defined{}", name, hint));
+        self.report(
+            "undefined-name",
+            format!("'{}' is not defined{}", name, hint),
+        );
     }
 
     fn check_arity(&mut self, name: &str, args: &[CallArg]) {
@@ -735,13 +738,19 @@ println(double(2))
     #[test]
     fn reports_too_few_arguments() {
         let found = check("fn add(a, b) { a + b }\nadd(1)");
-        assert_eq!(found, vec!["arity: 'add' takes 2 argument(s), but 1 were given"]);
+        assert_eq!(
+            found,
+            vec!["arity: 'add' takes 2 argument(s), but 1 were given"]
+        );
     }
 
     #[test]
     fn reports_too_many_arguments() {
         let found = check("fn add(a, b) { a + b }\nadd(1, 2, 3)");
-        assert_eq!(found, vec!["arity: 'add' takes 2 argument(s), but 3 were given"]);
+        assert_eq!(
+            found,
+            vec!["arity: 'add' takes 2 argument(s), but 3 were given"]
+        );
     }
 
     #[test]

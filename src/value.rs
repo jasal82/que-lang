@@ -1,5 +1,4 @@
 /// Runtime values for the Que interpreter.
-
 use crate::ast::{Block, Param, TypeExpr};
 use crate::token::DurationUnit;
 use std::collections::BTreeMap;
@@ -32,7 +31,9 @@ pub struct MethodDef {
 }
 
 impl PartialEq for MethodDef {
-    fn eq(&self, other: &Self) -> bool { self.name == other.name }
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
 }
 
 /// A method slot inside a trait definition.
@@ -367,9 +368,15 @@ fn apply_op_eager(op: &StreamOp, text: String) -> Result<String, String> {
         StreamOp::Append(s) => format!("{}{}", text, s),
         StreamOp::Grep(pat) => {
             if let Ok(re) = regex_lite::Regex::new(pat) {
-                text.lines().filter(|l| re.is_match(l)).collect::<Vec<_>>().join("\n")
+                text.lines()
+                    .filter(|l| re.is_match(l))
+                    .collect::<Vec<_>>()
+                    .join("\n")
             } else {
-                text.lines().filter(|l| l.contains(pat.as_str())).collect::<Vec<_>>().join("\n")
+                text.lines()
+                    .filter(|l| l.contains(pat.as_str()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
             }
         }
         StreamOp::Head(n) => text.lines().take(*n).collect::<Vec<_>>().join("\n"),
@@ -378,7 +385,11 @@ fn apply_op_eager(op: &StreamOp, text: String) -> Result<String, String> {
             let start = all.len().saturating_sub(*n);
             all[start..].join("\n")
         }
-        StreamOp::SkipEmpty => text.lines().filter(|l| !l.trim().is_empty()).collect::<Vec<_>>().join("\n"),
+        StreamOp::SkipEmpty => text
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n"),
         StreamOp::ReverseLines => {
             let mut v: Vec<&str> = text.lines().collect();
             v.reverse();
@@ -391,7 +402,10 @@ fn apply_op_eager(op: &StreamOp, text: String) -> Result<String, String> {
         }
         StreamOp::UniqueLines => {
             let mut seen = std::collections::HashSet::new();
-            text.lines().filter(|l| seen.insert(l.to_string())).collect::<Vec<_>>().join("\n")
+            text.lines()
+                .filter(|l| seen.insert(l.to_string()))
+                .collect::<Vec<_>>()
+                .join("\n")
         }
         StreamOp::EnumerateLines => text
             .lines()
@@ -567,7 +581,8 @@ impl Value {
             Value::Err(_) => false,
             Value::Stream(s) => {
                 let inner = s.inner.lock().unwrap();
-                let buf_non_empty = matches!(&inner.source, StreamSource::Buffer(b) if !b.is_empty());
+                let buf_non_empty =
+                    matches!(&inner.source, StreamSource::Buffer(b) if !b.is_empty());
                 buf_non_empty
                     || !matches!(inner.source, StreamSource::Buffer(_))
                     || !inner.ops.is_empty()
@@ -621,13 +636,26 @@ impl Value {
             }
             Value::BuiltinFn(name) => format!("BuiltinFn({})", name),
             Value::Instance { type_name, fields } => {
-                format!("{}(fields: [{}])", type_name, fields.keys().cloned().collect::<Vec<_>>().join(", "))
+                format!(
+                    "{}(fields: [{}])",
+                    type_name,
+                    fields.keys().cloned().collect::<Vec<_>>().join(", ")
+                )
             }
-            Value::Enum { enum_name, variant, fields } => {
+            Value::Enum {
+                enum_name,
+                variant,
+                fields,
+            } => {
                 if fields.is_empty() {
                     format!("{}.{}", enum_name, variant)
                 } else {
-                    format!("{}.{}(fields: [{}])", enum_name, variant, fields.keys().cloned().collect::<Vec<_>>().join(", "))
+                    format!(
+                        "{}.{}(fields: [{}])",
+                        enum_name,
+                        variant,
+                        fields.keys().cloned().collect::<Vec<_>>().join(", ")
+                    )
                 }
             }
             Value::TypeRef(name) => format!("Type({})", name),
@@ -704,7 +732,10 @@ impl Value {
                 m.insert(
                     "element_types".into(),
                     Value::List(
-                        items.iter().map(|v| Value::String(v.type_name().into())).collect(),
+                        items
+                            .iter()
+                            .map(|v| Value::String(v.type_name().into()))
+                            .collect(),
                     ),
                 );
             }
@@ -723,7 +754,10 @@ impl Value {
                 m.insert(
                     "params".into(),
                     Value::List(
-                        params.iter().map(|p| Value::String(p.name.clone())).collect(),
+                        params
+                            .iter()
+                            .map(|p| Value::String(p.name.clone()))
+                            .collect(),
                     ),
                 );
                 m.insert(
@@ -751,7 +785,8 @@ impl Value {
                 m.insert("name".into(), Value::String(t.name.clone()));
                 m.insert(
                     "description".into(),
-                    t.description.as_ref()
+                    t.description
+                        .as_ref()
                         .map(|d| Value::String(d.clone()))
                         .unwrap_or(Value::Null),
                 );
@@ -759,20 +794,24 @@ impl Value {
                 m.insert(
                     "params".into(),
                     Value::List(
-                        t.params.iter().map(|p| Value::String(p.name.clone())).collect(),
+                        t.params
+                            .iter()
+                            .map(|p| Value::String(p.name.clone()))
+                            .collect(),
                     ),
                 );
                 m.insert(
                     "depends_on".into(),
                     Value::List(
-                        t.depends_on.iter().map(|d| Value::String(d.clone())).collect(),
+                        t.depends_on
+                            .iter()
+                            .map(|d| Value::String(d.clone()))
+                            .collect(),
                     ),
                 );
                 m.insert(
                     "aliases".into(),
-                    Value::List(
-                        t.aliases.iter().map(|a| Value::String(a.clone())).collect(),
-                    ),
+                    Value::List(t.aliases.iter().map(|a| Value::String(a.clone())).collect()),
                 );
             }
             Value::Stream(s) => {
@@ -786,31 +825,49 @@ impl Value {
                 }
                 m.insert("pending_ops".into(), Value::Int(inner.ops.len() as i64));
                 match &inner.source {
-                    StreamSource::File(p) => { m.insert("source".into(), Value::Path(p.clone())); }
-                    StreamSource::Stdin => { m.insert("source".into(), Value::String("stdin".into())); }
+                    StreamSource::File(p) => {
+                        m.insert("source".into(), Value::Path(p.clone()));
+                    }
+                    StreamSource::Stdin => {
+                        m.insert("source".into(), Value::String("stdin".into()));
+                    }
                     StreamSource::Buffer(_) => {}
                 }
                 match &inner.sink {
                     StreamSink::None => {}
-                    StreamSink::Stdout => { m.insert("sink".into(), Value::String("stdout".into())); }
-                    StreamSink::Stderr => { m.insert("sink".into(), Value::String("stderr".into())); }
-                    StreamSink::File { path, .. } => { m.insert("sink".into(), Value::Path(path.clone())); }
-                    StreamSink::FileHandle(_) => { m.insert("sink".into(), Value::String("file_handle".into())); }
+                    StreamSink::Stdout => {
+                        m.insert("sink".into(), Value::String("stdout".into()));
+                    }
+                    StreamSink::Stderr => {
+                        m.insert("sink".into(), Value::String("stderr".into()));
+                    }
+                    StreamSink::File { path, .. } => {
+                        m.insert("sink".into(), Value::Path(path.clone()));
+                    }
+                    StreamSink::FileHandle(_) => {
+                        m.insert("sink".into(), Value::String("file_handle".into()));
+                    }
                 }
             }
             Value::Instance { type_name, fields } => {
                 m.insert("type_name".into(), Value::String(type_name.clone()));
-                m.insert("fields".into(), Value::List(
-                    fields.keys().map(|k| Value::String(k.clone())).collect()
-                ));
+                m.insert(
+                    "fields".into(),
+                    Value::List(fields.keys().map(|k| Value::String(k.clone())).collect()),
+                );
                 m.insert("field_count".into(), Value::Int(fields.len() as i64));
             }
-            Value::Enum { enum_name, variant, fields } => {
+            Value::Enum {
+                enum_name,
+                variant,
+                fields,
+            } => {
                 m.insert("enum_name".into(), Value::String(enum_name.clone()));
                 m.insert("variant".into(), Value::String(variant.clone()));
-                m.insert("fields".into(), Value::List(
-                    fields.keys().map(|k| Value::String(k.clone())).collect()
-                ));
+                m.insert(
+                    "fields".into(),
+                    Value::List(fields.keys().map(|k| Value::String(k.clone())).collect()),
+                );
                 m.insert("field_count".into(), Value::Int(fields.len() as i64));
             }
             Value::TypeRef(name) => {
@@ -995,7 +1052,11 @@ impl fmt::Display for Value {
             Value::ProcessHandle(h) => write!(f, "<ProcessHandle pid={}>", h.pid),
             Value::FileHandle(fh) => {
                 if let Some(inner) = fh.inner.lock().ok() {
-                    write!(f, "<FileHandle path={} mode={} open={}>", inner.path, inner.mode, inner.open)
+                    write!(
+                        f,
+                        "<FileHandle path={} mode={} open={}>",
+                        inner.path, inner.mode, inner.open
+                    )
                 } else {
                     write!(f, "<FileHandle>")
                 }
@@ -1010,18 +1071,26 @@ impl fmt::Display for Value {
             Value::Instance { type_name, fields } => {
                 write!(f, "{} {{", type_name)?;
                 for (i, (k, v)) in fields.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}: {}", k, v)?;
                 }
                 write!(f, "}}")
             }
-            Value::Enum { enum_name, variant, fields } => {
+            Value::Enum {
+                enum_name,
+                variant,
+                fields,
+            } => {
                 if fields.is_empty() {
                     write!(f, "{}.{}", enum_name, variant)
                 } else {
                     write!(f, "{}.{} {{", enum_name, variant)?;
                     for (i, (k, v)) in fields.iter().enumerate() {
-                        if i > 0 { write!(f, ", ")?; }
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
                         write!(f, "{}: {}", k, v)?;
                     }
                     write!(f, "}}")
@@ -1055,20 +1124,42 @@ impl PartialEq for Value {
             (Value::Semver(a), Value::Semver(b)) => a == b,
             (Value::Stream(a), Value::Stream(b)) => Arc::ptr_eq(&a.inner, &b.inner),
             (Value::Task(a), Value::Task(b)) => a.name == b.name,
-            (Value::Instance { type_name: ta, fields: fa }, Value::Instance { type_name: tb, fields: fb }) => {
-                ta == tb && fa == fb
-            }
             (
-                Value::Enum { enum_name: ea, variant: va, fields: fa },
-                Value::Enum { enum_name: eb, variant: vb, fields: fb },
+                Value::Instance {
+                    type_name: ta,
+                    fields: fa,
+                },
+                Value::Instance {
+                    type_name: tb,
+                    fields: fb,
+                },
+            ) => ta == tb && fa == fb,
+            (
+                Value::Enum {
+                    enum_name: ea,
+                    variant: va,
+                    fields: fa,
+                },
+                Value::Enum {
+                    enum_name: eb,
+                    variant: vb,
+                    fields: fb,
+                },
             ) => ea == eb && va == vb && fa == fb,
             (Value::TypeRef(a), Value::TypeRef(b)) => a == b,
             (Value::Ok(a), Value::Ok(b)) => a == b,
             (Value::Err(a), Value::Err(b)) => a == b,
             (Value::FileHandle(a), Value::FileHandle(b)) => a == b,
-            (Value::Module { name: na, entries: ea }, Value::Module { name: nb, entries: eb }) => {
-                na == nb && ea == eb
-            }
+            (
+                Value::Module {
+                    name: na,
+                    entries: ea,
+                },
+                Value::Module {
+                    name: nb,
+                    entries: eb,
+                },
+            ) => na == nb && ea == eb,
             _ => false,
         }
     }
@@ -1100,8 +1191,12 @@ impl std::hash::Hash for Value {
             // bit patterns that compare equal as bits hash the same).
             Value::Float(f) => f.to_bits().hash(state),
             Value::Bool(b) => b.hash(state),
-            Value::String(s) | Value::Path(s) | Value::Glob(s)
-            | Value::Regex(s) | Value::Semver(s) | Value::TypeRef(s) => s.hash(state),
+            Value::String(s)
+            | Value::Path(s)
+            | Value::Glob(s)
+            | Value::Regex(s)
+            | Value::Semver(s)
+            | Value::TypeRef(s) => s.hash(state),
             Value::Stream(s) => s.hash(state),
             // Secret: hash the underlying value so equality is consistent,
             // but callers should not use secrets as set/map keys in practice.
@@ -1138,7 +1233,11 @@ impl std::hash::Hash for Value {
                 parts.hash(state);
                 mods.hash(state);
             }
-            Value::ProcessResult { exit_code, stdout, stderr } => {
+            Value::ProcessResult {
+                exit_code,
+                stdout,
+                stderr,
+            } => {
                 exit_code.hash(state);
                 stdout.hash(state);
                 stderr.hash(state);
@@ -1154,7 +1253,11 @@ impl std::hash::Hash for Value {
                     v.hash(state);
                 }
             }
-            Value::Enum { enum_name, variant, fields } => {
+            Value::Enum {
+                enum_name,
+                variant,
+                fields,
+            } => {
                 enum_name.hash(state);
                 variant.hash(state);
                 for (k, v) in fields {

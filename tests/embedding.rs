@@ -922,11 +922,7 @@ fn modules_load_from_explicit_search_paths_only() {
     let root = scratch("modules_search");
     let kits = root.join("kits");
     std::fs::create_dir_all(kits.join("demo_kit")).unwrap();
-    std::fs::write(
-        kits.join("demo_kit/mod.que"),
-        "pub fn name() { \"kit\" }\n",
-    )
-    .unwrap();
+    std::fs::write(kits.join("demo_kit/mod.que"), "pub fn name() { \"kit\" }\n").unwrap();
     std::fs::write(
         kits.join("demo_kit/license.que"),
         "import .helpers\npub fn stage(ctx) { helpers.prefix() + ctx }\n",

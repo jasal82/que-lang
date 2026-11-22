@@ -100,8 +100,8 @@ impl QueHelper {
             if pos <= token_end {
                 let prefix = &line[token_start + 1..pos];
                 let cmds: &[&str] = &[
-                    "h", "help", "t", "type", "m", "methods", "i", "inspect",
-                    "v", "vars", "load", "reset", "r", "q", "quit", "exit",
+                    "h", "help", "t", "type", "m", "methods", "i", "inspect", "v", "vars", "load",
+                    "reset", "r", "q", "quit", "exit",
                 ];
                 let candidates = cmds
                     .iter()
@@ -285,9 +285,7 @@ impl QueHelper {
                         .map(|(_, t)| t.clone())
                         .collect();
                     for t in trait_keys {
-                        if let Some(methods) =
-                            interp.trait_impls.get(&(type_name.clone(), t))
-                        {
+                        if let Some(methods) = interp.trait_impls.get(&(type_name.clone(), t)) {
                             for m in methods {
                                 names.push(m.name.clone());
                             }
@@ -364,7 +362,10 @@ fn is_after_import_keyword(line: &str, start: usize) -> bool {
     before.ends_with("import")
         && (before.len() == 6
             || matches!(
-                before.as_bytes().get(before.len().saturating_sub(7)).copied(),
+                before
+                    .as_bytes()
+                    .get(before.len().saturating_sub(7))
+                    .copied(),
                 Some(b'\n') | Some(b';') | Some(b'\t') | Some(b' ') | None
             ))
 }
@@ -466,10 +467,11 @@ mod tests {
     #[test]
     fn dotted_completes_value_methods() {
         let h = helper();
-        h.interp
-            .borrow_mut()
-            .env
-            .define("s", Value::Set(vec![Value::Int(1), Value::Int(2)]), false);
+        h.interp.borrow_mut().env.define(
+            "s",
+            Value::Set(vec![Value::Int(1), Value::Int(2)]),
+            false,
+        );
         let (start, items) = complete(&h, "s.");
         assert_eq!(start, 2);
         // Set should expose at least `contains` and `len`.

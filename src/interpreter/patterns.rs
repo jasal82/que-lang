@@ -97,8 +97,7 @@ impl Interpreter {
                         bindings.extend(self.match_pattern(pat, val)?);
                     }
                     if let Some(rest_pat) = rest {
-                        let rest_val =
-                            Value::List(items[patterns.len()..].to_vec());
+                        let rest_val = Value::List(items[patterns.len()..].to_vec());
                         bindings.extend(self.match_pattern(rest_pat, &rest_val)?);
                     }
                     Some(bindings)
@@ -148,7 +147,11 @@ impl Interpreter {
             }
             Pattern::Instance(enum_name, type_name, field_pats, rest) => {
                 // Match struct instances
-                if let Value::Instance { type_name: inst_type, fields } = value {
+                if let Value::Instance {
+                    type_name: inst_type,
+                    fields,
+                } = value
+                {
                     if enum_name.is_some() || inst_type != type_name {
                         return None;
                     }
@@ -174,11 +177,19 @@ impl Interpreter {
                     return Some(bindings);
                 }
                 // Also match enum variants by variant name: Circle { radius } matches Value::Enum { variant: "Circle", .. }
-                if let Value::Enum { enum_name: actual_enum_name, variant, fields } = value {
+                if let Value::Enum {
+                    enum_name: actual_enum_name,
+                    variant,
+                    fields,
+                } = value
+                {
                     if variant != type_name {
                         return None;
                     }
-                    if enum_name.as_ref().is_some_and(|expected| expected != actual_enum_name) {
+                    if enum_name
+                        .as_ref()
+                        .is_some_and(|expected| expected != actual_enum_name)
+                    {
                         return None;
                     }
                     let mut bindings = Vec::new();
@@ -228,11 +239,19 @@ impl Interpreter {
                     _ => {}
                 }
                 // User-defined enum: Variant(field1, field2, ...) — positional destructuring
-                if let Value::Enum { enum_name: actual_enum_name, variant, fields: enum_fields } = value {
+                if let Value::Enum {
+                    enum_name: actual_enum_name,
+                    variant,
+                    fields: enum_fields,
+                } = value
+                {
                     if variant != name {
                         return None;
                     }
-                    if enum_name.as_ref().is_some_and(|expected| expected != actual_enum_name) {
+                    if enum_name
+                        .as_ref()
+                        .is_some_and(|expected| expected != actual_enum_name)
+                    {
                         return None;
                     }
                     // Get ordered field values for positional matching
@@ -401,7 +420,10 @@ impl Interpreter {
             }
             Pattern::Instance(enum_name, type_name, field_pats, rest) => {
                 let inst_fields = match &value {
-                    Value::Instance { type_name: inst_type, fields } => {
+                    Value::Instance {
+                        type_name: inst_type,
+                        fields,
+                    } => {
                         if enum_name.is_some() || inst_type != type_name {
                             return Err(Signal::Error(QueError::new(
                                 ErrorKind::TypeMismatch,
@@ -410,27 +432,43 @@ impl Interpreter {
                         }
                         fields.clone()
                     }
-                    Value::Enum { enum_name: actual_enum_name, variant, fields } => {
+                    Value::Enum {
+                        enum_name: actual_enum_name,
+                        variant,
+                        fields,
+                    } => {
                         if variant != type_name {
                             return Err(Signal::Error(QueError::new(
                                 ErrorKind::TypeMismatch,
-                                format!("pattern expected variant '{}', got '{}'", type_name, variant),
+                                format!(
+                                    "pattern expected variant '{}', got '{}'",
+                                    type_name, variant
+                                ),
                             )));
                         }
                         if let Some(expected) = enum_name.as_ref() {
                             if expected != actual_enum_name {
                                 return Err(Signal::Error(QueError::new(
                                     ErrorKind::TypeMismatch,
-                                    format!("pattern expected enum '{}', got '{}'", expected, actual_enum_name),
+                                    format!(
+                                        "pattern expected enum '{}', got '{}'",
+                                        expected, actual_enum_name
+                                    ),
                                 )));
                             }
                         }
                         fields.clone()
                     }
-                    _ => return Err(Signal::Error(QueError::new(
-                        ErrorKind::TypeMismatch,
-                        format!("cannot destructure {} with instance pattern '{}'", value.type_name(), type_name),
-                    ))),
+                    _ => {
+                        return Err(Signal::Error(QueError::new(
+                            ErrorKind::TypeMismatch,
+                            format!(
+                                "cannot destructure {} with instance pattern '{}'",
+                                value.type_name(),
+                                type_name
+                            ),
+                        )))
+                    }
                 };
                 let mut matched_keys = std::collections::HashSet::new();
                 for (name, inner_pat) in field_pats {
@@ -465,5 +503,4 @@ impl Interpreter {
             }
         }
     }
-
 }

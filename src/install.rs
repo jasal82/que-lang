@@ -282,7 +282,8 @@ fn checkout(dir: &Path, revision: &str) -> Result<(), String> {
     run(cmd, "git checkout").map(|_| ())
 }
 
-fn run(mut cmd: Command, what: &str) -> Result<String, String> {    let out = cmd.output().map_err(|e| {
+fn run(mut cmd: Command, what: &str) -> Result<String, String> {
+    let out = cmd.output().map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
             "git is not installed, and Que fetches dependencies with it".to_string()
         } else {
@@ -432,7 +433,10 @@ mod tests {
         assert!(!installed.join("README.md").exists());
         // The checkout itself is kept out of the way, under a name no import
         // can spell.
-        assert!(manifest::sources_dir(&dir).join("que_std").join(".git").is_dir());
+        assert!(manifest::sources_dir(&dir)
+            .join("que_std")
+            .join(".git")
+            .is_dir());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

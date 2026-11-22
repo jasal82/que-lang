@@ -6,10 +6,10 @@
 //! the disk. Splitting them makes the reading obvious at the call site and
 //! lets the capability policy classify each without inspecting arguments.
 
-use crate::error::*;
-use crate::value::{Stream, StreamSink, Value};
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::{Stream, StreamSink, Value};
 
 pub(super) fn module() -> StdModule {
     StdModule {

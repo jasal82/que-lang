@@ -218,11 +218,7 @@ impl Parser {
 
     fn parse_multiplication(&mut self) -> Result<Expr, QueError> {
         let mut left = self.parse_power()?;
-        while self.at_binary_op(&[
-            TokenKind::Star,
-            TokenKind::Slash,
-            TokenKind::Percent,
-        ]) {
+        while self.at_binary_op(&[TokenKind::Star, TokenKind::Slash, TokenKind::Percent]) {
             // `/` always lowers to BinOp::Div; path-join semantics are
             // resolved at eval time based on operand types.
             let op = match self.advance().kind {
@@ -411,7 +407,12 @@ impl Parser {
     /// followed by `{ ident :` qualifies, so `if s == State.Idle { ... }` and
     /// `for x in m.items { ... }` keep parsing as blocks.
     fn at_variant_literal_brace(&self, field: &str) -> bool {
-        if !field.chars().next().map(char::is_uppercase).unwrap_or(false) {
+        if !field
+            .chars()
+            .next()
+            .map(char::is_uppercase)
+            .unwrap_or(false)
+        {
             return false;
         }
         if !matches!(self.peek(), TokenKind::LBrace) {
@@ -490,7 +491,8 @@ impl Parser {
     pub(crate) fn parse_expr_list(&mut self, end: &TokenKind) -> Result<Vec<Expr>, QueError> {
         let mut exprs = Vec::new();
         self.skip_newlines();
-        while std::mem::discriminant(self.peek()) != std::mem::discriminant(end) && !self.is_at_end()
+        while std::mem::discriminant(self.peek()) != std::mem::discriminant(end)
+            && !self.is_at_end()
         {
             exprs.push(self.parse_expr()?);
             self.skip_newlines();
@@ -563,7 +565,11 @@ impl Parser {
                 // Struct literal: `TypeName { field: value, ... }`
                 // Only triggered when name starts with uppercase AND `{` immediately follows
                 // (no newline between) — prevents ambiguity with block statements.
-                if name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+                if name
+                    .chars()
+                    .next()
+                    .map(|c| c.is_uppercase())
+                    .unwrap_or(false)
                     && matches!(self.peek(), TokenKind::LBrace)
                 {
                     self.advance(); // consume `{`
@@ -665,8 +671,7 @@ impl Parser {
                             } else {
                                 // Key: identifier treated as string key, or expression
                                 let key = if let TokenKind::Ident(name) = self.peek().clone() {
-                                    if matches!(self.peek_nth(1), TokenKind::Colon)
-                                    {
+                                    if matches!(self.peek_nth(1), TokenKind::Colon) {
                                         self.advance();
                                         Expr::StringLit(name)
                                     } else {
@@ -787,7 +792,11 @@ impl Parser {
                 };
                 let body = self.parse_block()?;
                 self.skip_newlines();
-                Ok(Expr::WithContext { manager: Box::new(manager), name, body })
+                Ok(Expr::WithContext {
+                    manager: Box::new(manager),
+                    name,
+                    body,
+                })
             }
 
             // ── spawn expr — launch command in background ──
@@ -948,13 +957,16 @@ impl Parser {
     fn parse_optional_else(&mut self) -> Result<Option<Box<Expr>>, QueError> {
         let mut la = self.pos;
         while la < self.tokens.len()
-            && matches!(self.tokens[la].kind, TokenKind::Newline | TokenKind::Semicolon)
+            && matches!(
+                self.tokens[la].kind,
+                TokenKind::Newline | TokenKind::Semicolon
+            )
         {
             la += 1;
         }
         if la < self.tokens.len() && matches!(self.tokens[la].kind, TokenKind::Else) {
             self.skip_newlines(); // consume the newlines we peeked past
-            self.advance();       // consume `else`
+            self.advance(); // consume `else`
             self.skip_newlines();
             Ok(Some(Box::new(self.parse_else_branch()?)))
         } else {
@@ -1077,7 +1089,10 @@ impl Parser {
     /// variants) into `AstStringPart`s where those source strings are fully parsed
     /// into `Expr` AST nodes. Syntax errors inside `${...}` are detected here,
     /// at parse time, rather than being deferred to runtime evaluation.
-    fn parse_string_parts(&self, parts: Vec<crate::token::StringPart>) -> Result<Vec<AstStringPart>, QueError> {
+    fn parse_string_parts(
+        &self,
+        parts: Vec<crate::token::StringPart>,
+    ) -> Result<Vec<AstStringPart>, QueError> {
         let span = self.current_span();
         let mut result = Vec::with_capacity(parts.len());
         for part in parts {
@@ -1124,5 +1139,4 @@ impl Parser {
             e
         })
     }
-
 }

@@ -27,26 +27,42 @@ pub enum BuiltinKind {
 /// task attribute names) are completed and documented through
 /// `builtin_functions` and `keyword_doc` instead.
 pub const KEYWORDS: &[&str] = &[
-    "let", "mut", "fn", "task", "type", "enum", "struct",
-    "impl", "trait",
-    "if", "else", "match", "for", "in", "while", "loop",
-    "return", "break", "continue",
-    "import", "as", "from", "pub",
-    "true", "false", "null",
-    "try", "catch", "finally", "defer",
-    "spawn", "parallel",
-    "where", "with",
+    "let", "mut", "fn", "task", "type", "enum", "struct", "impl", "trait", "if", "else", "match",
+    "for", "in", "while", "loop", "return", "break", "continue", "import", "as", "from", "pub",
+    "true", "false", "null", "try", "catch", "finally", "defer", "spawn", "parallel", "where",
+    "with",
 ];
 
 /// All Que primitive type names.
 pub const TYPES: &[&str] = &[
-    "Int", "Float", "Bool", "String", "Bytes",
-    "Path", "Glob", "Cmd", "Duration", "Timestamp",
-    "Regex", "Semver", "Secret",
-    "List", "Map", "Set", "Result",
-    "ProcessHandle", "FileHandle", "TempDir", "TempFile",
-    "TypeInfo", "VarInfo", "OsInfo", "Logger", "DateTime",
-    "Any", "Null",
+    "Int",
+    "Float",
+    "Bool",
+    "String",
+    "Bytes",
+    "Path",
+    "Glob",
+    "Cmd",
+    "Duration",
+    "Timestamp",
+    "Regex",
+    "Semver",
+    "Secret",
+    "List",
+    "Map",
+    "Set",
+    "Result",
+    "ProcessHandle",
+    "FileHandle",
+    "TempDir",
+    "TempFile",
+    "TypeInfo",
+    "VarInfo",
+    "OsInfo",
+    "Logger",
+    "DateTime",
+    "Any",
+    "Null",
 ];
 
 /// Built-in function registry with documentation.
@@ -1178,8 +1194,14 @@ pub fn methods_for_type(type_hint: &str) -> Vec<(&'static str, &'static str)> {
             ("starts_with", "(prefix: String) -> Bool"),
             ("ends_with", "(suffix: String) -> Bool"),
             ("contains", "(substr: String) -> Bool"),
-            ("contains_all", "(needles: List<String> | ...String) -> Bool"),
-            ("contains_any", "(needles: List<String> | ...String) -> Bool"),
+            (
+                "contains_all",
+                "(needles: List<String> | ...String) -> Bool",
+            ),
+            (
+                "contains_any",
+                "(needles: List<String> | ...String) -> Bool",
+            ),
             ("replace", "(old: String, new: String) -> String"),
             ("split", "(delimiter: String) -> List<String>"),
             ("chars", "() -> List<String>"),
@@ -1427,10 +1449,7 @@ pub fn methods_for_type(type_hint: &str) -> Vec<(&'static str, &'static str)> {
             ("satisfied_by", "(ver: Semver) -> Bool"),
             ("to_string", "() -> String"),
         ],
-        "Secret" => vec![
-            ("expose", "() -> String"),
-            ("len", "() -> Int"),
-        ],
+        "Secret" => vec![("expose", "() -> String"), ("len", "() -> Int")],
         "Glob" => vec![
             ("test", "(path: Path) -> Bool"),
             ("expand", "() -> List<Path>"),
@@ -1447,7 +1466,10 @@ pub fn methods_for_type(type_hint: &str) -> Vec<(&'static str, &'static str)> {
             ("find", "(str: String) -> Option<String>"),
             ("find_all", "(str: String) -> List<String>"),
             ("replace", "(str: String, replacement: String) -> String"),
-            ("replace_all", "(str: String, replacement: String) -> String"),
+            (
+                "replace_all",
+                "(str: String, replacement: String) -> String",
+            ),
             ("captures", "(str: String) -> List<String>"),
             ("named_captures", "(str: String) -> Map<String, String>"),
             ("split", "(str: String) -> List<String>"),
@@ -1474,10 +1496,7 @@ pub fn methods_for_type(type_hint: &str) -> Vec<(&'static str, &'static str)> {
             ("ceil", "() -> Float"),
             ("round", "() -> Float"),
         ],
-        "Bool" => vec![
-            ("to_int", "() -> Int"),
-            ("to_string", "() -> String"),
-        ],
+        "Bool" => vec![("to_int", "() -> Int"), ("to_string", "() -> String")],
         "DateTime" => vec![
             ("year", "() -> Int"),
             ("month", "() -> Int"),

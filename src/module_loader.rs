@@ -8,7 +8,6 @@
 ///   - Dot-prefixed paths     → local (package-root-relative)
 ///   - `mod.que` convention  → directory modules
 ///   - Single evaluation      → each module loaded once, cached by absolute path
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -239,13 +238,13 @@ impl ModuleLoader {
             // Better approach: we always try to load path as a module first.
             // If path resolves to a file, treat items as selective imports.
             // If path does not resolve to a file, treat items as sub-module names.
-            
+
             let base_path = if decl.is_local {
                 self.resolve_local_path(&decl.path, caller_dir)
             } else {
                 self.resolve_external_path(&decl.path)
             };
-            
+
             match base_path {
                 Some(file_path) if decl.path.len() >= 1 => {
                     // Path resolves to a file → selective imports from that module
@@ -253,7 +252,7 @@ impl ModuleLoader {
                     return Ok(vec![("__selective__".to_string(), module_val)]);
                 }
                 _ => {
-                    // Path doesn't resolve to a file, or empty path (`.{a,b}`) 
+                    // Path doesn't resolve to a file, or empty path (`.{a,b}`)
                     // → multi-module shorthand: each item is a separate module
                     let mut results = Vec::new();
                     for item_name in items {
@@ -302,7 +301,10 @@ impl ModuleLoader {
                     alias.clone()
                 } else {
                     // Last segment of path
-                    decl.path.last().cloned().unwrap_or_else(|| "module".to_string())
+                    decl.path
+                        .last()
+                        .cloned()
+                        .unwrap_or_else(|| "module".to_string())
                 };
                 Ok(vec![(name, module_val)])
             }
@@ -345,7 +347,11 @@ impl ModuleLoader {
         let declared = crate::manifest::load(&self.package_root)
             .ok()
             .flatten()
-            .map(|m| m.dependencies.iter().any(|d| d.dir_name == pkg.replace('-', "_")))
+            .map(|m| {
+                m.dependencies
+                    .iter()
+                    .any(|d| d.dir_name == pkg.replace('-', "_"))
+            })
             .unwrap_or(false);
         // With more than one directory in play, "not installed" is ambiguous
         // unless the search path is spelled out.
@@ -632,17 +638,20 @@ impl ModuleLoader {
         // binding that names it does not.
         for type_name in &interp.known_type_names {
             if let Some(fields) = interp.struct_defs.get(type_name) {
-                self.pending_struct_defs.insert(type_name.clone(), fields.clone());
+                self.pending_struct_defs
+                    .insert(type_name.clone(), fields.clone());
             }
             if let Some(variants) = interp.enum_defs.get(type_name) {
-                self.pending_enum_defs.insert(type_name.clone(), variants.clone());
+                self.pending_enum_defs
+                    .insert(type_name.clone(), variants.clone());
                 for (variant_name, _) in variants {
                     self.pending_enum_variant_to_enum
                         .insert(variant_name.clone(), type_name.clone());
                 }
             }
             if let Some(methods) = interp.impl_methods.get(type_name) {
-                self.pending_impl_methods.insert(type_name.clone(), methods.clone());
+                self.pending_impl_methods
+                    .insert(type_name.clone(), methods.clone());
             }
             for ((tname, trait_name), methods) in &interp.trait_impls {
                 if tname == type_name {

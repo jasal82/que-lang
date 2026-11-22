@@ -1,6 +1,5 @@
 /// Analysis module — runs the Que lexer + parser on document text and
 /// collects symbols, definitions, and any errors encountered.
-
 use que_lang::ast::*;
 use que_lang::lexer::Lexer;
 use que_lang::parser::Parser;
@@ -288,7 +287,9 @@ fn extract_symbols(module: &Module) -> Vec<SymbolInfo> {
 /// Extract variable definitions from statements.
 fn extract_stmt_symbols(stmt: &Stmt, symbols: &mut Vec<SymbolInfo>) {
     match stmt {
-        Stmt::Let { pattern, type_ann, .. } => {
+        Stmt::Let {
+            pattern, type_ann, ..
+        } => {
             if let Some(name) = pattern_name(pattern) {
                 symbols.push(SymbolInfo {
                     name,
@@ -412,7 +413,8 @@ mod tests {
     #[test]
     fn test_word_at_position_unicode_delimiter_no_panic() {
         // '─' is U+2500, 3 bytes in UTF-8 — this triggered the original crash
-        let src = "        // ── Emulator ZIP (Windows + Linux/crosstool-ng)\n        let archive = foo";
+        let src =
+            "        // ── Emulator ZIP (Windows + Linux/crosstool-ng)\n        let archive = foo";
         // Second line: "        let archive = foo"
         //               0       8   12      20 22
         // 'f' in 'foo' is at UTF-16 col 22

@@ -12,10 +12,10 @@
 //! blind spot, needs no dependency, and the latency budget here is a human
 //! noticing their editor saved a file.
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::Value;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
@@ -360,9 +360,7 @@ fn watch_opts(arg: Option<&Value>, who: &str) -> Result<WatchOpts, Signal> {
     }
     match map.get("times") {
         Some(Value::Int(n)) if *n > 0 => opts.times = Some(*n as u64),
-        Some(Value::Int(_)) => {
-            return Err(sig_err(format!("{}: times must be positive", who)))
-        }
+        Some(Value::Int(_)) => return Err(sig_err(format!("{}: times must be positive", who))),
         _ => {}
     }
     match map.get("ignore") {

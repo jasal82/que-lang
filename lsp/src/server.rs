@@ -1,6 +1,5 @@
 /// The Que Language Server — ties all providers together behind the
 /// `tower-lsp` `LanguageServer` trait.
-
 use crate::completion;
 use crate::diagnostics;
 use crate::document::DocumentStore;
@@ -32,9 +31,7 @@ impl QueLanguageServer {
             None => return,
         };
         let diags = diagnostics::compute_diagnostics(&source);
-        self.client
-            .publish_diagnostics(uri, diags, None)
-            .await;
+        self.client.publish_diagnostics(uri, diags, None).await;
     }
 }
 
@@ -118,10 +115,7 @@ impl LanguageServer for QueLanguageServer {
 
     // ── Completions ──
 
-    async fn completion(
-        &self,
-        params: CompletionParams,
-    ) -> Result<Option<CompletionResponse>> {
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = &params.text_document_position.text_document.uri;
         let position = &params.text_document_position.position;
 
@@ -272,7 +266,6 @@ fn compute_semantic_tokens(source: &str) -> Vec<SemanticToken> {
             | TokenKind::Catch
             | TokenKind::Finally
             | TokenKind::Defer
-
             | TokenKind::Spawn
             | TokenKind::Parallel
             | TokenKind::Where
@@ -316,11 +309,7 @@ fn compute_semantic_tokens(source: &str) -> Vec<SemanticToken> {
         let length = (tok.span.end.saturating_sub(tok.span.start)) as u32;
 
         let delta_line = line - prev_line;
-        let delta_start = if delta_line == 0 {
-            col - prev_col
-        } else {
-            col
-        };
+        let delta_start = if delta_line == 0 { col - prev_col } else { col };
 
         result.push(SemanticToken {
             delta_line,

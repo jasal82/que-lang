@@ -3,7 +3,6 @@
 /// Provides built-in functions for making HTTP requests:
 ///   http_get, http_post, http_put, http_patch, http_delete,
 ///   http_request, http_download, http_upload, url_encode, url_decode, query_string
-
 use crate::value::Value;
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -83,7 +82,10 @@ fn extract_tls_opts(val: &Value) -> Result<Option<BTreeMap<String, Value>>, Stri
     match val {
         Value::Map(m) => Ok(Some(m.clone())),
         Value::Null => Ok(None),
-        other => Err(format!("tls options must be a Map, got {}", other.type_name())),
+        other => Err(format!(
+            "tls options must be a Map, got {}",
+            other.type_name()
+        )),
     }
 }
 
@@ -160,13 +162,8 @@ fn execute_request(request: ureq::Request, body: Option<&str>) -> Result<Value, 
         Ok(response) => read_response(response),
         Err(ureq::Error::Status(code, response)) => {
             // HTTP error status (4xx, 5xx) — still return a response map
-            read_response(response).or_else(|_| {
-                Ok(build_response_map(
-                    code,
-                    BTreeMap::new(),
-                    String::new(),
-                ))
-            })
+            read_response(response)
+                .or_else(|_| Ok(build_response_map(code, BTreeMap::new(), String::new())))
         }
         Err(ureq::Error::Transport(e)) => Err(format!("HTTP transport error: {}", e)),
     }
@@ -178,7 +175,12 @@ fn execute_request(request: ureq::Request, body: Option<&str>) -> Result<Value, 
 pub fn http_get(args: &[Value]) -> Result<Value, String> {
     let url = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!("http_get() url must be a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "http_get() url must be a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_get() requires at least 1 argument (url)".into()),
     };
     let headers = match args.get(1) {
@@ -198,7 +200,12 @@ pub fn http_get(args: &[Value]) -> Result<Value, String> {
 pub fn http_post(args: &[Value]) -> Result<Value, String> {
     let url = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!("http_post() url must be a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "http_post() url must be a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_post() requires at least 2 arguments (url, body)".into()),
     };
     let body = match args.get(1) {
@@ -224,7 +231,12 @@ pub fn http_post(args: &[Value]) -> Result<Value, String> {
 pub fn http_put(args: &[Value]) -> Result<Value, String> {
     let url = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!("http_put() url must be a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "http_put() url must be a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_put() requires at least 2 arguments (url, body)".into()),
     };
     let body = match args.get(1) {
@@ -250,7 +262,12 @@ pub fn http_put(args: &[Value]) -> Result<Value, String> {
 pub fn http_patch(args: &[Value]) -> Result<Value, String> {
     let url = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!("http_patch() url must be a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "http_patch() url must be a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_patch() requires at least 2 arguments (url, body)".into()),
     };
     let body = match args.get(1) {
@@ -276,7 +293,12 @@ pub fn http_patch(args: &[Value]) -> Result<Value, String> {
 pub fn http_delete(args: &[Value]) -> Result<Value, String> {
     let url = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!("http_delete() url must be a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "http_delete() url must be a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_delete() requires at least 1 argument (url)".into()),
     };
     let headers = match args.get(1) {
@@ -304,23 +326,35 @@ pub fn http_delete(args: &[Value]) -> Result<Value, String> {
 pub fn http_request(args: &[Value]) -> Result<Value, String> {
     let opts = match args.first() {
         Some(Value::Map(m)) => m,
-        Some(other) => return Err(format!(
-            "http_request() requires a Map argument, got {}",
-            other.type_name()
-        )),
+        Some(other) => {
+            return Err(format!(
+                "http_request() requires a Map argument, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_request() requires 1 argument (options Map)".into()),
     };
 
     let url = match opts.get("url") {
         Some(Value::String(s)) => s.clone(),
-        Some(other) => return Err(format!("http_request() url must be a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "http_request() url must be a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_request() options must include \"url\"".into()),
     };
 
     let method = match opts.get("method") {
         Some(Value::String(s)) => s.to_uppercase(),
         None => "GET".into(),
-        Some(other) => return Err(format!("http_request() method must be a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "http_request() method must be a String, got {}",
+                other.type_name()
+            ))
+        }
     };
 
     let headers = match opts.get("headers") {
@@ -358,17 +392,24 @@ pub fn http_request(args: &[Value]) -> Result<Value, String> {
 pub fn http_download(args: &[Value]) -> Result<Value, String> {
     let url = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!("http_download() url must be a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "http_download() url must be a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_download() requires at least 2 arguments (url, dest)".into()),
     };
 
     let dest = match args.get(1) {
         Some(Value::String(s)) => s.clone(),
         Some(Value::Path(p)) => p.clone(),
-        Some(other) => return Err(format!(
-            "http_download() dest must be a String or Path, got {}",
-            other.type_name()
-        )),
+        Some(other) => {
+            return Err(format!(
+                "http_download() dest must be a String or Path, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_download() requires a dest argument".into()),
     };
 
@@ -450,18 +491,24 @@ pub fn http_download(args: &[Value]) -> Result<Value, String> {
 pub fn http_upload(args: &[Value]) -> Result<Value, String> {
     let url = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!(
-            "http_upload() url must be a String, got {}", other.type_name()
-        )),
+        Some(other) => {
+            return Err(format!(
+                "http_upload() url must be a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_upload() requires at least 2 arguments (url, path)".into()),
     };
 
     let file_path = match args.get(1) {
         Some(Value::String(s)) => s.clone(),
         Some(Value::Path(p)) => p.clone(),
-        Some(other) => return Err(format!(
-            "http_upload() path must be a String or Path, got {}", other.type_name()
-        )),
+        Some(other) => {
+            return Err(format!(
+                "http_upload() path must be a String or Path, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("http_upload() requires a file path argument".into()),
     };
 
@@ -489,11 +536,13 @@ pub fn http_upload(args: &[Value]) -> Result<Value, String> {
     let result = req.send(file);
     match result {
         Ok(response) => read_response(response),
-        Err(ureq::Error::Status(code, response)) => {
-            read_response(response).or_else(|_| {
-                Ok(build_response_map(code, std::collections::BTreeMap::new(), String::new()))
-            })
-        }
+        Err(ureq::Error::Status(code, response)) => read_response(response).or_else(|_| {
+            Ok(build_response_map(
+                code,
+                std::collections::BTreeMap::new(),
+                String::new(),
+            ))
+        }),
         Err(ureq::Error::Transport(e)) => Err(format!("HTTP transport error: {}", e)),
     }
 }
@@ -504,7 +553,12 @@ pub fn http_upload(args: &[Value]) -> Result<Value, String> {
 pub fn url_encode(args: &[Value]) -> Result<Value, String> {
     let s = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!("url_encode() requires a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "url_encode() requires a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("url_encode() requires 1 argument".into()),
     };
 
@@ -528,7 +582,12 @@ pub fn url_encode(args: &[Value]) -> Result<Value, String> {
 pub fn url_decode(args: &[Value]) -> Result<Value, String> {
     let s = match args.first() {
         Some(Value::String(s)) => s.as_str(),
-        Some(other) => return Err(format!("url_decode() requires a String, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "url_decode() requires a String, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("url_decode() requires 1 argument".into()),
     };
 
@@ -569,7 +628,12 @@ pub fn url_decode(args: &[Value]) -> Result<Value, String> {
 pub fn query_string(args: &[Value]) -> Result<Value, String> {
     let map = match args.first() {
         Some(Value::Map(m)) => m,
-        Some(other) => return Err(format!("query_string() requires a Map, got {}", other.type_name())),
+        Some(other) => {
+            return Err(format!(
+                "query_string() requires a Map, got {}",
+                other.type_name()
+            ))
+        }
         None => return Err("query_string() requires 1 argument".into()),
     };
 
@@ -661,7 +725,10 @@ mod tests {
     #[test]
     fn test_extract_headers_map() {
         let mut map = BTreeMap::new();
-        map.insert("Content-Type".into(), Value::String("application/json".into()));
+        map.insert(
+            "Content-Type".into(),
+            Value::String("application/json".into()),
+        );
         map.insert("X-Count".into(), Value::Int(42));
         let headers = extract_headers(&Value::Map(map)).unwrap();
         assert_eq!(headers.len(), 2);

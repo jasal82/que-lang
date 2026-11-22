@@ -1,10 +1,10 @@
 //! std.log module — Structured logging with levels, formats, and sinks.
 
-use crate::error::*;
-use crate::value::Value;
-use super::super::helpers::{arg_str, parse_log_level, parse_log_format, default_console_sink};
+use super::super::helpers::{arg_str, default_console_sink, parse_log_format, parse_log_level};
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::Value;
 
 use std::collections::BTreeMap;
 
@@ -12,9 +12,15 @@ pub(super) fn module() -> StdModule {
     StdModule {
         name: "log",
         functions: &[
-            "debug", "info", "warn", "error",
-            "set_level", "set_format",
-            "add_file_sink", "add_console_sink", "remove_sinks",
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "set_level",
+            "set_format",
+            "add_file_sink",
+            "add_console_sink",
+            "remove_sinks",
             "new",
         ],
     }
@@ -103,7 +109,12 @@ impl Interpreter {
                 let context = match args.first() {
                     Some(Value::Map(m)) => m.clone(),
                     Some(Value::Null) | None => BTreeMap::new(),
-                    Some(other) => return Err(sig_type("log.new", &format!("Map, got {}", other.type_name()))),
+                    Some(other) => {
+                        return Err(sig_type(
+                            "log.new",
+                            &format!("Map, got {}", other.type_name()),
+                        ))
+                    }
                 };
                 let mut fields = BTreeMap::new();
                 fields.insert("context".to_string(), Value::Map(context));

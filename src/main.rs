@@ -12,10 +12,10 @@ use que_lang::parser::Parser;
 use que_lang::token::TokenKind;
 use que_lang::value::Value;
 
+use que_lang::completion::QueHelper;
 use rustyline::error::ReadlineError;
 use rustyline::history::DefaultHistory;
-use rustyline::{Editor, CompletionType, Config};
-use que_lang::completion::QueHelper;
+use rustyline::{CompletionType, Config, Editor};
 
 mod help;
 
@@ -96,7 +96,11 @@ fn main() {
                 }
                 i += 1;
             }
-            let global_dir = if use_global { Some(global_packages_dir()) } else { None };
+            let global_dir = if use_global {
+                Some(global_packages_dir())
+            } else {
+                None
+            };
             match script_pos {
                 Some(idx) => run_file(
                     &tail[idx],
@@ -184,7 +188,10 @@ fn permission_flag(tail: &[String], i: &mut usize) -> Option<(bool, String)> {
             match tail.get(*i) {
                 Some(v) => v.clone(),
                 None => {
-                    eprintln!("error: {} requires a capability, e.g. {} read=src", flag, flag);
+                    eprintln!(
+                        "error: {} requires a capability, e.g. {} read=src",
+                        flag, flag
+                    );
                     process::exit(EXIT_USAGE);
                 }
             }
@@ -325,9 +332,15 @@ fn find_project_quefile() -> Option<QuefileSource> {
             let candidate = dir.join(name);
             if candidate.is_file() {
                 return Some(if dir == cwd {
-                    QuefileSource { path: name.to_string(), global: false }
+                    QuefileSource {
+                        path: name.to_string(),
+                        global: false,
+                    }
                 } else {
-                    QuefileSource { path: candidate.display().to_string(), global: false }
+                    QuefileSource {
+                        path: candidate.display().to_string(),
+                        global: false,
+                    }
                 });
             }
         }
@@ -400,7 +413,8 @@ fn global_packages_dir() -> std::path::PathBuf {
 }
 
 /// Report that there is nothing to run and exit.
-fn exit_no_quefile(global_only: bool) -> ! {    if global_only {
+fn exit_no_quefile(global_only: bool) -> ! {
+    if global_only {
         eprintln!("error: no global Quefile found");
     } else {
         eprintln!("error: no Quefile found in this directory or any parent, and no global Quefile");
@@ -449,12 +463,18 @@ fn resolve_quefile(args: &[String]) -> (QuefileSelection, Vec<String>) {
 
     let selection = if let Some(f) = file {
         QuefileSelection {
-            project: Some(QuefileSource { path: f, global: false }),
+            project: Some(QuefileSource {
+                path: f,
+                global: false,
+            }),
             global: None,
         }
     } else if force_global {
         match find_global_quefile() {
-            Some(g) => QuefileSelection { project: None, global: Some(g) },
+            Some(g) => QuefileSelection {
+                project: None,
+                global: Some(g),
+            },
             None => exit_no_quefile(true),
         }
     } else {
@@ -594,7 +614,9 @@ fn parse_run_args(
         }
         idx += 1;
     }
-    (selection, task_name, help, dry_run, force, policy, task_args)
+    (
+        selection, task_name, help, dry_run, force, policy, task_args,
+    )
 }
 
 /// The outcome of looking a task name up across the selected Quefiles.
@@ -792,7 +814,12 @@ fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
     if !task.params.is_empty() {
         println!();
         println!("{}", help::heading("Arguments"));
-        let max_name = task.params.iter().map(|p| p.name.chars().count()).max().unwrap_or(0);
+        let max_name = task
+            .params
+            .iter()
+            .map(|p| p.name.chars().count())
+            .max()
+            .unwrap_or(0);
         let types: Vec<String> = task
             .params
             .iter()
@@ -800,7 +827,13 @@ fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
                 p.type_ann
                     .as_ref()
                     .map(|t| t.to_string())
-                    .unwrap_or_else(|| if p.rest { "List".to_string() } else { "any".to_string() })
+                    .unwrap_or_else(|| {
+                        if p.rest {
+                            "List".to_string()
+                        } else {
+                            "any".to_string()
+                        }
+                    })
             })
             .collect();
         let max_type = types.iter().map(|t| t.chars().count()).max().unwrap_or(0);
@@ -808,10 +841,7 @@ fn print_task_help(source: &QuefileSource, task: &que_lang::value::TaskData) {
             let note = if param.rest {
                 "rest".to_string()
             } else if let Some(default) = &param.default {
-                format!(
-                    "optional (default: {})",
-                    Formatter::expr_to_source(default)
-                )
+                format!("optional (default: {})", Formatter::expr_to_source(default))
             } else {
                 "required".to_string()
             };
@@ -1310,7 +1340,10 @@ fn cmd_lint(args: &[String]) {
 
     if total_errors > 0 || total_warnings > 0 {
         eprintln!();
-        eprintln!("{} error(s), {} warning(s) found", total_errors, total_warnings);
+        eprintln!(
+            "{} error(s), {} warning(s) found",
+            total_errors, total_warnings
+        );
         process::exit(1);
     }
 }
@@ -1419,10 +1452,7 @@ fn repl() {
 /// from `-g` and is searched last. Both are handed to the interpreter before
 /// the first line is read, because the module loader is built once and a
 /// session that has already imported cannot be told about a new directory.
-fn repl_with_packages(
-    packages: Vec<std::path::PathBuf>,
-    global: Option<std::path::PathBuf>,
-) {
+fn repl_with_packages(packages: Vec<std::path::PathBuf>, global: Option<std::path::PathBuf>) {
     use colored::Colorize;
 
     println!(
@@ -1701,9 +1731,7 @@ fn handle_meta_command(input: &str, interp: &mut Interpreter) -> MetaResult {
         }
         // `vars` lives in std.reflect now, but a REPL shortcut that made you
         // import something first would not be a shortcut.
-        "v" | "vars" => {
-            MetaResult::Rewritten("import std.reflect\nreflect.vars()".to_string())
-        }
+        "v" | "vars" => MetaResult::Rewritten("import std.reflect\nreflect.vars()".to_string()),
         "r" | "reset" => {
             *interp = Interpreter::new();
             println!("{}", "(interpreter reset)".yellow());
@@ -1718,7 +1746,12 @@ fn handle_meta_command(input: &str, interp: &mut Interpreter) -> MetaResult {
             match std::fs::read_to_string(arg) {
                 Ok(src) => MetaResult::Rewritten(src),
                 Err(e) => {
-                    eprintln!("{} cannot read {}: {}", "error:".red().bold(), arg.green(), e);
+                    eprintln!(
+                        "{} cannot read {}: {}",
+                        "error:".red().bold(),
+                        arg.green(),
+                        e
+                    );
                     MetaResult::Handled
                 }
             }

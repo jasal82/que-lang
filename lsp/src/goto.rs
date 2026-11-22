@@ -1,5 +1,4 @@
 /// Go-to-definition — find the definition site of a symbol in the same document.
-
 use crate::analysis;
 use tower_lsp::lsp_types::*;
 
@@ -48,7 +47,10 @@ fn find_definition_in_source(uri: &Url, source: &str, name: &str) -> Option<Loca
 
         // let name = ...
         // mut name = ...
-        if let Some(rest) = trimmed.strip_prefix("let ").or_else(|| trimmed.strip_prefix("mut ")) {
+        if let Some(rest) = trimmed
+            .strip_prefix("let ")
+            .or_else(|| trimmed.strip_prefix("mut "))
+        {
             if rest.starts_with(name)
                 && rest[name.len()..]
                     .chars()

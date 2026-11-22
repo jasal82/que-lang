@@ -31,11 +31,7 @@ pub fn install() {
         {
             use signal_hook::consts::{SIGINT, SIGTERM};
             for sig in [SIGINT, SIGTERM] {
-                let _ = signal_hook::flag::register_usize(
-                    sig,
-                    Arc::clone(pending()),
-                    sig as usize,
-                );
+                let _ = signal_hook::flag::register_usize(sig, Arc::clone(pending()), sig as usize);
             }
         }
     });

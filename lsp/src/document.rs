@@ -1,6 +1,5 @@
 /// Document store — maintains open file contents as rope text buffers,
 /// keyed by URI. Thread-safe via `DashMap`.
-
 use dashmap::DashMap;
 use ropey::Rope;
 use tower_lsp::lsp_types::Url;

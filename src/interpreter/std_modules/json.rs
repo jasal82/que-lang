@@ -1,11 +1,11 @@
 //! std.json module — JSON parsing and serialization.
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::helpers::arg_str;
 use super::super::Interpreter;
+use super::fs::{atomic_write_str, path_str};
 use super::StdModule;
-use super::fs::{path_str, atomic_write_str};
+use crate::error::*;
+use crate::value::Value;
 
 pub(super) fn module() -> StdModule {
     StdModule {
@@ -26,9 +26,18 @@ impl Interpreter {
             }
             "stringify" => {
                 let value = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "json.stringify requires 1-2 arguments"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "json.stringify requires 1-2 arguments",
+                    ))
                 })?;
-                let indent = args.get(1).and_then(|v| if let Value::Int(n) = v { Some(*n as usize) } else { None });
+                let indent = args.get(1).and_then(|v| {
+                    if let Value::Int(n) = v {
+                        Some(*n as usize)
+                    } else {
+                        None
+                    }
+                });
                 match crate::config::to_json(value, indent) {
                     Ok(s) => Ok(Value::String(s)),
                     Err(e) => Ok(Value::Err(Box::new(Value::String(e)))),
@@ -43,16 +52,13 @@ impl Interpreter {
                 }
                 let p = path_str(&args[0], "json.edit")?;
                 let func_val = args[1].clone();
-                let content = std::fs::read_to_string(&p).map_err(|e| {
-                    Signal::Error(QueError::new(ErrorKind::IoError, e.to_string()))
-                })?;
-                let doc = crate::config::parse_json(&content).map_err(|e| {
-                    Signal::Error(QueError::new(ErrorKind::Runtime, e))
-                })?;
+                let content = std::fs::read_to_string(&p)
+                    .map_err(|e| Signal::Error(QueError::new(ErrorKind::IoError, e.to_string())))?;
+                let doc = crate::config::parse_json(&content)
+                    .map_err(|e| Signal::Error(QueError::new(ErrorKind::Runtime, e)))?;
                 let result = self.call_value(func_val, vec![doc])?;
-                let serialized = crate::config::to_json_ordered(&result, &content, Some(2)).map_err(|e| {
-                    Signal::Error(QueError::new(ErrorKind::Runtime, e))
-                })?;
+                let serialized = crate::config::to_json_ordered(&result, &content, Some(2))
+                    .map_err(|e| Signal::Error(QueError::new(ErrorKind::Runtime, e)))?;
                 atomic_write_str(&p, &serialized)?;
                 Ok(Value::Null)
             }

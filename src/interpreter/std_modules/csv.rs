@@ -1,10 +1,10 @@
 //! std.csv module — CSV parsing and serialization.
 
-use crate::error::*;
-use crate::value::Value;
-use crate::interpreter::helpers::arg_path_str;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::interpreter::helpers::arg_path_str;
+use crate::value::Value;
 
 use std::collections::BTreeMap;
 
@@ -26,17 +26,21 @@ impl Interpreter {
                         // `~` is expanded only for the filename reading.
                         let candidate = crate::interpreter::helpers::expand_tilde(p);
                         if std::path::Path::new(&candidate).exists() && !p.contains('\n') {
-                            std::fs::read_to_string(&candidate).map_err(|e| sig_err(e.to_string()))?
+                            std::fs::read_to_string(&candidate)
+                                .map_err(|e| sig_err(e.to_string()))?
                         } else {
                             p.clone()
                         }
                     }
                     _ => return Err(sig_type("csv.parse", "Path or String")),
                 };
-                let delimiter = args.get(1).and_then(|v| match v {
-                    Value::String(s) => Some(s.chars().next().unwrap_or(',')),
-                    _ => None,
-                }).unwrap_or(',');
+                let delimiter = args
+                    .get(1)
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.chars().next().unwrap_or(',')),
+                        _ => None,
+                    })
+                    .unwrap_or(',');
                 let rows = csv_parse_str(&text, true, delimiter).map_err(|e| sig_err(e))?;
                 Ok(Value::List(rows))
             }
@@ -45,10 +49,13 @@ impl Interpreter {
                     Some(Value::String(s)) => s.clone(),
                     _ => return Err(sig_type("csv.parse_str", "String")),
                 };
-                let delimiter = args.get(1).and_then(|v| match v {
-                    Value::String(s) => Some(s.chars().next().unwrap_or(',')),
-                    _ => None,
-                }).unwrap_or(',');
+                let delimiter = args
+                    .get(1)
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.chars().next().unwrap_or(',')),
+                        _ => None,
+                    })
+                    .unwrap_or(',');
                 let rows = csv_parse_str(&text, true, delimiter).map_err(|e| sig_err(e))?;
                 Ok(Value::List(rows))
             }
@@ -58,10 +65,13 @@ impl Interpreter {
                     _ => return Err(sig_type("csv.write", "List")),
                 };
                 let path_str = arg_path_str(args, 1, "csv.write")?;
-                let delimiter = args.get(2).and_then(|v| match v {
-                    Value::String(s) => Some(s.chars().next().unwrap_or(',')),
-                    _ => None,
-                }).unwrap_or(',');
+                let delimiter = args
+                    .get(2)
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.chars().next().unwrap_or(',')),
+                        _ => None,
+                    })
+                    .unwrap_or(',');
                 let content = csv_write_rows(&rows, delimiter).map_err(|e| sig_err(e))?;
                 std::fs::write(&path_str, content).map_err(|e| sig_err(e.to_string()))?;
                 Ok(Value::Null)
@@ -71,10 +81,13 @@ impl Interpreter {
                     Some(Value::List(l)) => l.clone(),
                     _ => return Err(sig_type("csv.to_string", "List")),
                 };
-                let delimiter = args.get(1).and_then(|v| match v {
-                    Value::String(s) => Some(s.chars().next().unwrap_or(',')),
-                    _ => None,
-                }).unwrap_or(',');
+                let delimiter = args
+                    .get(1)
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.chars().next().unwrap_or(',')),
+                        _ => None,
+                    })
+                    .unwrap_or(',');
                 let content = csv_write_rows(&rows, delimiter).map_err(|e| sig_err(e))?;
                 Ok(Value::String(content))
             }
@@ -106,11 +119,7 @@ fn sig_type(name: &str, expected: &str) -> Signal {
     ))
 }
 
-fn csv_parse_str(
-    text: &str,
-    headers: bool,
-    delimiter: char,
-) -> Result<Vec<Value>, String> {
+fn csv_parse_str(text: &str, headers: bool, delimiter: char) -> Result<Vec<Value>, String> {
     let lines: Vec<&str> = text.lines().collect();
     if lines.is_empty() {
         return Ok(Vec::new());
@@ -143,7 +152,9 @@ fn csv_parse_str(
         let header_fields = parse_row(lines[0]);
         let mut rows = Vec::new();
         for line in &lines[1..] {
-            if line.trim().is_empty() { continue; }
+            if line.trim().is_empty() {
+                continue;
+            }
             let values = parse_row(line);
             let mut map: BTreeMap<String, Value> = BTreeMap::new();
             for (i, h) in header_fields.iter().enumerate() {
@@ -156,20 +167,17 @@ fn csv_parse_str(
     } else {
         let mut rows = Vec::new();
         for line in &lines {
-            if line.trim().is_empty() { continue; }
+            if line.trim().is_empty() {
+                continue;
+            }
             let fields = parse_row(line);
-            rows.push(Value::List(
-                fields.into_iter().map(Value::String).collect()
-            ));
+            rows.push(Value::List(fields.into_iter().map(Value::String).collect()));
         }
         Ok(rows)
     }
 }
 
-fn csv_write_rows(
-    rows: &[Value],
-    delimiter: char,
-) -> Result<String, String> {
+fn csv_write_rows(rows: &[Value], delimiter: char) -> Result<String, String> {
     use std::fmt::Write as FmtWrite;
     if rows.is_empty() {
         return Ok(String::new());
@@ -184,19 +192,32 @@ fn csv_write_rows(
     let mut out = String::new();
     if let Value::Map(first_map) = &rows[0] {
         let headers: Vec<&str> = first_map.keys().map(|k| k.as_str()).collect();
-        let _ = writeln!(out, "{}", headers.iter().map(|h| csv_field(h, delimiter)).collect::<Vec<_>>().join(&delimiter.to_string()));
+        let _ = writeln!(
+            out,
+            "{}",
+            headers
+                .iter()
+                .map(|h| csv_field(h, delimiter))
+                .collect::<Vec<_>>()
+                .join(&delimiter.to_string())
+        );
         for row in rows {
             if let Value::Map(m) = row {
-                let fields: Vec<String> = headers.iter().map(|h| {
-                    m.get(*h).map(|v| v.display_string()).unwrap_or_default()
-                }).map(|s| csv_field(&s, delimiter)).collect();
+                let fields: Vec<String> = headers
+                    .iter()
+                    .map(|h| m.get(*h).map(|v| v.display_string()).unwrap_or_default())
+                    .map(|s| csv_field(&s, delimiter))
+                    .collect();
                 let _ = writeln!(out, "{}", fields.join(&delimiter.to_string()));
             }
         }
     } else {
         for row in rows {
             let fields = match row {
-                Value::List(l) => l.iter().map(|v| csv_field(&v.display_string(), delimiter)).collect::<Vec<_>>(),
+                Value::List(l) => l
+                    .iter()
+                    .map(|v| csv_field(&v.display_string(), delimiter))
+                    .collect::<Vec<_>>(),
                 other => vec![csv_field(&other.display_string(), delimiter)],
             };
             let _ = writeln!(out, "{}", fields.join(&delimiter.to_string()));

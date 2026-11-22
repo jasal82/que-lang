@@ -1,16 +1,25 @@
 //! std.http module — HTTP client operations.
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::Value;
 
 pub(super) fn module() -> StdModule {
     StdModule {
         name: "http",
         functions: &[
-            "get", "post", "put", "patch", "delete",
-            "request", "download", "upload", "url_encode", "url_decode", "query_string",
+            "get",
+            "post",
+            "put",
+            "patch",
+            "delete",
+            "request",
+            "download",
+            "upload",
+            "url_encode",
+            "url_decode",
+            "query_string",
         ],
     }
 }
@@ -20,7 +29,10 @@ impl Interpreter {
         // Requests that change something on the other end are announced, not
         // sent. `get`/`head`/`request` are left alone: `request` takes its
         // method as data, so suppressing it would mean guessing.
-        if matches!(func, "post" | "put" | "patch" | "delete" | "upload" | "download") {
+        if matches!(
+            func,
+            "post" | "put" | "patch" | "delete" | "upload" | "download"
+        ) {
             let target = args.first().map(|v| v.display_string()).unwrap_or_default();
             if self.dry_run_skip(format!("http.{} {}", func, target)) {
                 let mut map = std::collections::BTreeMap::new();

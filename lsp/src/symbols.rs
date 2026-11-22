@@ -1,6 +1,5 @@
 /// Document symbol provider — produces the outline tree shown in the
 /// breadcrumb bar and the Outline panel.
-
 use crate::analysis;
 use tower_lsp::lsp_types::*;
 
@@ -60,11 +59,7 @@ fn symbol_to_doc_symbol(sym: &analysis::SymbolInfo, source: &str) -> DocumentSym
 }
 
 /// Search source text for the definition of a named symbol.
-fn find_symbol_range(
-    source: &str,
-    name: &str,
-    kind: analysis::SymbolKind,
-) -> Option<Range> {
+fn find_symbol_range(source: &str, name: &str, kind: analysis::SymbolKind) -> Option<Range> {
     let prefix = match kind {
         analysis::SymbolKind::Function => "fn ",
         analysis::SymbolKind::Task => "task ",
@@ -77,9 +72,7 @@ fn find_symbol_range(
     for (line_idx, line) in source.lines().enumerate() {
         let trimmed = line.trim_start();
         // Handle pub prefix
-        let check = trimmed
-            .strip_prefix("pub ")
-            .unwrap_or(trimmed);
+        let check = trimmed.strip_prefix("pub ").unwrap_or(trimmed);
         if let Some(rest) = check.strip_prefix(prefix) {
             if rest.starts_with(name) {
                 let col = line.find(name).unwrap_or(0) as u32;

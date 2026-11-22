@@ -5,10 +5,10 @@
 //! What is left here is the part that touches the disk, and the part that
 //! knows JSON from YAML from TOML by looking at the file extension.
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::Interpreter;
 use super::StdModule;
+use crate::error::*;
+use crate::value::Value;
 
 pub(super) fn module() -> StdModule {
     StdModule {

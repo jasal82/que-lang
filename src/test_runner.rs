@@ -62,8 +62,7 @@ pub fn is_test_file(path: &Path) -> bool {
     if stem.ends_with("_test") || stem.starts_with(TEST_PREFIX) {
         return true;
     }
-    path.components()
-        .any(|c| c.as_os_str() == "tests")
+    path.components().any(|c| c.as_os_str() == "tests")
 }
 
 /// Directories never worth descending into.
@@ -192,10 +191,8 @@ pub fn run_file(path: &Path, filter: Option<&str>) -> FileReport {
                 return report;
             }
             Signal::Interrupted(sig) => {
-                report.load_error = Some(QueError::runtime(format!(
-                    "interrupted by signal {}",
-                    sig
-                )));
+                report.load_error =
+                    Some(QueError::runtime(format!("interrupted by signal {}", sig)));
                 return report;
             }
             _ => {}
@@ -290,9 +287,7 @@ fn test_defaulted(x = 1) { x }
 
     #[test]
     fn a_returned_err_counts_as_a_failure() {
-        let failure = describe_failure(Ok(Value::Err(Box::new(Value::String(
-            "boom".to_string(),
-        )))));
+        let failure = describe_failure(Ok(Value::Err(Box::new(Value::String("boom".to_string())))));
         assert_eq!(failure.as_deref(), Some("boom"));
         assert_eq!(describe_failure(Ok(Value::Int(1))), None);
     }

@@ -1,11 +1,11 @@
 //! std.yaml module — YAML parsing and serialization.
 
-use crate::error::*;
-use crate::value::Value;
 use super::super::helpers::arg_str;
 use super::super::Interpreter;
+use super::fs::{atomic_write_str, path_str};
 use super::StdModule;
-use super::fs::{path_str, atomic_write_str};
+use crate::error::*;
+use crate::value::Value;
 
 pub(super) fn module() -> StdModule {
     StdModule {
@@ -26,7 +26,10 @@ impl Interpreter {
             }
             "stringify" => {
                 let value = args.first().ok_or_else(|| {
-                    Signal::Error(QueError::new(ErrorKind::ArityMismatch, "yaml.stringify requires 1 argument"))
+                    Signal::Error(QueError::new(
+                        ErrorKind::ArityMismatch,
+                        "yaml.stringify requires 1 argument",
+                    ))
                 })?;
                 match crate::config::to_yaml(value) {
                     Ok(s) => Ok(Value::String(s)),
@@ -42,21 +45,17 @@ impl Interpreter {
                 }
                 let p = path_str(&args[0], "yaml.edit")?;
                 let func_val = args[1].clone();
-                let content = std::fs::read_to_string(&p).map_err(|e| {
-                    Signal::Error(QueError::new(ErrorKind::IoError, e.to_string()))
-                })?;
-                let doc = crate::config::parse_yaml(&content).map_err(|e| {
-                    Signal::Error(QueError::new(ErrorKind::Runtime, e))
-                })?;
+                let content = std::fs::read_to_string(&p)
+                    .map_err(|e| Signal::Error(QueError::new(ErrorKind::IoError, e.to_string())))?;
+                let doc = crate::config::parse_yaml(&content)
+                    .map_err(|e| Signal::Error(QueError::new(ErrorKind::Runtime, e)))?;
                 let result = self.call_value(func_val, vec![doc])?;
                 // Edit the original text so comments and layout survive; fall
                 // back to a full re-serialisation for the documents the
                 // in-place editor refuses (anchors, non-string keys, ...).
                 let serialized = crate::config::to_yaml_lossless(&result, &content)
                     .or_else(|_| crate::config::to_yaml_ordered(&result, &content))
-                    .map_err(|e| {
-                        Signal::Error(QueError::new(ErrorKind::Runtime, e))
-                    })?;
+                    .map_err(|e| Signal::Error(QueError::new(ErrorKind::Runtime, e)))?;
                 atomic_write_str(&p, &serialized)?;
                 Ok(Value::Null)
             }

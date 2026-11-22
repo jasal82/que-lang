@@ -2,7 +2,6 @@
 /// for the Que language.
 ///
 /// Parses a token stream into an AST (see `ast.rs`).
-
 use crate::ast::*;
 use crate::error::{ErrorKind, QueError};
 use crate::token::*;
@@ -67,7 +66,12 @@ pub struct Parser {
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         let bracket_pairs = Self::build_bracket_pairs(&tokens);
-        Self { tokens, pos: 0, pattern_mode: PatternMode::Bind, bracket_pairs }
+        Self {
+            tokens,
+            pos: 0,
+            pattern_mode: PatternMode::Bind,
+            bracket_pairs,
+        }
     }
 
     /// Pre-compute the matching-bracket index for every opener and closer
@@ -118,7 +122,11 @@ impl Parser {
             items.push((span, self.parse_item()?));
             self.skip_newlines();
         }
-        Ok(Module { items, shebang, strict })
+        Ok(Module {
+            items,
+            shebang,
+            strict,
+        })
     }
 
     /// Consume the `#!` lines at the top of the file: an optional interpreter
@@ -393,7 +401,11 @@ impl Parser {
                 self.skip_newlines();
                 let value = self.parse_expr()?;
                 self.skip_newlines();
-                Ok(Item::PubLet { pattern, type_ann, value })
+                Ok(Item::PubLet {
+                    pattern,
+                    type_ann,
+                    value,
+                })
             }
             TokenKind::Fn => {
                 self.advance();
@@ -484,11 +496,19 @@ impl Parser {
             } else {
                 None
             };
-            fields.push(StructField { name: field_name, type_ann, default });
+            fields.push(StructField {
+                name: field_name,
+                type_ann,
+                default,
+            });
             self.skip_separator();
         }
         self.expect(&TokenKind::RBrace)?;
-        Ok(StructDecl { name, fields, is_pub })
+        Ok(StructDecl {
+            name,
+            fields,
+            is_pub,
+        })
     }
 
     // ── Impl body (shared between impl Type and impl Trait for Type) ──
@@ -542,11 +562,20 @@ impl Parser {
             } else {
                 None
             };
-            methods.push(TraitMethod { name: method_name, params, return_type, default_body });
+            methods.push(TraitMethod {
+                name: method_name,
+                params,
+                return_type,
+                default_body,
+            });
             self.skip_newlines();
         }
         self.expect(&TokenKind::RBrace)?;
-        Ok(TraitDecl { name, methods, is_pub })
+        Ok(TraitDecl {
+            name,
+            methods,
+            is_pub,
+        })
     }
 
     // ── Function declaration ──
@@ -632,10 +661,7 @@ impl Parser {
                 if prev.rest {
                     return Err(QueError::parser(
                         crate::error::ErrorKind::UnexpectedToken,
-                        format!(
-                            "`...{}` must be the last parameter",
-                            prev.name
-                        ),
+                        format!("`...{}` must be the last parameter", prev.name),
                         rest_span,
                     ));
                 }
@@ -786,21 +812,19 @@ impl Parser {
             self.expect(&TokenKind::LParen)?;
             self.skip_newlines();
             match name.as_str() {
-                "description" => {
-                    match self.peek().clone() {
-                        TokenKind::StringLit(s) => {
-                            self.advance();
-                            attrs.description = Some(s);
-                        }
-                        other => {
-                            return Err(QueError::parser(
-                                crate::error::ErrorKind::UnexpectedToken,
-                                format!("@description takes a string, got {}", other.display_name()),
-                                self.current_span(),
-                            ))
-                        }
+                "description" => match self.peek().clone() {
+                    TokenKind::StringLit(s) => {
+                        self.advance();
+                        attrs.description = Some(s);
                     }
-                }
+                    other => {
+                        return Err(QueError::parser(
+                            crate::error::ErrorKind::UnexpectedToken,
+                            format!("@description takes a string, got {}", other.display_name()),
+                            self.current_span(),
+                        ))
+                    }
+                },
                 "inputs" => attrs.inputs = self.parse_attr_expr_list()?,
                 "outputs" => attrs.outputs = self.parse_attr_expr_list()?,
                 "deps" => attrs.depends_on = self.parse_attr_dep_list()?,
@@ -985,7 +1009,7 @@ impl Parser {
         let mut path = Vec::new();
         path.push(self.expect_ident()?);
 
-        // Parse remaining `.segment` or `.{items}` 
+        // Parse remaining `.segment` or `.{items}`
         while matches!(self.peek(), TokenKind::Dot) {
             self.advance();
             // Handle `import std.{fs, path}` multi-module shorthand
@@ -1045,7 +1069,13 @@ impl Parser {
             None
         };
 
-        Ok(ImportDecl { path, alias, items, is_local, is_pub })
+        Ok(ImportDecl {
+            path,
+            alias,
+            items,
+            is_local,
+            is_pub,
+        })
     }
 
     // ── Type expressions ──
@@ -1193,7 +1223,8 @@ impl Parser {
                     //   catch { ... }               — no type, no binding
                     //   catch e { ... }             — binding only (e is the error variable)
                     //   catch IOError as e { ... }  — error type + binding
-                    let (error_type, binding) = if let TokenKind::Ident(name) = self.peek().clone() {
+                    let (error_type, binding) = if let TokenKind::Ident(name) = self.peek().clone()
+                    {
                         self.advance();
                         if matches!(self.peek(), TokenKind::As) {
                             // `catch ErrorType as binding { ... }`
@@ -1316,7 +1347,6 @@ impl Parser {
             })),
         })
     }
-
 }
 
 // ── Unit Tests ──
@@ -1335,7 +1365,9 @@ mod tests {
 
     /// Return the first item in a module.
     fn first_item(module: &Module) -> &Item {
-        module.items.iter()
+        module
+            .items
+            .iter()
             .map(|(_, i)| i)
             .next()
             .expect("no items in module")
@@ -1373,10 +1405,7 @@ mod tests {
 
     #[test]
     fn test_string_literal() {
-        assert_eq!(
-            parse_expr(r#""hello""#),
-            Expr::StringLit("hello".into())
-        );
+        assert_eq!(parse_expr(r#""hello""#), Expr::StringLit("hello".into()));
     }
 
     #[test]
@@ -1772,7 +1801,6 @@ mod tests {
         assert!(matches!(stmt, Stmt::While { .. }));
     }
 
-
     // ── Match tests ──
 
     #[test]
@@ -1834,8 +1862,18 @@ mod tests {
         let expr = parse_expr("match value { Status.ok => 1, Status.err(code) => code } ");
         match expr {
             Expr::Match { arms, .. } => {
-                assert_eq!(arms[0].pattern, Pattern::Enum(Some("Status".into()), "ok".into(), vec![]));
-                assert_eq!(arms[1].pattern, Pattern::Enum(Some("Status".into()), "err".into(), vec![Pattern::Ident("code".into())]));
+                assert_eq!(
+                    arms[0].pattern,
+                    Pattern::Enum(Some("Status".into()), "ok".into(), vec![])
+                );
+                assert_eq!(
+                    arms[1].pattern,
+                    Pattern::Enum(
+                        Some("Status".into()),
+                        "err".into(),
+                        vec![Pattern::Ident("code".into())]
+                    )
+                );
             }
             _ => panic!("expected match"),
         }
@@ -1862,8 +1900,7 @@ mod tests {
 
     #[test]
     fn test_match_list_pattern() {
-        let expr =
-            parse_expr("match args { [] => 0, [x] => 1, [x, ...rest] => 2, _ => 3 }");
+        let expr = parse_expr("match args { [] => 0, [x] => 1, [x, ...rest] => 2, _ => 3 }");
         match expr {
             Expr::Match { arms, .. } => {
                 assert_eq!(arms.len(), 4);
@@ -1956,10 +1993,7 @@ mod tests {
         match first_item(&module) {
             Item::Import(imp) => {
                 assert_eq!(imp.path, vec!["std"]);
-                assert_eq!(
-                    imp.items,
-                    Some(vec!["fs".into(), "path".into()])
-                );
+                assert_eq!(imp.items, Some(vec!["fs".into(), "path".into()]));
             }
             _ => panic!("expected import"),
         }
